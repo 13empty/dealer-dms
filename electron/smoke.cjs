@@ -6,8 +6,9 @@ const { openDatabase } = require("./db/index.cjs");
 const { seedDemo } = require("./db/seed.cjs");
 const repo = require("./db/repo.cjs");
 const auth = require("./db/auth.cjs");
+const { backupShopData } = require("./backup.cjs");
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dms-smoke-"));
   openDatabase(dir);
   seedDemo();
@@ -509,6 +510,10 @@ app.whenReady().then(() => {
   if (!repo.listWorkOrders(openWo.id).some((o) => o.id === openWo.id)) throw new Error("No busca OT por GUID");
 
   const kpis = repo.dashboardKpis();
+  const snap = await backupShopData({ userDataDir: dir, reason: "smoke", version: "test" });
+  if (!fs.existsSync(snap.file) || fs.statSync(snap.file).size < 1000) {
+    throw new Error("El respaldo SQLite no se escribió");
+  }
   process.stdout.write(
     JSON.stringify(
       {

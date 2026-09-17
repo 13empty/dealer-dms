@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AppearancePanel } from "../components/Appearance";
+import { UpdatePanel } from "../components/UpdatePanel";
 import { SearchPicker } from "../components/SearchPicker";
 import { CatalogEditor } from "../components/CatalogEditor";
 import { Button, Card, ErrorText, Field, PageHeader } from "../components/ui";
@@ -141,6 +142,9 @@ export default function Settings() {
       <PageHeader title={t("settings.title")} subtitle={t("settings.subtitle")} />
       <ErrorText error={error} />
       {saved ? <p className="mb-4 text-sm text-emerald-300">{t("settings.saved")}</p> : null}
+      <Card className="mb-6 max-w-3xl p-5">
+        <UpdatePanel />
+      </Card>
       <Card className="mb-6 max-w-3xl p-5">
         <AppearancePanel />
       </Card>

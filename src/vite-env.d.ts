@@ -583,6 +583,26 @@ export type FinanceSummary = {
   report?: FinanceReport;
 };
 
+export type UpdateStatus = {
+  current: string;
+  packaged: boolean;
+  available: boolean;
+  version: string | null;
+  releaseDate?: string | null;
+  downloaded: boolean;
+  backupDir: string | null;
+  busy: boolean;
+  note?: string;
+};
+
+export type UpdateEvent = {
+  type: string;
+  version?: string;
+  percent?: number;
+  dir?: string;
+  message?: string;
+};
+
 interface DmsApi {
   auth: {
     status: () => Result<AuthStatus>;
@@ -757,6 +777,15 @@ interface DmsApi {
   meta: {
     dbPath: () => Result<string>;
     isPackaged: () => Result<boolean>;
+    version: () => Result<string>;
+  };
+  updates: {
+    status: () => Result<UpdateStatus>;
+    check: () => Result<UpdateStatus>;
+    download: () => Result<UpdateStatus>;
+    install: () => Result<{ ok: true; backupDir?: string | null }>;
+    backup: () => Result<{ dir: string; file: string }>;
+    onEvent: (cb: (event: UpdateEvent) => void) => () => void;
   };
   sql: {
     tables: () => Result<SqlTable[]>;

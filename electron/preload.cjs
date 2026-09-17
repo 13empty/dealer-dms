@@ -117,6 +117,19 @@ contextBridge.exposeInMainWorld("dms", {
   meta: {
     dbPath: () => invoke("meta:dbPath"),
     isPackaged: () => invoke("meta:isPackaged"),
+    version: () => invoke("meta:version"),
+  },
+  updates: {
+    status: () => invoke("updates:status"),
+    check: () => invoke("updates:check"),
+    download: () => invoke("updates:download"),
+    install: () => invoke("updates:install"),
+    backup: () => invoke("updates:backup"),
+    onEvent: (cb) => {
+      const listener = (_event, data) => cb(data);
+      ipcRenderer.on("updates:event", listener);
+      return () => ipcRenderer.removeListener("updates:event", listener);
+    },
   },
   sql: {
     tables: () => invoke("sql:tables"),

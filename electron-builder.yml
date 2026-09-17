@@ -27,6 +27,8 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: Dealer DMS
   uninstallDisplayName: Dealer DMS
+  deleteAppDataOnUninstall: false
+  perMachine: false
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
   installerHeaderIcon: build/icon.ico
@@ -38,3 +40,8 @@ electronLanguages:
   - es-ES
   - es-MX
 afterPack: electron/afterPack.cjs
+publish:
+  provider: github
+  owner: 13empty
+  repo: dealer-dms
+  releaseType: release

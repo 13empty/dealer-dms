@@ -21,7 +21,11 @@ Los datos quedan en:
 %APPDATA%\DealerDMS\dealer.db
 ```
 
-Copia de seguridad: cierra la app y copia `dealer.db`, `dealer.db-wal` y `dealer.db-shm`.
+Copia de seguridad: cierra la app y copia `dealer.db`, `dealer.db-wal` y `dealer.db-shm`. La app también guarda copias automáticas en `%APPDATA%\DealerDMS\backups\` antes de cada actualización (y con **Respaldar ahora** en Ajustes).
+
+## Actualizaciones
+
+En la app instalada, **Ajustes → Actualizaciones**. Antes de instalar se respalda la base; el instalador solo reemplaza el programa, no la carpeta de datos. La primera vez hay que instalar esta versión (1.0.1) a mano; las siguientes se pueden aplicar desde la app.
 
 ## Qué incluye
 

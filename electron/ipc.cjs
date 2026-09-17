@@ -6,6 +6,7 @@ const auth = require("./db/auth.cjs");
 const { seedDemo } = require("./db/seed.cjs");
 const { getDbPath } = require("./db/index.cjs");
 const { decodeVin } = require("./vin.cjs");
+const updater = require("./updater.cjs");
 
 let sessionUserId = null;
 let sessionFile = null;
@@ -211,6 +212,12 @@ function registerIpc(app) {
   handle("demo:isEmpty", wrap(() => repo.isEmpty()));
   handle("meta:dbPath", wrap(() => getDbPath(), { minRank: 50 }));
   handle("meta:isPackaged", wrap(() => app.isPackaged, { public: true }));
+  handle("meta:version", wrap(() => app.getVersion(), { public: true }));
+  handle("updates:status", wrap(() => updater.status(), { minRank: 50 }));
+  handle("updates:check", wrap(() => updater.check(), { minRank: 50 }));
+  handle("updates:download", wrap(() => updater.download(), { minRank: 50 }));
+  handle("updates:install", wrap(() => updater.install(), { minRank: 50 }));
+  handle("updates:backup", wrap(() => updater.backupOnly("manual"), { minRank: 50 }));
   handle("sql:tables", wrap(() => repo.listSqlTables(), { minRank: 80 }));
   handle("sql:query", wrap((_u, payload) => repo.sqlQuery(payload?.sql, payload), { minRank: 80 }));
 }

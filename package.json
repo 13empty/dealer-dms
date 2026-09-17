@@ -1,7 +1,7 @@
 {
   "name": "dealer-dms",
   "productName": "Dealer DMS",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Sistema local para talleres: órdenes de servicio, clientes, partes y caja",
   "author": "Dealer DMS",
   "private": true,
@@ -11,12 +11,13 @@
     "build": "vite build",
     "rebuild": "node node_modules/electron/install.js && electron-builder install-app-deps",
     "smoke": "electron electron/smoke.cjs",
-    "dist": "vite build && electron-builder --win nsis --config.win.signAndEditExecutable=false",
+    "dist": "vite build && electron-builder --win nsis --publish never --config.win.signAndEditExecutable=false",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",
-    "drizzle-orm": "^0.39.3"
+    "drizzle-orm": "^0.39.3",
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "@types/react": "^19.0.10",
