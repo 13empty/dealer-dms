@@ -1,0 +1,13 @@
+node_modules/
+dist/
+release/
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+Thumbs.db
+.env
+*.log
+build/rcedit-x64.exe
+build/exe-icon-check.png
+tmp-shot/

@@ -1,0 +1,40 @@
+appId: com.dealerdms.app
+productName: Dealer DMS
+forceCodeSigning: false
+directories:
+  output: release
+files:
+  - dist/**/*
+  - electron/**/*
+  - package.json
+asar: true
+asarUnpack:
+  - node_modules/better-sqlite3/**
+  - node_modules/bindings/**
+  - node_modules/file-uri-to-path/**
+win:
+  icon: build/icon.ico
+  signAndEditExecutable: false
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: DealerDMS-Setup.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Dealer DMS
+  uninstallDisplayName: Dealer DMS
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+  installerLanguages:
+    - es_ES
+  language: "3082"
+electronLanguages:
+  - es
+  - es-ES
+  - es-MX
+afterPack: electron/afterPack.cjs

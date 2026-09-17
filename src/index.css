@@ -1,0 +1,227 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+html[data-theme="oro"] {
+  --ink-950: 12 16 23;
+  --ink-900: 18 24 33;
+  --ink-800: 23 30 41;
+  --ink-700: 29 38 51;
+  --ink-600: 36 48 68;
+  --gold-400: 232 184 109;
+  --gold-500: 212 160 84;
+  --fg: 232 238 246;
+  --fg-muted: 203 213 225;
+  --fg-dim: 148 163 184;
+  --fg-faint: 100 116 139;
+  --on-accent: 12 16 23;
+}
+
+html[data-theme="bahia"] {
+  --ink-950: 14 12 10;
+  --ink-900: 22 18 15;
+  --ink-800: 32 26 20;
+  --ink-700: 42 34 26;
+  --ink-600: 64 50 36;
+  --gold-400: 245 158 66;
+  --gold-500: 234 88 12;
+  --fg: 255 247 237;
+  --fg-muted: 254 215 170;
+  --fg-dim: 217 179 140;
+  --fg-faint: 168 132 98;
+  --on-accent: 20 12 4;
+}
+
+html[data-theme="acero"] {
+  --ink-950: 8 14 20;
+  --ink-900: 12 22 32;
+  --ink-800: 16 30 44;
+  --ink-700: 22 40 56;
+  --ink-600: 32 54 74;
+  --gold-400: 56 189 248;
+  --gold-500: 14 165 233;
+  --fg: 226 239 248;
+  --fg-muted: 186 210 227;
+  --fg-dim: 125 160 184;
+  --fg-faint: 84 116 138;
+  --on-accent: 8 14 20;
+}
+
+html[data-theme="bosque"] {
+  --ink-950: 10 18 14;
+  --ink-900: 14 26 20;
+  --ink-800: 18 34 26;
+  --ink-700: 24 44 34;
+  --ink-600: 36 64 48;
+  --gold-400: 163 230 53;
+  --gold-500: 132 204 22;
+  --fg: 236 253 220;
+  --fg-muted: 190 219 160;
+  --fg-dim: 134 166 110;
+  --fg-faint: 90 122 78;
+  --on-accent: 10 18 14;
+}
+
+html[data-theme="noche"] {
+  --ink-950: 0 0 0;
+  --ink-900: 10 10 10;
+  --ink-800: 18 18 18;
+  --ink-700: 32 32 32;
+  --ink-600: 58 58 58;
+  --gold-400: 251 191 36;
+  --gold-500: 245 158 11;
+  --fg: 255 255 255;
+  --fg-muted: 226 232 240;
+  --fg-dim: 203 213 225;
+  --fg-faint: 148 163 184;
+  --on-accent: 0 0 0;
+}
+
+html[data-theme="dia"] {
+  --ink-950: 245 241 232;
+  --ink-900: 236 230 216;
+  --ink-800: 255 252 246;
+  --ink-700: 226 218 200;
+  --ink-600: 196 184 160;
+  --gold-400: 180 120 32;
+  --gold-500: 146 94 20;
+  --fg: 28 25 21;
+  --fg-muted: 55 48 40;
+  --fg-dim: 90 80 68;
+  --fg-faint: 120 108 92;
+  --on-accent: 255 252 246;
+}
+
+html[data-theme="dia"] .text-white,
+html[data-theme="dia"] .hover\:text-white:hover {
+  color: rgb(var(--fg)) !important;
+}
+
+html[data-type="lg"] {
+  font-size: 17px;
+}
+
+html[data-density="compacto"] .page {
+  @apply px-4 py-3 lg:px-5;
+}
+
+html[data-density="compacto"] .toolbar {
+  @apply p-2;
+}
+
+html[data-density="compacto"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-density="compacto"] select,
+html[data-density="compacto"] textarea {
+  @apply px-2.5 py-1.5 text-sm;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 420px at -10% -20%, rgb(var(--gold-400) / 0.08), transparent 55%),
+    rgb(var(--ink-950));
+  color: rgb(var(--fg));
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgb(var(--gold-400) / 0.28);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--ink-600));
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.page {
+  @apply px-6 py-5 lg:px-8;
+}
+
+.toolbar {
+  @apply rounded-xl border border-ink-600 bg-ink-900/80 p-3 shadow-sm shadow-black/20;
+}
+
+.btn-ghost {
+  @apply inline-flex items-center rounded-md border border-ink-600 bg-ink-800 px-3 py-2 text-sm font-medium text-slate-100 hover:bg-ink-700;
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  @apply w-full rounded-lg border border-ink-600 bg-ink-950 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20;
+}
+
+input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: rgb(var(--gold-400));
+  flex-shrink: 0;
+}
+
+input[type="date"],
+input[type="time"] {
+  color-scheme: light;
+}
+
+.search-field {
+  padding-left: 2rem !important;
+}
+
+label {
+  @apply mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+thead th {
+  @apply sticky top-0 z-10 bg-ink-900 text-[11px] font-medium uppercase tracking-wide text-slate-400;
+}
+
+tbody tr {
+  transition: background 0.12s ease;
+}
+
+tbody tr:hover td {
+  background: rgb(var(--ink-700) / 0.55);
+}
+
+@media print {
+  aside,
+  .no-print {
+    display: none !important;
+  }
+
+  html,
+  body,
+  #root,
+  main {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #111 !important;
+  }
+}
