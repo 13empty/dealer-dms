@@ -420,6 +420,7 @@ function migrate(sqlite) {
   addColumnIfMissing(sqlite, "users", "zip", "zip TEXT NOT NULL DEFAULT ''");
   addColumnIfMissing(sqlite, "users", "notes", "notes TEXT NOT NULL DEFAULT ''");
   addColumnIfMissing(sqlite, "shop_settings", "gst_number", "gst_number TEXT NOT NULL DEFAULT ''");
+  addColumnIfMissing(sqlite, "shop_settings", "allow_updates", "allow_updates INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing(sqlite, "sales", "tax_rate", "tax_rate REAL NOT NULL DEFAULT 0");
   addColumnIfMissing(sqlite, "sales", "tax", "tax REAL NOT NULL DEFAULT 0");
   ensureShopSettingsRow(sqlite);

@@ -105,6 +105,7 @@ export type AppUser = {
     destructive: boolean;
     demo: boolean;
     options: boolean;
+    updates: boolean;
     assignableRoles: UserRole[];
   };
 };
@@ -395,6 +396,7 @@ export type ShopSettings = {
   laborRate?: number;
   invoiceNotes?: string;
   serviceMode?: "sencillo" | "completo";
+  allowUpdates?: boolean;
   opcodeCategories?: string[];
   partCategories?: string[];
   partUoms?: string[];
@@ -592,6 +594,7 @@ export type UpdateStatus = {
   downloaded: boolean;
   backupDir: string | null;
   busy: boolean;
+  allowUpdates: boolean;
   note?: string;
 };
 
@@ -785,6 +788,7 @@ interface DmsApi {
     download: () => Result<UpdateStatus>;
     install: () => Result<{ ok: true; backupDir?: string | null }>;
     backup: () => Result<{ dir: string; file: string }>;
+    setAllow: (allow: boolean) => Result<UpdateStatus>;
     onEvent: (cb: (event: UpdateEvent) => void) => () => void;
   };
   sql: {

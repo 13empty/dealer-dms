@@ -125,6 +125,7 @@ contextBridge.exposeInMainWorld("dms", {
     download: () => invoke("updates:download"),
     install: () => invoke("updates:install"),
     backup: () => invoke("updates:backup"),
+    setAllow: (allow) => invoke("updates:setAllow", allow),
     onEvent: (cb) => {
       const listener = (_event, data) => cb(data);
       ipcRenderer.on("updates:event", listener);

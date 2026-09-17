@@ -1,4 +1,4 @@
-export const THEMES = ["oro", "bahia", "acero", "bosque", "noche", "dia"] as const;
+export const THEMES = ["oro", "bahia", "acero", "bosque", "noche", "cobre", "vino", "pizarra", "marina", "dia", "niebla"] as const;
 export type ThemeId = (typeof THEMES)[number];
 export type DensityId = "comodo" | "compacto";
 export type TypeSizeId = "md" | "lg";

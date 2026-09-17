@@ -290,7 +290,8 @@ CREATE TABLE shop_settings (
   service_mode TEXT NOT NULL DEFAULT 'completo',
   opcode_categories TEXT NOT NULL DEFAULT '',
   part_categories TEXT NOT NULL DEFAULT '',
-  part_uoms TEXT NOT NULL DEFAULT ''
+  part_uoms TEXT NOT NULL DEFAULT '',
+  allow_updates INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE expenses (
   id TEXT PRIMARY KEY,

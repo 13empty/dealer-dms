@@ -138,6 +138,7 @@ function permissionsFor(role) {
     destructive: r >= 50,
     demo: r >= 80,
     options: r >= 80,
+    updates: r >= 80,
     assignableRoles: assignableRoles(role),
   };
 }

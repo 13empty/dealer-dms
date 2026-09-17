@@ -12,6 +12,7 @@ type UpdateState = {
   downloaded: boolean;
   backupDir: string | null;
   busy: boolean;
+  allowUpdates: boolean;
   note?: string;
 };
 
@@ -26,7 +27,7 @@ export function UpdatePanel() {
   async function refresh() {
     const next = await call(window.dms.updates.status());
     setState(next);
-    if (next.downloaded) setPhase("ready");
+    if (next.downloaded && next.allowUpdates) setPhase("ready");
   }
 
   useEffect(() => {
@@ -49,6 +50,9 @@ export function UpdatePanel() {
       }
       if (event.type === "current") {
         setState((prev) => (prev ? { ...prev, available: false } : prev));
+      }
+      if (event.type === "disabled" || event.type === "policy") {
+        void refresh();
       }
       if (event.type === "error") setError(String(event.message || t("updates.failed")));
     });
@@ -89,19 +93,48 @@ export function UpdatePanel() {
     if (next?.dir) setSaved(next.dir);
   }
 
+  async function toggleAllow(on: boolean) {
+    const next = await run(() => window.dms.updates.setAllow(on));
+    if (next) {
+      setState(next);
+      if (!next.allowUpdates) {
+        setPhase("idle");
+        setPercent(0);
+      }
+    }
+  }
+
   const current = state?.current || "…";
   const packaged = Boolean(state?.packaged);
+  const allowed = Boolean(state?.allowUpdates);
   const available = Boolean(state?.available);
   const downloaded = Boolean(state?.downloaded);
 
   return (
     <div>
-      <h2 className="text-lg font-medium">{t("updates.title")}</h2>
-      <p className="mt-1 text-sm text-slate-400">{t("updates.hint")}</p>
-      <p className="mt-3 text-sm">
-        {t("updates.current", { version: current })}
-        {state?.version && available ? ` · ${t("updates.found", { version: state.version })}` : null}
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lg font-medium">{t("updates.title")}</h2>
+          <p className="mt-1 text-sm text-slate-400">{t("updates.hint")}</p>
+        </div>
+        <p className="shrink-0 text-sm text-slate-300">
+          {t("updates.current", { version: current })}
+          {allowed && state?.version && available ? ` · ${t("updates.found", { version: state.version })}` : null}
+        </p>
+      </div>
+      <label className="mt-3 flex items-start gap-3 rounded-lg border border-ink-600 bg-ink-900/60 px-3 py-2.5 text-sm normal-case tracking-normal text-slate-100">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={allowed}
+          onChange={(e) => void toggleAllow(e.target.checked)}
+        />
+        <span>
+          <span className="block font-medium">{t("updates.allow")}</span>
+          <span className="mt-0.5 block text-xs font-normal text-slate-400">{t("updates.allowHint")}</span>
+        </span>
+      </label>
+      {!allowed ? <p className="mt-2 text-sm text-slate-400">{t("updates.off")}</p> : null}
       {!packaged ? <p className="mt-2 text-sm text-amber-300">{t("updates.devOnly")}</p> : null}
       {phase === "backing" ? <p className="mt-2 text-sm text-slate-300">{t("updates.backing")}</p> : null}
       {phase === "downloading" ? (
@@ -111,14 +144,14 @@ export function UpdatePanel() {
         <p className="mt-2 break-all font-mono text-xs text-slate-500">{saved || state?.backupDir}</p>
       ) : null}
       {error ? <p className="mt-2 text-sm text-red-300">{error}</p> : null}
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button variant="ghost" disabled={phase === "checking"} onClick={() => void check()}>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button variant="ghost" disabled={!allowed || phase === "checking"} onClick={() => void check()}>
           {phase === "checking" ? t("updates.checking") : t("updates.check")}
         </Button>
         <Button variant="ghost" onClick={() => void backupNow()}>
           {t("updates.backupNow")}
         </Button>
-        {packaged && (available || downloaded) ? (
+        {packaged && allowed && (available || downloaded) ? (
           <Button disabled={phase === "backing" || phase === "downloading"} onClick={() => void apply()}>
             {downloaded ? t("updates.restart") : t("updates.install")}
           </Button>
@@ -138,6 +171,8 @@ export function UpdateBanner() {
       try {
         const packaged = await call(window.dms.meta.isPackaged());
         if (!packaged) return;
+        const status = await call(window.dms.updates.status());
+        if (!status.allowUpdates) return;
         const next = await call(window.dms.updates.check());
         if (alive && next.available && next.version) setVersion(next.version);
       } catch {

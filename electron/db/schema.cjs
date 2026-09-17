@@ -265,6 +265,7 @@ const shopSettings = sqliteTable("shop_settings", {
   opcodeCategories: text("opcode_categories").notNull().default(""),
   partCategories: text("part_categories").notNull().default(""),
   partUoms: text("part_uoms").notNull().default(""),
+  allowUpdates: integer("allow_updates").notNull().default(0),
 });
 
 const expenses = sqliteTable("expenses", {

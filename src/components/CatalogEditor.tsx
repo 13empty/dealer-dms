@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { CatalogItem } from "../vite-env";
 import { useI18n } from "../lib/i18n";
-import { Button, Card } from "./ui";
+import { Button } from "./ui";
 
 export function CatalogEditor({
   title,
@@ -52,7 +52,7 @@ export function CatalogEditor({
   }
 
   return (
-    <Card className="p-4">
+    <div className="rounded-lg border border-ink-600 bg-ink-900/50 p-3">
       <h3 className="font-medium">{title}</h3>
       {hint ? <p className="mt-1 text-xs text-slate-400">{hint}</p> : null}
       <ul className="mt-3 space-y-1.5">
@@ -93,6 +93,6 @@ export function CatalogEditor({
           </Button>
         </div>
       ) : null}
-    </Card>
+    </div>
   );
 }

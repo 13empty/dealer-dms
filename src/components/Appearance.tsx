@@ -9,7 +9,12 @@ const SWATCH: Record<ThemeId, { bg: string; accent: string }> = {
   acero: { bg: "#080e14", accent: "#38bdf8" },
   bosque: { bg: "#0a120e", accent: "#a3e635" },
   noche: { bg: "#000000", accent: "#fbbf24" },
+  cobre: { bg: "#140c08", accent: "#e07a3d" },
+  vino: { bg: "#14080e", accent: "#e11d48" },
+  pizarra: { bg: "#101018", accent: "#a78bfa" },
+  marina: { bg: "#061016", accent: "#2dd4bf" },
   dia: { bg: "#f5f1e8", accent: "#b47820" },
+  niebla: { bg: "#e8ecf2", accent: "#2563eb" },
 };
 
 export function AppearancePanel({ compact = false }: { compact?: boolean }) {
@@ -21,7 +26,7 @@ export function AppearancePanel({ compact = false }: { compact?: boolean }) {
       <div>
         {!compact ? <h2 className="text-lg font-medium">{t("appearance.title")}</h2> : null}
         <p className={compact ? "text-xs text-slate-400" : "mt-1 text-sm text-slate-400"}>{t("appearance.hint")}</p>
-        <div className={`grid gap-2 ${compact ? "mt-2 grid-cols-3" : "mt-3 sm:grid-cols-3"}`}>
+        <div className={`grid gap-2 ${compact ? "mt-2 grid-cols-3" : "mt-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"}`}>
           {THEMES.map((id) => {
             const active = prefs.theme === id;
             const swatch = SWATCH[id];
@@ -30,12 +35,15 @@ export function AppearancePanel({ compact = false }: { compact?: boolean }) {
                 key={id}
                 type="button"
                 onClick={() => setPref("theme", id)}
-                className={`flex items-center gap-2 rounded-lg border p-3 text-left transition ${
-                  active ? "border-gold-400 bg-gold-400/10" : "border-ink-600 bg-ink-900/60 hover:border-gold-400/40"
-                }`}
+                className={`flex items-center gap-2 rounded-lg border text-left transition ${
+                  compact ? "p-2" : "px-2.5 py-2"
+                } ${active ? "border-gold-400 bg-gold-400/10" : "border-ink-600 bg-ink-900/60 hover:border-gold-400/40"}`}
               >
-                <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md border border-ink-600" style={{ background: swatch.bg }}>
-                  <span className="absolute inset-x-0 bottom-0 h-2" style={{ background: swatch.accent }} />
+                <span
+                  className={`relative shrink-0 overflow-hidden rounded-md border border-ink-600 ${compact ? "h-6 w-6" : "h-7 w-7"}`}
+                  style={{ background: swatch.bg }}
+                >
+                  <span className="absolute inset-x-0 bottom-0 h-1.5" style={{ background: swatch.accent }} />
                 </span>
                 <span className="text-sm">{t(k(`appearance.theme.${id}`))}</span>
               </button>

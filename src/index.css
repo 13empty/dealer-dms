@@ -78,6 +78,66 @@ html[data-theme="noche"] {
   --on-accent: 0 0 0;
 }
 
+html[data-theme="cobre"] {
+  --ink-950: 16 10 6;
+  --ink-900: 28 16 10;
+  --ink-800: 40 24 14;
+  --ink-700: 56 34 20;
+  --ink-600: 82 50 28;
+  --gold-400: 224 122 61;
+  --gold-500: 194 90 36;
+  --fg: 255 241 230;
+  --fg-muted: 245 210 180;
+  --fg-dim: 196 150 118;
+  --fg-faint: 148 108 82;
+  --on-accent: 20 10 4;
+}
+
+html[data-theme="vino"] {
+  --ink-950: 16 6 10;
+  --ink-900: 28 10 16;
+  --ink-800: 40 14 22;
+  --ink-700: 56 20 32;
+  --ink-600: 82 32 48;
+  --gold-400: 244 63 94;
+  --gold-500: 190 18 60;
+  --fg: 255 241 244;
+  --fg-muted: 254 205 211;
+  --fg-dim: 190 140 150;
+  --fg-faint: 140 96 108;
+  --on-accent: 255 241 244;
+}
+
+html[data-theme="pizarra"] {
+  --ink-950: 12 12 18;
+  --ink-900: 18 18 28;
+  --ink-800: 24 24 38;
+  --ink-700: 34 34 52;
+  --ink-600: 52 52 74;
+  --gold-400: 167 139 250;
+  --gold-500: 139 92 246;
+  --fg: 244 240 255;
+  --fg-muted: 216 204 245;
+  --fg-dim: 160 148 196;
+  --fg-faint: 112 102 148;
+  --on-accent: 16 12 28;
+}
+
+html[data-theme="marina"] {
+  --ink-950: 4 12 18;
+  --ink-900: 8 22 32;
+  --ink-800: 10 32 44;
+  --ink-700: 14 44 58;
+  --ink-600: 22 64 82;
+  --gold-400: 45 212 191;
+  --gold-500: 13 148 136;
+  --fg: 220 252 248;
+  --fg-muted: 153 246 228;
+  --fg-dim: 94 180 168;
+  --fg-faint: 64 128 120;
+  --on-accent: 4 16 18;
+}
+
 html[data-theme="dia"] {
   --ink-950: 245 241 232;
   --ink-900: 236 230 216;
@@ -93,8 +153,25 @@ html[data-theme="dia"] {
   --on-accent: 255 252 246;
 }
 
+html[data-theme="niebla"] {
+  --ink-950: 232 236 242;
+  --ink-900: 220 226 234;
+  --ink-800: 248 250 252;
+  --ink-700: 203 213 225;
+  --ink-600: 148 163 184;
+  --gold-400: 37 99 235;
+  --gold-500: 29 78 216;
+  --fg: 15 23 42;
+  --fg-muted: 51 65 85;
+  --fg-dim: 71 85 105;
+  --fg-faint: 100 116 139;
+  --on-accent: 248 250 252;
+}
+
 html[data-theme="dia"] .text-white,
-html[data-theme="dia"] .hover\:text-white:hover {
+html[data-theme="dia"] .hover\:text-white:hover,
+html[data-theme="niebla"] .text-white,
+html[data-theme="niebla"] .hover\:text-white:hover {
   color: rgb(var(--fg)) !important;
 }
 

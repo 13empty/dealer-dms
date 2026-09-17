@@ -21,6 +21,7 @@ const emptyPerms: AppUser["permissions"] = {
   destructive: false,
   demo: false,
   options: false,
+  updates: false,
   assignableRoles: [],
 };
 

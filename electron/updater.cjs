@@ -1,6 +1,7 @@
 const { app, BrowserWindow } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const { backupShopData } = require("./backup.cjs");
+const repo = require("./db/repo.cjs");
 
 let userDataDir = "";
 let lastInfo = null;
@@ -29,7 +30,16 @@ function explain(error) {
   if (/sha512|blockmap|checksum/i.test(msg)) {
     return "El paquete bajó incompleto. Reintenta; los datos del taller no se tocaron.";
   }
+  if (/desactivad/i.test(msg)) return msg;
   return msg || "No se pudo actualizar";
+}
+
+function updatesAllowed() {
+  try {
+    return repo.updatesAllowed();
+  } catch {
+    return false;
+  }
 }
 
 function snapshot() {
@@ -42,6 +52,7 @@ function snapshot() {
     downloaded,
     backupDir: lastBackup?.dir || null,
     busy,
+    allowUpdates: updatesAllowed(),
   };
 }
 
@@ -74,7 +85,23 @@ async function status() {
   return snapshot();
 }
 
+async function setAllow(on) {
+  repo.setUpdatesAllowed(Boolean(on));
+  if (!updatesAllowed()) {
+    lastInfo = null;
+    downloaded = false;
+  }
+  send({ type: "policy", allowUpdates: updatesAllowed() });
+  return snapshot();
+}
+
 async function check() {
+  if (!updatesAllowed()) {
+    lastInfo = null;
+    downloaded = false;
+    send({ type: "disabled" });
+    return { ...snapshot(), available: false, note: "disabled" };
+  }
   if (!app.isPackaged) {
     return { ...snapshot(), available: false, note: "dev" };
   }
@@ -101,6 +128,7 @@ async function backupOnly(reason = "manual") {
 }
 
 async function download() {
+  if (!updatesAllowed()) throw new Error("Las actualizaciones están desactivadas en esta PC.");
   if (!app.isPackaged) throw new Error("Las actualizaciones solo corren en la app instalada.");
   if (busy) throw new Error("Ya hay una actualización en curso.");
   busy = true;
@@ -122,6 +150,7 @@ async function download() {
 }
 
 async function install() {
+  if (!updatesAllowed()) throw new Error("Las actualizaciones están desactivadas en esta PC.");
   if (!app.isPackaged) throw new Error("Las actualizaciones solo corren en la app instalada.");
   if (!downloaded) throw new Error("Todavía no se bajó la actualización.");
   if (!lastBackup) {
@@ -137,4 +166,4 @@ async function install() {
   return { ok: true, backupDir: lastBackup.dir };
 }
 
-module.exports = { initUpdater, status, check, download, install, backupOnly };
+module.exports = { initUpdater, status, check, download, install, backupOnly, setAllow };

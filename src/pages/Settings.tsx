@@ -139,206 +139,227 @@ export default function Settings() {
 
   return (
     <div className="page">
-      <PageHeader title={t("settings.title")} subtitle={t("settings.subtitle")} />
+      <PageHeader
+        title={t("settings.title")}
+        subtitle={t("settings.subtitle")}
+        actions={<Button onClick={() => void save()}>{t("common.save")}</Button>}
+      />
       <ErrorText error={error} />
       {saved ? <p className="mb-4 text-sm text-emerald-300">{t("settings.saved")}</p> : null}
-      <Card className="mb-6 max-w-3xl p-5">
-        <UpdatePanel />
-      </Card>
-      <Card className="mb-6 max-w-3xl p-5">
-        <AppearancePanel />
-      </Card>
-      {dbPath ? (
-        <Card className="mb-6 max-w-3xl p-5">
-          <h2 className="text-lg font-medium">{t("settings.backupTitle")}</h2>
-          <p className="mt-1 text-sm text-slate-400">{t("settings.backupHint")}</p>
-          <p className="mt-2 break-all font-mono text-xs text-slate-500">{dbPath}</p>
-          <Button variant="ghost" className="mt-3" onClick={() => void navigator.clipboard.writeText(dbPath)}>
-            {t("settings.copyPath")}
-          </Button>
-        </Card>
-      ) : null}
-      <Card className="mb-6 max-w-2xl p-5">
-        <h2 className="text-lg font-medium">{t("settings.serviceMode")}</h2>
-        <p className="mt-1 text-sm text-slate-400">{t("settings.serviceModeHint")}</p>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          {(["sencillo", "completo"] as const).map((mode) => {
-            const active = (form.serviceMode || "completo") === mode;
-            return (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => void saveServiceMode(mode)}
-                className={`rounded-lg border p-4 text-left transition ${
-                  active ? "border-gold-400 bg-gold-400/10" : "border-ink-600 bg-ink-900/60 hover:border-gold-400/40"
-                }`}
-              >
-                <div className="font-medium text-slate-100">
-                  {t(mode === "sencillo" ? "settings.serviceSimple" : "settings.serviceFull")}
-                </div>
-                <p className="mt-1 text-xs text-slate-400">
-                  {t(mode === "sencillo" ? "settings.serviceSimpleHint" : "settings.serviceFullHint")}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-      </Card>
-      <Card className="max-w-2xl p-5">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <Field label={t("settings.name")}>
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <div className="grid gap-4">
+        <Card className="p-5">
+          <h2 className="text-lg font-medium">{t("settings.shopTitle")}</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="sm:col-span-2 lg:col-span-3">
+              <Field label={t("settings.name")}>
+                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </Field>
+            </div>
+            <Field label={t("settings.phone")}>
+              <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </Field>
-          </div>
-          <Field label={t("settings.phone")}>
-            <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          </Field>
-          <Field label={t("settings.email")}>
-            <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          </Field>
-          <div className="sm:col-span-2">
-            <Field label={t("settings.address")}>
-              <textarea rows={2} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            <Field label={t("settings.email")}>
+              <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </Field>
-          </div>
-          <Field label={t("settings.taxLabel")}>
-            <input value={form.taxLabel} onChange={(e) => setForm({ ...form, taxLabel: e.target.value })} />
-          </Field>
-          <Field label={t("settings.taxRate")} hint={t("settings.taxHintAb")}>
-            <input value={rateText.tax} onChange={(e) => setRateText({ ...rateText, tax: e.target.value })} />
-          </Field>
-          <div className="sm:col-span-2">
-            <Field label={t("settings.gstNumber")} hint={t("settings.gstHint")}>
+            <Field label={t("settings.laborRate")}>
+              <input value={rateText.labor} onChange={(e) => setRateText({ ...rateText, labor: e.target.value })} />
+            </Field>
+            <div className="sm:col-span-2 lg:col-span-3">
+              <Field label={t("settings.address")}>
+                <textarea rows={2} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              </Field>
+            </div>
+            <Field label={t("settings.taxLabel")}>
+              <input value={form.taxLabel} onChange={(e) => setForm({ ...form, taxLabel: e.target.value })} />
+            </Field>
+            <Field label={t("settings.taxRate")}>
+              <input value={rateText.tax} onChange={(e) => setRateText({ ...rateText, tax: e.target.value })} />
+            </Field>
+            <Field label={t("settings.gstNumber")}>
               <input
                 value={form.gstNumber || ""}
                 onChange={(e) => setForm({ ...form, gstNumber: e.target.value })}
                 placeholder="123456789RT0001"
               />
             </Field>
-          </div>
-          <Field label={t("settings.laborRate")}>
-            <input value={rateText.labor} onChange={(e) => setRateText({ ...rateText, labor: e.target.value })} />
-          </Field>
-          <div className="sm:col-span-2">
-            <Field label={t("settings.invoiceNotes")}>
-              <textarea rows={3} value={form.invoiceNotes || ""} onChange={(e) => setForm({ ...form, invoiceNotes: e.target.value })} />
-            </Field>
-          </div>
-        </div>
-        <p className="mt-4 text-xs text-slate-400">{t("settings.hint")}</p>
-        <div className="mt-4">
-          <Button onClick={() => void save()}>{t("common.save")}</Button>
-        </div>
-      </Card>
-
-      {can.options ? (
-        <Card className="mt-6 max-w-2xl p-5">
-          <h2 className="text-lg font-medium">{t("settings.numberingTitle")}</h2>
-          <p className="mt-1 text-sm text-slate-400">{t("settings.numberingSubtitle")}</p>
-          {numberSaved ? <p className="mt-3 text-sm text-emerald-300">{t("settings.numberingSaved")}</p> : null}
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <Field label={t("settings.woPrefix")}>
-              <input value={numbering.woPrefix} onChange={(e) => setNumbering({ ...numbering, woPrefix: e.target.value })} />
-            </Field>
-            <Field label={t("settings.woNext")}>
-              <input value={numbering.woNextNumber} onChange={(e) => setNumbering({ ...numbering, woNextNumber: e.target.value })} />
-            </Field>
-            <Field label={t("settings.woPad")}>
-              <input value={numbering.woPad} onChange={(e) => setNumbering({ ...numbering, woPad: e.target.value })} />
-            </Field>
-          </div>
-          <p className="mt-3 text-sm text-gold-400">{t("settings.woPreview", { number: numbering.woPreview })}</p>
-          <div className="mt-4">
-            <Button onClick={() => void saveNumbering()}>{t("common.save")}</Button>
-          </div>
-
-          <div className="mt-8 border-t border-ink-600 pt-5">
-            <h3 className="font-medium">{t("settings.changeNumberTitle")}</h3>
-            <p className="mt-1 text-sm text-slate-400">{t("settings.changeNumberHint")}</p>
-            {changedNumber ? <p className="mt-3 text-sm text-emerald-300">{t("settings.numberChanged")}</p> : null}
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Field label={t("settings.currentNumber")}>
-                <SearchPicker
-                  value={pickedWo.id}
-                  selectedLabel={pickedWo.label}
-                  selectedHint={pickedWo.hint}
-                  placeholder={t("search.placeholder")}
-                  allowEmpty
-                  onChange={(id, option) => {
-                    setPickedWo({
-                      id,
-                      label: option?.label || "",
-                      hint: option?.hint || "",
-                    });
-                    setNewNumber(option?.label || "");
-                  }}
-                  search={async (query) => {
-                    const rows = await call(window.dms.workOrders.list(query, { limit: 8 }));
-                    return rows.map((row) => ({
-                      id: row.id,
-                      label: row.number,
-                      hint: [customerName(row.customer), vehicleLabel(row.vehicle)].filter(Boolean).join(" · "),
-                      raw: row,
-                    }));
-                  }}
-                />
-              </Field>
-              <Field label={t("settings.newNumber")}>
-                <input value={newNumber} onChange={(e) => setNewNumber(e.target.value)} placeholder="OT-0100" />
+            <p className="text-xs text-slate-500 sm:col-span-2 lg:col-span-3">
+              {t("settings.taxHintAb")} {t("settings.gstHint")}
+            </p>
+            <div className="sm:col-span-2 lg:col-span-3">
+              <Field label={t("settings.invoiceNotes")}>
+                <textarea rows={2} value={form.invoiceNotes || ""} onChange={(e) => setForm({ ...form, invoiceNotes: e.target.value })} />
               </Field>
             </div>
-            <div className="mt-4">
-              <Button disabled={!pickedWo.id || !newNumber.trim()} onClick={() => void changeExistingNumber()}>
-                {t("settings.changeNumber")}
-              </Button>
-            </div>
           </div>
+          <p className="mt-3 text-xs text-slate-400">{t("settings.hint")}</p>
         </Card>
-      ) : null}
 
-      {can.finance ? (
-        <Card className="mt-6 max-w-4xl p-5">
-          <h2 className="text-lg font-medium">{t("settings.catalogsTitle")}</h2>
-          <p className="mt-1 text-sm text-slate-400">{t("settings.catalogsSubtitle")}</p>
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <CatalogEditor
-              title={t("catalog.opcodeCats")}
-              items={catalogs?.opcodeCategories || []}
-              placeholder={t("catalog.new")}
-              canEdit={can.finance}
-              labelFor={(id) => catalogLabel(t, "op", id)}
-              onChange={(ids) => saveCatalogs({ opcodeCategories: ids })}
-            />
-            <CatalogEditor
-              title={t("catalog.partCats")}
-              items={catalogs?.partCategories || []}
-              placeholder={t("catalog.new")}
-              canEdit={can.finance}
-              labelFor={(id) => catalogLabel(t, "partCat", id)}
-              onChange={(ids) => saveCatalogs({ partCategories: ids })}
-            />
-            <CatalogEditor
-              title={t("catalog.uoms")}
-              items={catalogs?.partUoms || []}
-              placeholder={t("catalog.new")}
-              canEdit={can.finance}
-              labelFor={(id) => catalogLabel(t, "partUom", id)}
-              onChange={(ids) => saveCatalogs({ partUoms: ids })}
-            />
-            <CatalogEditor
-              title={t("catalog.payTypes")}
-              hint={t("catalog.payHint")}
-              items={catalogs?.payTypes || []}
-              placeholder=""
-              canEdit={false}
-              locked
-              labelFor={(id) => catalogLabel(t, "opPay", id)}
-              onChange={() => undefined}
-            />
-          </div>
-        </Card>
-      ) : null}
+        {can.updates ? (
+          <Card className="p-5">
+            <UpdatePanel />
+          </Card>
+        ) : null}
+        </div>
+
+        <div className="grid gap-4">
+          <Card className="p-5">
+            <AppearancePanel />
+          </Card>
+          <Card className="p-5">
+            <h2 className="text-lg font-medium">{t("settings.serviceMode")}</h2>
+            <p className="mt-1 text-sm text-slate-400">{t("settings.serviceModeHint")}</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {(["sencillo", "completo"] as const).map((mode) => {
+                const active = (form.serviceMode || "completo") === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => void saveServiceMode(mode)}
+                    className={`rounded-lg border p-3 text-left transition ${
+                      active ? "border-gold-400 bg-gold-400/10" : "border-ink-600 bg-ink-900/60 hover:border-gold-400/40"
+                    }`}
+                  >
+                    <div className="font-medium text-slate-100">
+                      {t(mode === "sencillo" ? "settings.serviceSimple" : "settings.serviceFull")}
+                    </div>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {t(mode === "sencillo" ? "settings.serviceSimpleHint" : "settings.serviceFullHint")}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+          {dbPath ? (
+            <Card className="p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-lg font-medium">{t("settings.backupTitle")}</h2>
+                  <p className="mt-1 text-sm text-slate-400">{t("settings.backupHint")}</p>
+                  <p className="mt-2 break-all font-mono text-xs text-slate-500">{dbPath}</p>
+                </div>
+                <Button variant="ghost" onClick={() => void navigator.clipboard.writeText(dbPath)}>
+                  {t("settings.copyPath")}
+                </Button>
+              </div>
+            </Card>
+          ) : null}
+        </div>
+
+        {can.options ? (
+          <Card className="p-5 lg:col-span-2">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div>
+                <h2 className="text-lg font-medium">{t("settings.numberingTitle")}</h2>
+                <p className="mt-1 text-sm text-slate-400">{t("settings.numberingSubtitle")}</p>
+                {numberSaved ? <p className="mt-2 text-sm text-emerald-300">{t("settings.numberingSaved")}</p> : null}
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <Field label={t("settings.woPrefix")}>
+                    <input value={numbering.woPrefix} onChange={(e) => setNumbering({ ...numbering, woPrefix: e.target.value })} />
+                  </Field>
+                  <Field label={t("settings.woNext")}>
+                    <input value={numbering.woNextNumber} onChange={(e) => setNumbering({ ...numbering, woNextNumber: e.target.value })} />
+                  </Field>
+                  <Field label={t("settings.woPad")}>
+                    <input value={numbering.woPad} onChange={(e) => setNumbering({ ...numbering, woPad: e.target.value })} />
+                  </Field>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <Button onClick={() => void saveNumbering()}>{t("common.save")}</Button>
+                  <p className="text-sm text-gold-400">{t("settings.woPreview", { number: numbering.woPreview })}</p>
+                </div>
+              </div>
+              <div className="border-t border-ink-600 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                <h3 className="text-lg font-medium">{t("settings.changeNumberTitle")}</h3>
+                <p className="mt-1 text-sm text-slate-400">{t("settings.changeNumberHint")}</p>
+                {changedNumber ? <p className="mt-2 text-sm text-emerald-300">{t("settings.numberChanged")}</p> : null}
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <Field label={t("settings.currentNumber")}>
+                    <SearchPicker
+                      value={pickedWo.id}
+                      selectedLabel={pickedWo.label}
+                      selectedHint={pickedWo.hint}
+                      placeholder={t("search.placeholder")}
+                      allowEmpty
+                      onChange={(id, option) => {
+                        setPickedWo({
+                          id,
+                          label: option?.label || "",
+                          hint: option?.hint || "",
+                        });
+                        setNewNumber(option?.label || "");
+                      }}
+                      search={async (query) => {
+                        const rows = await call(window.dms.workOrders.list(query, { limit: 8 }));
+                        return rows.map((row) => ({
+                          id: row.id,
+                          label: row.number,
+                          hint: [customerName(row.customer), vehicleLabel(row.vehicle)].filter(Boolean).join(" · "),
+                          raw: row,
+                        }));
+                      }}
+                    />
+                  </Field>
+                  <Field label={t("settings.newNumber")}>
+                    <input value={newNumber} onChange={(e) => setNewNumber(e.target.value)} placeholder="OT-0100" />
+                  </Field>
+                </div>
+                <div className="mt-4">
+                  <Button disabled={!pickedWo.id || !newNumber.trim()} onClick={() => void changeExistingNumber()}>
+                    {t("settings.changeNumber")}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        ) : null}
+
+        {can.finance ? (
+          <Card className="p-5 lg:col-span-2">
+            <h2 className="text-lg font-medium">{t("settings.catalogsTitle")}</h2>
+            <p className="mt-1 text-sm text-slate-400">{t("settings.catalogsSubtitle")}</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <CatalogEditor
+                title={t("catalog.opcodeCats")}
+                items={catalogs?.opcodeCategories || []}
+                placeholder={t("catalog.new")}
+                canEdit={can.finance}
+                labelFor={(id) => catalogLabel(t, "op", id)}
+                onChange={(ids) => saveCatalogs({ opcodeCategories: ids })}
+              />
+              <CatalogEditor
+                title={t("catalog.partCats")}
+                items={catalogs?.partCategories || []}
+                placeholder={t("catalog.new")}
+                canEdit={can.finance}
+                labelFor={(id) => catalogLabel(t, "partCat", id)}
+                onChange={(ids) => saveCatalogs({ partCategories: ids })}
+              />
+              <CatalogEditor
+                title={t("catalog.uoms")}
+                items={catalogs?.partUoms || []}
+                placeholder={t("catalog.new")}
+                canEdit={can.finance}
+                labelFor={(id) => catalogLabel(t, "partUom", id)}
+                onChange={(ids) => saveCatalogs({ partUoms: ids })}
+              />
+              <CatalogEditor
+                title={t("catalog.payTypes")}
+                hint={t("catalog.payHint")}
+                items={catalogs?.payTypes || []}
+                placeholder=""
+                canEdit={false}
+                locked
+                labelFor={(id) => catalogLabel(t, "opPay", id)}
+                onChange={() => undefined}
+              />
+            </div>
+          </Card>
+        ) : null}
+      </div>
     </div>
   );
 }

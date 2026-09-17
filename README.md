@@ -25,7 +25,7 @@ Copia de seguridad: cierra la app y copia `dealer.db`, `dealer.db-wal` y `dealer
 
 ## Actualizaciones
 
-En la app instalada, **Ajustes → Actualizaciones**. Antes de instalar se respalda la base; el instalador solo reemplaza el programa, no la carpeta de datos. La primera vez hay que instalar esta versión (1.0.1) a mano; las siguientes se pueden aplicar desde la app.
+En la app instalada, **Ajustes → Actualizaciones** (solo Admin/Master, y hay que activar la casilla). Antes de instalar se respalda la base; el instalador solo reemplaza el programa, no la carpeta de datos. Quien tenga 1.0.0 debe instalar 1.0.1 o 1.0.2 a mano una vez; después las siguientes salen desde la app.
 
 ## Qué incluye
 

@@ -1772,6 +1772,7 @@ function readSettingsRow() {
         laborRate: 145,
         invoiceNotes: "Prices in CAD. GST 5% (Alberta — no provincial sales tax).",
         serviceMode: "completo",
+        allowUpdates: 0,
       })
       .run();
     row = db().select().from(shopSettings).where(eq(shopSettings.id, id)).get();
@@ -1782,7 +1783,17 @@ function readSettingsRow() {
     woNextNumber: Math.max(1, Number(row.woNextNumber) || 1),
     woPad: woPadOf(row),
     serviceMode: serviceModeOf(row),
+    allowUpdates: Number(row.allowUpdates) === 1 ? 1 : 0,
   };
+}
+
+function updatesAllowed() {
+  return Number(readSettingsRow().allowUpdates) === 1;
+}
+
+function setUpdatesAllowed(on) {
+  patchSettings({ allowUpdates: on ? 1 : 0 });
+  return updatesAllowed();
 }
 
 function patchSettings(values) {
@@ -2506,6 +2517,7 @@ function getSettings() {
     partCategories: catalogs.partCategories.map((item) => item.id),
     partUoms: catalogs.partUoms.map((item) => item.id),
     catalogs,
+    allowUpdates: updatesAllowed(),
   };
 }
 
@@ -3409,6 +3421,8 @@ module.exports = {
   addWorkOrderPayment,
   setWorkOrderNumber,
   getSettings,
+  updatesAllowed,
+  setUpdatesAllowed,
   saveSettings,
   saveWorkOrderNumbering,
   getCatalogs,

@@ -213,11 +213,12 @@ function registerIpc(app) {
   handle("meta:dbPath", wrap(() => getDbPath(), { minRank: 50 }));
   handle("meta:isPackaged", wrap(() => app.isPackaged, { public: true }));
   handle("meta:version", wrap(() => app.getVersion(), { public: true }));
-  handle("updates:status", wrap(() => updater.status(), { minRank: 50 }));
-  handle("updates:check", wrap(() => updater.check(), { minRank: 50 }));
-  handle("updates:download", wrap(() => updater.download(), { minRank: 50 }));
-  handle("updates:install", wrap(() => updater.install(), { minRank: 50 }));
+  handle("updates:status", wrap(() => updater.status(), { minRank: 80 }));
+  handle("updates:check", wrap(() => updater.check(), { minRank: 80 }));
+  handle("updates:download", wrap(() => updater.download(), { minRank: 80 }));
+  handle("updates:install", wrap(() => updater.install(), { minRank: 80 }));
   handle("updates:backup", wrap(() => updater.backupOnly("manual"), { minRank: 50 }));
+  handle("updates:setAllow", wrap((_u, on) => updater.setAllow(on), { minRank: 80 }));
   handle("sql:tables", wrap(() => repo.listSqlTables(), { minRank: 80 }));
   handle("sql:query", wrap((_u, payload) => repo.sqlQuery(payload?.sql, payload), { minRank: 80 }));
 }

@@ -288,8 +288,19 @@ app.whenReady().then(async () => {
   if (!repo.searchGlobal("PUE-4418").vehicles.length) throw new Error("El buscador global no halla vehículos");
   if (!repo.searchGlobal("Mazda").sales.length && !repo.searchGlobal("CX-5").sales.length) throw new Error("El buscador global no halla ventas");
   if (!admin.permissions.options || !master.permissions.options) throw new Error("Admin/Master deben poder numerar OT");
+  if (!admin.permissions.updates || !master.permissions.updates) throw new Error("Admin/Master deben ver actualizaciones");
   const gerente = auth.createUser(master, { name: "Gerente", username: "gerente", password: "gerente1", role: "gerente" });
   if (gerente.permissions.options) throw new Error("Gerente no debe cambiar numeración");
+  if (gerente.permissions.updates) throw new Error("Gerente no debe ver actualizaciones");
+  if (repo.updatesAllowed()) throw new Error("Las actualizaciones deben nacer apagadas");
+  const updater = require("./updater.cjs");
+  updater.initUpdater(dir);
+  const blocked = await updater.check();
+  if (blocked.allowUpdates || blocked.note !== "disabled") throw new Error("check no respetó el apagado");
+  if (!repo.setUpdatesAllowed(true) || !repo.updatesAllowed()) throw new Error("No se activaron las actualizaciones");
+  const opened = await updater.check();
+  if (!opened.allowUpdates || opened.note !== "dev") throw new Error("Al activar, check debe correr (dev)");
+  if (repo.setUpdatesAllowed(false) || repo.updatesAllowed()) throw new Error("No se desactivaron las actualizaciones");
   if (gerente.job !== "asesor" || !gerente.canTech) throw new Error("Gerente debe ser asesor de taller");
 
   const techEmp = auth.createUser(master, {
