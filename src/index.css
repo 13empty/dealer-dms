@@ -292,6 +292,16 @@ tbody tr:hover td {
     display: none !important;
   }
 
+  thead th {
+    position: static !important;
+    background: transparent !important;
+    color: #525252 !important;
+  }
+
+  tbody tr:hover td {
+    background: transparent !important;
+  }
+
   html,
   body,
   #root,
@@ -301,4 +311,28 @@ tbody tr:hover td {
     background: #fff !important;
     color: #111 !important;
   }
+
+  .print-doc {
+    box-shadow: none !important;
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  @page {
+    margin: 14mm;
+  }
+}
+
+.print-doc {
+  color-scheme: light;
+}
+
+.print-doc thead th {
+  position: static;
+  background: transparent;
+  color: #737373;
+}
+
+.print-doc tbody tr:hover td {
+  background: transparent;
 }
