@@ -11,6 +11,7 @@ import { UpdateBanner } from "./components/UpdatePanel";
 import { LanguageSelect, k, useI18n } from "./lib/i18n";
 import { call } from "./lib/format";
 import { usePrefs } from "./lib/prefs-context";
+import { useShop } from "./lib/shop-context";
 import { DEFAULT_NAV_OFFICE, DEFAULT_NAV_OPS, NAV_OFFICE, NAV_OPS, reorderNav, sortByNavOrder, type NavId } from "./lib/nav";
 import LoginGate from "./pages/LoginGate";
 import Dashboard from "./pages/Dashboard";
@@ -36,6 +37,7 @@ import SalePrint from "./pages/SalePrint";
 import VehiclePrint from "./pages/VehiclePrint";
 import SqlStudio from "./pages/SqlStudio";
 import { ChangelogModal, VersionButton } from "./components/ChangelogModal";
+import { ShopProvider } from "./lib/shop-context";
 import { markChangelogSeen, shouldShowChangelog } from "./lib/changelog";
 
 type MenuLink = { id: NavId; to: string; label: string; icon: IconName; show: boolean; end?: boolean };
@@ -120,6 +122,7 @@ function Shell() {
   const { user, can, logout } = useAuth();
   const { t } = useI18n();
   const { prefs, setPref } = usePrefs();
+  const { name: shopName } = useShop();
   const [appVersion, setAppVersion] = useState("");
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [changelogAuto, setChangelogAuto] = useState(false);
@@ -166,7 +169,7 @@ function Shell() {
             <BrandMark className="h-9 w-9" />
             <div className="min-w-0">
               <div className="text-[10px] uppercase tracking-[0.22em] text-gold-400">{t("nav.brand")}</div>
-              <div className="truncate text-base font-semibold leading-tight">Dealer DMS</div>
+              <div className="truncate text-base font-semibold leading-tight">{shopName}</div>
             </div>
           </div>
         </div>
@@ -319,9 +322,11 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <ErrorBoundary>
-        <Gate />
-      </ErrorBoundary>
+      <ShopProvider>
+        <ErrorBoundary>
+          <Gate />
+        </ErrorBoundary>
+      </ShopProvider>
     </AuthProvider>
   );
 }

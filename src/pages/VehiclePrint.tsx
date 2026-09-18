@@ -3,11 +3,13 @@ import { Link, useParams } from "react-router-dom";
 import { Button, ErrorText, PageHeader, GuidCopy } from "../components/ui";
 import { call, customerName, dateEs, formatNumber, money, vehicleLabel } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
+import { useShop } from "../lib/shop-context";
 import type { ShopSettings, Vehicle } from "../vite-env";
 
 export default function VehiclePrint() {
   const { id } = useParams();
   const { t } = useI18n();
+  const { name: shopName } = useShop();
   const [row, setRow] = useState<Vehicle | null>(null);
   const [shop, setShop] = useState<ShopSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export default function VehiclePrint() {
       <div className="mx-auto max-w-3xl rounded-lg border border-ink-600 p-8 print:border-black">
         <div className="mb-6 flex justify-between">
           <div>
-            <div className="text-xs uppercase tracking-widest text-gold-400 print:text-black">{shop.name}</div>
+            <div className="text-xs uppercase tracking-widest text-gold-400 print:text-black">{shopName || shop.name}</div>
             <h1 className="mt-1 text-2xl font-semibold">{vehicleLabel(row)}</h1>
             <p className="text-sm text-slate-400 print:text-neutral-600">
               {[row.stockNumber, row.plate, row.vin].filter(Boolean).join(" · ")}

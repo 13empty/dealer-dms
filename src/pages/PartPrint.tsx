@@ -3,12 +3,14 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Button, ErrorText, PageHeader, GuidCopy } from "../components/ui";
 import { call, dateEs, money } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
+import { useShop } from "../lib/shop-context";
 import type { Part, ShopSettings } from "../vite-env";
 
 export default function PartPrint() {
   const { id } = useParams();
   const [search] = useSearchParams();
   const { t } = useI18n();
+  const { name: shopName } = useShop();
   const [row, setRow] = useState<Part | null>(null);
   const [rows, setRows] = useState<Part[]>([]);
   const [shop, setShop] = useState<ShopSettings | null>(null);
@@ -70,7 +72,7 @@ export default function PartPrint() {
         <div className="mx-auto max-w-3xl rounded-lg border border-ink-600 p-8 print:border-black">
           <div className="mb-6 flex justify-between">
             <div>
-              <div className="text-xs uppercase tracking-widest text-gold-400 print:text-black">{shop.name}</div>
+              <div className="text-xs uppercase tracking-widest text-gold-400 print:text-black">{shopName || shop.name}</div>
               <h1 className="mt-1 text-2xl font-semibold">{row.sku}</h1>
               <p className="text-sm text-slate-400 print:text-neutral-600">{row.name}</p>
               <div className="mt-2">
@@ -141,7 +143,7 @@ export default function PartPrint() {
       </div>
       <div className="mx-auto max-w-5xl">
         <div className="mb-4">
-          <div className="text-xs uppercase tracking-widest text-gold-400 print:text-black">{shop.name}</div>
+          <div className="text-xs uppercase tracking-widest text-gold-400 print:text-black">{shopName || shop.name}</div>
           <h1 className="text-2xl font-semibold">{title}</h1>
           <p className="text-sm text-slate-400 print:text-neutral-600">{dateEs(new Date().toISOString())}</p>
         </div>

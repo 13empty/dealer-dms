@@ -82,6 +82,7 @@ contextBridge.exposeInMainWorld("dms", {
   },
   settings: {
     get: () => invoke("settings:get"),
+    identity: () => invoke("settings:identity"),
     save: (data) => invoke("settings:save", data),
     saveNumbering: (data) => invoke("settings:saveNumbering", data),
     catalogs: () => invoke("settings:catalogs"),

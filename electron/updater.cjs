@@ -89,7 +89,13 @@ function showNotice(version) {
   if (!Notification.isSupported()) return;
   try {
     const n = new Notification({
-      title: "Dealer DMS",
+      title: (() => {
+        try {
+          return repo.shopDisplayName();
+        } catch {
+          return "Dealer DMS";
+        }
+      })(),
       body,
       icon: path.join(__dirname, "icon.ico"),
     });

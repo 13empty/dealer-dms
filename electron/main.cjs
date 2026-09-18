@@ -2,6 +2,7 @@ const { app, BrowserWindow } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const { openDatabase } = require("./db/index.cjs");
+const repo = require("./db/repo.cjs");
 const { seedStarter } = require("./db/seed.cjs");
 const { registerIpc, setSessionPath } = require("./ipc.cjs");
 const { initUpdater, scheduleNotify } = require("./updater.cjs");
@@ -17,6 +18,14 @@ function appIcon() {
   return path.join(__dirname, "icon.ico");
 }
 
+function shopTitle() {
+  try {
+    return repo.shopDisplayName();
+  } catch {
+    return "Dealer DMS";
+  }
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
@@ -24,7 +33,7 @@ function createWindow() {
     minWidth: 1100,
     minHeight: 720,
     backgroundColor: "#0c1017",
-    title: "Dealer DMS",
+    title: shopTitle(),
     icon: appIcon(),
     show: false,
     webPreferences: {

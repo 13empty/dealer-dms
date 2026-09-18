@@ -190,7 +190,18 @@ function registerIpc(app) {
   handle("workOrders:setNumber", wrap((_u, { id, number }) => repo.setWorkOrderNumber(id, number), { minRank: 80 }));
 
   handle("settings:get", wrap(() => repo.getSettings()));
-  handle("settings:save", wrap((_u, data) => repo.saveSettings(data), { minRank: 50 }));
+  handle("settings:identity", wrap(() => ({ name: repo.shopDisplayName() }), { public: true }));
+  handle("settings:save", wrap((_u, data) => {
+    const next = repo.saveSettings(data);
+    for (const win of BrowserWindow.getAllWindows()) {
+      try {
+        win.setTitle(repo.shopDisplayName());
+      } catch {
+        // ignore
+      }
+    }
+    return next;
+  }, { minRank: 50 }));
   handle("settings:saveNumbering", wrap((_u, data) => repo.saveWorkOrderNumbering(data), { minRank: 80 }));
   handle("settings:catalogs", wrap(() => repo.getCatalogs()));
   handle("settings:saveCatalogs", wrap((_u, data) => repo.saveCatalogs(data), { minRank: 50 }));

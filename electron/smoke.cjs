@@ -103,6 +103,9 @@ app.whenReady().then(async () => {
   repo.saveSettings({ name: "Taller Demo", phone: "2221110000", email: "taller@demo.local", address: "Calle 1", taxLabel: "IVA", taxRate: 16 });
   const settings = repo.getSettings();
   if (settings.taxRate !== 16) throw new Error("No se guardó el impuesto");
+  if (settings.name !== "Taller Demo" || repo.shopDisplayName() !== "Taller Demo") {
+    throw new Error("El nombre del taller no se guardó");
+  }
   const plated = repo.listVehicles().find((v) => v.plate === "PUE-4418");
   if (!plated) throw new Error("Falta la placa en el vehículo de ejemplo");
   if (!repo.listVehicles("PUE-4418", null, { limit: 5 }).length) throw new Error("No busca por placa");

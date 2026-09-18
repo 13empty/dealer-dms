@@ -2762,6 +2762,14 @@ function addWorkOrderPayment(id, data) {
   return next;
 }
 
+function shopDisplayName() {
+  try {
+    return String(readSettingsRow().name || "").trim() || "Dealer DMS";
+  } catch {
+    return "Dealer DMS";
+  }
+}
+
 function getSettings() {
   const row = readSettingsRow();
   const peek = peekNextWorkOrderNumber(row);
@@ -3692,6 +3700,7 @@ module.exports = {
   addWorkOrderPayment,
   setWorkOrderNumber,
   getSettings,
+  shopDisplayName,
   updatesAllowed,
   setUpdatesAllowed,
   saveSettings,

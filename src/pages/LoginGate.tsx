@@ -6,10 +6,12 @@ import { Button, Card, ErrorText, Field } from "../components/ui";
 import { useAuth } from "../lib/auth";
 import { call } from "../lib/format";
 import { LanguageSelect, useI18n } from "../lib/i18n";
+import { useShop } from "../lib/shop-context";
 
 export default function LoginGate() {
   const { needsSetup, login, setup } = useAuth();
   const { t } = useI18n();
+  const { name: shopName } = useShop();
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -44,8 +46,8 @@ export default function LoginGate() {
         <div className="mb-5 flex items-center gap-3">
           <BrandMark className="h-10 w-10" />
           <div>
-            <div className="text-[11px] uppercase tracking-[0.22em] text-gold-400">Dealer DMS</div>
-            <div className="text-sm text-slate-400">{t("nav.brand")}</div>
+            <div className="text-[11px] uppercase tracking-[0.22em] text-gold-400">{t("nav.brand")}</div>
+            <div className="text-sm font-semibold text-slate-100">{shopName}</div>
           </div>
         </div>
         <h1 className="text-2xl font-semibold">{needsSetup ? t("login.setupTitle") : t("login.loginTitle")}</h1>
