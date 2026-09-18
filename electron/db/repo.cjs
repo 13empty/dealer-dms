@@ -163,6 +163,19 @@ function likePattern(q) {
   return `%${String(q || "").trim()}%`;
 }
 
+function isGone(row) {
+  return Number(row?.deleted) === 1;
+}
+
+function alive(table) {
+  return eq(table.deleted, 0);
+}
+
+function markDeleted(table, id, extra = {}) {
+  db().update(table).set({ deleted: 1, ...extra }).where(eq(table.id, id)).run();
+  return { id };
+}
+
 function parsePhones(raw, fallbackPhone = "") {
   let phones = [];
   if (Array.isArray(raw)) phones = raw;
@@ -367,7 +380,7 @@ function withPhones(row) {
 function withVehicles(row) {
   const base = withPhones(row);
   if (!base) return base;
-  const owned = db().select().from(vehicles).where(eq(vehicles.customerId, row.id)).all();
+  const owned = db().select().from(vehicles).where(and(eq(vehicles.customerId, row.id), alive(vehicles))).all();
   return { ...base, vehicles: owned };
 }
 
@@ -376,7 +389,7 @@ function matchingCustomerIdsByVehicle(query) {
   return getSqlite()
     .prepare(
       `SELECT DISTINCT customer_id AS id FROM vehicles
-       WHERE customer_id IS NOT NULL AND (vin LIKE ? OR plate LIKE ? OR make LIKE ? OR model LIKE ? OR stock_number LIKE ? OR trim LIKE ?)`
+       WHERE customer_id IS NOT NULL AND IFNULL(deleted,0)=0 AND (vin LIKE ? OR plate LIKE ? OR make LIKE ? OR model LIKE ? OR stock_number LIKE ? OR trim LIKE ?)`
     )
     .all(p, p, p, p, p, p)
     .map((r) => asId(r.id))
@@ -405,6 +418,7 @@ function customerStatsMap() {
       .map((p) => [p.id, p.taxable == null ? 1 : Number(p.taxable)])
   );
   for (const order of db().select().from(workOrders).all()) {
+    if (isGone(order)) continue;
     const st = ensure(order.customerId);
     touch(st, order.createdAt);
     touch(st, order.deliveredAt);
@@ -417,6 +431,7 @@ function customerStatsMap() {
     if (balance > 0) st.receivable = roundMoney(st.receivable + balance);
   }
   for (const sale of db().select().from(sales).all()) {
+    if (isGone(sale)) continue;
     const st = ensure(sale.customerId);
     const paid = (salePayBy.get(sale.id) || []).reduce((s, p) => s + Number(p.amount || 0), 0);
     const taxRate = Number(sale.taxRate) || 0;
@@ -458,6 +473,7 @@ function findDuplicates(data, excludeId) {
     .from(customers)
     .all()
     .filter((row) => {
+      if (isGone(row)) return false;
       if (excludeId && String(row.id) === asId(excludeId)) return false;
       if (email && String(row.email || "").trim().toLowerCase() === email) return true;
       if (document && String(row.document || "").trim().toLowerCase() === document) return true;
@@ -476,7 +492,7 @@ function assertNoDuplicates(data, excludeId) {
 }
 
 function assertCustomerCanTransact(customer) {
-  if (!customer) throw new Error("Cliente no encontrado");
+  if (!customer || isGone(customer)) throw new Error("Cliente no encontrado");
   if (customer.status === "bloqueado") {
     throw new Error("Cliente bloqueado. Desbloquéalo en el expediente para abrir órdenes o ventas.");
   }
@@ -496,6 +512,7 @@ function listCustomers(q, opts = {}) {
   const limit = Number(opts.limit) || 0;
   const lite = Boolean(opts.lite || limit);
   const filters = [];
+  filters.push(alive(customers));
   if (opts.type) filters.push(eq(customers.type, String(opts.type)));
   if (opts.status) filters.push(eq(customers.status, String(opts.status)));
   if (query) {
@@ -550,18 +567,18 @@ function getCustomer(id) {
   const customerSales = db()
     .select()
     .from(sales)
-    .where(eq(sales.customerId, id))
+    .where(and(eq(sales.customerId, id), alive(sales)))
     .orderBy(desc(sales.createdAt))
     .all()
     .map(attachSaleExtras);
   const customerOrders = db()
     .select()
     .from(workOrders)
-    .where(eq(workOrders.customerId, id))
+    .where(and(eq(workOrders.customerId, id), alive(workOrders)))
     .orderBy(desc(workOrders.createdAt))
     .all()
     .map(attachWorkOrder);
-  const customerVehicles = db().select().from(vehicles).where(eq(vehicles.customerId, id)).all();
+  const customerVehicles = db().select().from(vehicles).where(and(eq(vehicles.customerId, id), alive(vehicles))).all();
   return {
     ...withStats(customer, stats),
     sales: customerSales,
@@ -705,15 +722,10 @@ function unlinkCustomerVehicle(customerId, vehicleId) {
 }
 
 function removeCustomer(id) {
-  const saleCount = db().select({ n: sql`count(*)` }).from(sales).where(eq(sales.customerId, id)).get();
-  const woCount = db().select({ n: sql`count(*)` }).from(workOrders).where(eq(workOrders.customerId, id)).get();
-  if (Number(saleCount?.n) > 0 || Number(woCount?.n) > 0) {
-    throw new Error("No se puede borrar: el cliente tiene ventas u órdenes de taller. Márcalo inactivo.");
-  }
-  db().delete(customerNotes).where(eq(customerNotes.customerId, id)).run();
-  db().update(vehicles).set({ customerId: null }).where(eq(vehicles.customerId, id)).run();
-  db().delete(customers).where(eq(customers.id, id)).run();
-  return { id };
+  const current = db().select().from(customers).where(eq(customers.id, id)).get();
+  if (!current) throw new Error("Cliente no encontrado");
+  if (isGone(current)) return { id };
+  return markDeleted(customers, id, { updatedAt: nowIso() });
 }
 
 const VEHICLE_STATUSES = ["en_stock", "reservado", "vendido", "cliente", "consignacion"];
@@ -786,7 +798,7 @@ function assertStockNumberFree(stockNumber, excludeId) {
   const value = String(stockNumber || "").trim().toUpperCase();
   if (!value) return "";
   const clash = db().select().from(vehicles).where(eq(vehicles.stockNumber, value)).get();
-  if (clash && asId(clash.id) !== asId(excludeId || "")) throw new Error("Ese número de stock ya existe");
+  if (clash && !isGone(clash) && asId(clash.id) !== asId(excludeId || "")) throw new Error("Ese número de stock ya existe");
   return value;
 }
 
@@ -799,6 +811,7 @@ function vehicleStatsMap() {
     return stats.get(key);
   }
   for (const order of db().select().from(workOrders).all()) {
+    if (isGone(order)) continue;
     const st = ensure(order.vehicleId);
     if (order.createdAt && (!st.lastVisit || order.createdAt > st.lastVisit)) st.lastVisit = order.createdAt;
     if (order.deliveredAt && (!st.lastVisit || order.deliveredAt > st.lastVisit)) st.lastVisit = order.deliveredAt;
@@ -906,6 +919,7 @@ function listVehicles(q, status, opts = {}) {
   const query = String(q || "").trim();
   const limit = Number(opts.limit) || 0;
   const filters = [];
+  filters.push(alive(vehicles));
   if (status) filters.push(eq(vehicles.status, status));
   if (opts.customerId) filters.push(eq(vehicles.customerId, asId(opts.customerId)));
   if (opts.condition) filters.push(eq(vehicles.condition, String(opts.condition)));
@@ -955,7 +969,7 @@ function getVehicle(id, opts = {}) {
   const orders = db()
     .select()
     .from(workOrders)
-    .where(eq(workOrders.vehicleId, id))
+    .where(and(eq(workOrders.vehicleId, id), alive(workOrders)))
     .orderBy(desc(workOrders.createdAt))
     .all()
     .map((o) => {
@@ -973,7 +987,7 @@ function getVehicle(id, opts = {}) {
   const vehicleSales = db()
     .select()
     .from(sales)
-    .where(eq(sales.vehicleId, id))
+    .where(and(eq(sales.vehicleId, id), alive(sales)))
     .orderBy(desc(sales.createdAt))
     .all()
     .map(attachSaleExtras);
@@ -989,7 +1003,10 @@ function getVehicle(id, opts = {}) {
 function createVehicle(data) {
   const profile = vehicleProfile(data);
   const existing = db().select().from(vehicles).where(eq(vehicles.vin, profile.vin)).get();
-  if (existing) throw new Error("Ya existe un vehículo con ese VIN");
+  if (existing && !isGone(existing)) throw new Error("Ya existe un vehículo con ese VIN");
+  if (existing && isGone(existing)) {
+    return restoreVehicle(existing.id, data);
+  }
   const createdAt = nowIso();
   const id = newGuid();
   db()
@@ -1103,20 +1120,16 @@ function addVehicleNote(id, data = {}) {
   return getVehicle(id, { history: true });
 }
 
+function restoreVehicle(id, data) {
+  db().update(vehicles).set({ deleted: 0, updatedAt: nowIso() }).where(eq(vehicles.id, id)).run();
+  return updateVehicle(id, data);
+}
+
 function removeVehicle(id) {
-  const current = getVehicle(id);
+  const current = db().select().from(vehicles).where(eq(vehicles.id, id)).get();
   if (!current) throw new Error("Vehículo no encontrado");
-  if (current.status === "vendido" || current.status === "reservado") {
-    throw new Error("No se puede borrar un vehículo reservado o vendido");
-  }
-  const saleCount = db().select({ n: sql`count(*)` }).from(sales).where(eq(sales.vehicleId, id)).get();
-  const woCount = db().select({ n: sql`count(*)` }).from(workOrders).where(eq(workOrders.vehicleId, id)).get();
-  if (Number(saleCount?.n) > 0 || Number(woCount?.n) > 0) {
-    throw new Error("No se puede borrar: el vehículo tiene ventas u órdenes de taller");
-  }
-  db().delete(vehicleNotes).where(eq(vehicleNotes.vehicleId, id)).run();
-  db().delete(vehicles).where(eq(vehicles.id, id)).run();
-  return { id };
+  if (isGone(current)) return { id };
+  return markDeleted(vehicles, id, { updatedAt: nowIso() });
 }
 
 function attachSaleExtras(sale) {
@@ -1147,7 +1160,7 @@ function attachSaleExtras(sale) {
 }
 
 function listSales(q, opts = {}) {
-  const rows = db().select().from(sales).orderBy(desc(sales.createdAt)).all();
+  const rows = db().select().from(sales).where(alive(sales)).orderBy(desc(sales.createdAt)).all();
   let detailed = rows.map(attachSaleExtras);
   const query = String(q || "").trim().toLowerCase();
   if (query) {
@@ -1173,14 +1186,14 @@ function createSale(data) {
   const customer = db().select().from(customers).where(eq(customers.id, customerId)).get();
   assertCustomerCanTransact(customer);
   const vehicle = getVehicle(vehicleId);
-  if (!vehicle) throw new Error("Vehículo no encontrado");
+  if (!vehicle || isGone(vehicle)) throw new Error("Vehículo no encontrado");
   if (vehicle.status !== "en_stock" && vehicle.status !== "reservado" && vehicle.status !== "consignacion") {
     throw new Error("El vehículo no está disponible para venta");
   }
   const open = db()
     .select()
     .from(sales)
-    .where(and(eq(sales.vehicleId, vehicleId), ne(sales.status, "entregada")))
+    .where(and(eq(sales.vehicleId, vehicleId), ne(sales.status, "entregada"), alive(sales)))
     .all()
     .filter((s) => s.status === "borrador" || s.status === "cerrada");
   if (open.length) throw new Error("Ese vehículo ya tiene una venta abierta");
@@ -1212,7 +1225,7 @@ function createSale(data) {
 
 function updateSale(id, data) {
   const sale = db().select().from(sales).where(eq(sales.id, id)).get();
-  if (!sale) throw new Error("Venta no encontrada");
+  if (!sale || isGone(sale)) throw new Error("Venta no encontrada");
   if (sale.status !== "borrador") throw new Error("Solo se puede editar un borrador");
   const priced = salePriceDown(data, sale, sale.taxRate);
   db()
@@ -1233,7 +1246,7 @@ function updateSale(id, data) {
 function closeSale(id) {
   const run = getSqlite().transaction(() => {
     const sale = db().select().from(sales).where(eq(sales.id, id)).get();
-    if (!sale) throw new Error("Venta no encontrada");
+    if (!sale || isGone(sale)) throw new Error("Venta no encontrada");
     if (sale.status !== "borrador") throw new Error("Solo se puede cerrar un borrador");
     const closedAt = nowIso();
     db()
@@ -1308,10 +1321,10 @@ function addSalePayment(id, data) {
 function deleteSale(id) {
   const sale = db().select().from(sales).where(eq(sales.id, id)).get();
   if (!sale) throw new Error("Venta no encontrada");
+  if (isGone(sale)) return { id };
   if (sale.status !== "borrador") throw new Error("Solo se puede eliminar un borrador");
   const run = getSqlite().transaction(() => {
-    db().delete(salePayments).where(eq(salePayments.saleId, id)).run();
-    db().delete(sales).where(eq(sales.id, id)).run();
+    markDeleted(sales, id);
     const vehicle = getVehicle(sale.vehicleId);
     if (vehicle && vehicle.status === "reservado") {
       if (vehicle.customerId && vehicle.customerId !== sale.customerId) {
@@ -1575,7 +1588,7 @@ function listWashTypes(opts = {}) {
     .select()
     .from(opCodes)
     .all()
-    .filter((row) => isWashCategory(row.category));
+    .filter((row) => isWashCategory(row.category) && !isGone(row));
   if (opts.activeOnly) rows = rows.filter((row) => Number(row.active) !== 0);
   rows.sort((a, b) => {
     const ca = catalogKey(a.category);
@@ -1644,7 +1657,8 @@ function applyWashTypesToOrder(orderId, typeIds, complaint) {
   const names = [];
   for (const typeId of ids) {
     const type = getWashType(typeId);
-    if (!type || !type.active) throw new Error("Tipo de lavado no encontrado");
+    const raw = db().select().from(opCodes).where(eq(opCodes.id, typeId)).get();
+    if (!type || !type.active || isGone(raw)) throw new Error("Tipo de lavado no encontrado");
     addWorkOrderLine(orderId, { type: "labor", opCodeId: type.id, payType: "cliente" });
     names.push(type.name);
   }
@@ -1740,6 +1754,7 @@ function listParts(q, opts = {}) {
   const query = String(q || "").trim();
   const limit = Number(opts.limit) || 0;
   const filters = [];
+  filters.push(alive(parts));
   if (opts.category) filters.push(eq(parts.category, String(opts.category)));
   if (opts.status) filters.push(eq(parts.status, String(opts.status)));
   else if (opts.activeOnly) filters.push(eq(parts.status, "activo"));
@@ -1785,11 +1800,13 @@ function getPart(id) {
     .all()
     .map((line) => {
       const order = db().select().from(workOrders).where(eq(workOrders.id, line.workOrderId)).get();
+      if (order && isGone(order)) return null;
       return {
         ...line,
         workOrder: order ? { id: order.id, number: order.number, status: order.status, kind: order.kind || "orden" } : null,
       };
-    });
+    })
+    .filter(Boolean);
   const lastSold = movements.find((m) => m.reason === "taller")?.createdAt || null;
   const lastReceived = movements.find((m) => m.qty > 0 && (m.reason === "recibo" || m.reason === "alta" || m.reason === "entrada"))?.createdAt || null;
   return { ...part, movements, usage, lastSold, lastReceived };
@@ -1798,7 +1815,8 @@ function getPart(id) {
 function createPart(data) {
   const profile = partProfile(data);
   const existing = db().select().from(parts).where(eq(parts.sku, profile.sku)).get();
-  if (existing) throw new Error("Ya existe una parte con ese SKU");
+  if (existing && !isGone(existing)) throw new Error("Ya existe una parte con ese SKU");
+  if (existing && isGone(existing)) return restorePart(existing.id, data);
   const stock = Math.max(0, Number(data.stock) || 0);
   const createdAt = nowIso();
   const id = newGuid();
@@ -1830,7 +1848,7 @@ function createPart(data) {
 
 function updatePart(id, data) {
   const current = db().select().from(parts).where(eq(parts.id, id)).get();
-  if (!current) throw new Error("Parte no encontrada");
+  if (!current || isGone(current)) throw new Error("Parte no encontrada");
   const profile = partProfile(data, current);
   if (profile.sku !== current.sku) {
     const clash = db().select().from(parts).where(eq(parts.sku, profile.sku)).get();
@@ -1846,7 +1864,7 @@ function updatePart(id, data) {
 
 function adjustPartStock(id, data) {
   const current = db().select().from(parts).where(eq(parts.id, id)).get();
-  if (!current) throw new Error("Parte no encontrada");
+  if (!current || isGone(current)) throw new Error("Parte no encontrada");
   const qty = Number(data.qty);
   if (!qty || qty === 0) throw new Error("La cantidad no puede ser 0");
   const next = current.stock + qty;
@@ -1872,7 +1890,7 @@ function adjustPartStock(id, data) {
 
 function receivePart(id, data = {}) {
   const current = db().select().from(parts).where(eq(parts.id, id)).get();
-  if (!current) throw new Error("Parte no encontrada");
+  if (!current || isGone(current)) throw new Error("Parte no encontrada");
   const qty = Math.floor(Number(data.qty));
   if (!qty || qty <= 0) throw new Error("La cantidad a recibir debe ser mayor a 0");
   const cost = data.cost != null && data.cost !== "" ? Math.max(0, Number(data.cost) || 0) : Number(current.cost) || 0;
@@ -1904,7 +1922,7 @@ function receivePart(id, data = {}) {
 
 function orderPart(id, data = {}) {
   const current = db().select().from(parts).where(eq(parts.id, id)).get();
-  if (!current) throw new Error("Parte no encontrada");
+  if (!current || isGone(current)) throw new Error("Parte no encontrada");
   const qty = Math.floor(Number(data.qty));
   if (!qty || qty <= 0) throw new Error("La cantidad a pedir debe ser mayor a 0");
   const patch = {
@@ -1916,12 +1934,16 @@ function orderPart(id, data = {}) {
   return getPart(id);
 }
 
+function restorePart(id, data) {
+  db().update(parts).set({ deleted: 0, updatedAt: nowIso() }).where(eq(parts.id, id)).run();
+  return updatePart(id, data);
+}
+
 function removePart(id) {
-  const lines = db().select({ n: sql`count(*)` }).from(workOrderLines).where(eq(workOrderLines.partId, id)).get();
-  if (Number(lines?.n) > 0) throw new Error("No se puede borrar: la parte está en órdenes de taller");
-  db().delete(inventoryMovements).where(eq(inventoryMovements.partId, id)).run();
-  db().delete(parts).where(eq(parts.id, id)).run();
-  return { id };
+  const current = db().select().from(parts).where(eq(parts.id, id)).get();
+  if (!current) throw new Error("Parte no encontrada");
+  if (isGone(current)) return { id };
+  return markDeleted(parts, id, { updatedAt: nowIso() });
 }
 
 function clampInt(value, min, max, fallback) {
@@ -2220,6 +2242,7 @@ function attachWorkOrder(order) {
 
 function listWorkOrders(q, opts = {}) {
   const filters = [];
+  filters.push(alive(workOrders));
   if (opts.kind) filters.push(eq(workOrders.kind, String(opts.kind)));
   if (opts.serviceLine === "lavado" || opts.serviceLine === "taller") {
     filters.push(eq(workOrders.serviceLine, opts.serviceLine));
@@ -2253,7 +2276,7 @@ function getWorkOrder(id) {
     .where(eq(workOrders.vehicleId, attached.vehicleId))
     .orderBy(desc(workOrders.createdAt))
     .all()
-    .filter((o) => o.id !== attached.id)
+    .filter((o) => o.id !== attached.id && !isGone(o))
     .slice(0, 6)
     .map(lightWorkOrder);
   return { ...attached, history };
@@ -2265,7 +2288,7 @@ function createWorkOrder(data) {
   const customer = db().select().from(customers).where(eq(customers.id, customerId)).get();
   assertCustomerCanTransact(customer);
   const vehicle = getVehicle(vehicleId);
-  if (!vehicle) throw new Error("Vehículo no encontrado");
+  if (!vehicle || isGone(vehicle)) throw new Error("Vehículo no encontrado");
   if (vehicle.customerId && asId(vehicle.customerId) !== customerId) {
     throw new Error("Ese vehículo pertenece a otro cliente");
   }
@@ -2324,7 +2347,7 @@ function createWorkOrder(data) {
 
 function updateWorkOrder(id, data) {
   const current = db().select().from(workOrders).where(eq(workOrders.id, id)).get();
-  if (!current) throw new Error("Orden no encontrada");
+  if (!current || isGone(current)) throw new Error("Orden no encontrada");
   if (current.status === "entregada") throw new Error("La orden ya fue entregada");
   db()
     .update(workOrders)
@@ -2354,7 +2377,7 @@ function updateWorkOrder(id, data) {
 function setWorkOrderStatus(id, status) {
   if (!WO_STATUSES.includes(status)) throw new Error("Estado no válido");
   const current = db().select().from(workOrders).where(eq(workOrders.id, id)).get();
-  if (!current) throw new Error("Orden no encontrada");
+  if (!current || isGone(current)) throw new Error("Orden no encontrada");
   if (current.status === "entregada") throw new Error("La orden ya fue entregada");
   if (isEstimate(current) && status !== "recepcion" && status !== "autorizacion") {
     throw new Error("Convierte el presupuesto a OT para avanzar el taller");
@@ -2446,7 +2469,7 @@ function restorePartStock(order, line, qty) {
 
 function addWorkOrderLine(id, data) {
   const order = db().select().from(workOrders).where(eq(workOrders.id, id)).get();
-  if (!order) throw new Error("Orden no encontrada");
+  if (!order || isGone(order)) throw new Error("Orden no encontrada");
   if (order.status === "entregada") throw new Error("La orden ya fue entregada");
   const type = data.type === "part" ? "part" : "labor";
   if (data.qty != null && data.qty !== "" && !(Number(data.qty) > 0)) {
@@ -2467,7 +2490,7 @@ function addWorkOrderLine(id, data) {
     if (type === "part") {
       partId = asId(data.partId);
       const part = db().select().from(parts).where(eq(parts.id, partId)).get();
-      if (!part) throw new Error("Parte no encontrada");
+      if (!part || isGone(part)) throw new Error("Parte no encontrada");
       if (!estimate && part.stock < qty && !Number(part.specialOrder)) {
         throw new Error(`Stock insuficiente de ${part.name} (${part.stock} disp.)`);
       }
@@ -2505,7 +2528,7 @@ function addWorkOrderLine(id, data) {
     let bundled = [];
     if (opCodeId) {
       const op = getOpCode(opCodeId);
-      if (!op || !op.active) throw new Error("Op Code no encontrado o inactivo");
+      if (!op || isGone(op) || !op.active) throw new Error("Op Code no encontrado o inactivo");
       description = description || `${op.code} · ${op.description}`;
       hours = data.qty != null ? Number(data.qty) : Number(op.laborHours) || 1;
       unitPrice = data.unitPrice != null ? Number(data.unitPrice) : Number(op.price) || Number(op.laborHours) * Number(op.laborRate);
@@ -2545,7 +2568,7 @@ function addWorkOrderLine(id, data) {
 
     for (const bundle of bundled) {
       const part = db().select().from(parts).where(eq(parts.id, bundle.partId)).get();
-      if (!part) throw new Error("Parte del Op Code no encontrada");
+      if (!part || isGone(part)) throw new Error("Parte del Op Code no encontrada");
       const partQty = Number(bundle.qty) > 0 ? Number(bundle.qty) : 1;
       if (!estimate && part.stock < partQty && !Number(part.specialOrder)) {
         throw new Error(`Stock insuficiente de ${part.name} (${part.stock} disp.)`);
@@ -2581,7 +2604,7 @@ function updateWorkOrderLine(lineId, data) {
   const line = db().select().from(workOrderLines).where(eq(workOrderLines.id, lineId)).get();
   if (!line) throw new Error("Línea no encontrada");
   const order = db().select().from(workOrders).where(eq(workOrders.id, line.workOrderId)).get();
-  if (!order || order.status === "entregada") throw new Error("No se puede modificar una orden entregada");
+  if (!order || isGone(order) || order.status === "entregada") throw new Error("No se puede modificar una orden entregada");
   const authorized = data.authorized != null ? flag01(data.authorized, Number(line.authorized) || 1) : line.authorized == null ? 1 : Number(line.authorized);
   const payType = data.payType != null ? pickEnum(data.payType, LINE_PAYS, line.payType || "cliente") : line.payType || "cliente";
   const wasAuthorized = Number(line.authorized) !== 0;
@@ -2627,7 +2650,7 @@ function updateWorkOrderLine(lineId, data) {
 
 function convertEstimate(id) {
   const order = db().select().from(workOrders).where(eq(workOrders.id, id)).get();
-  if (!order) throw new Error("Orden no encontrada");
+  if (!order || isGone(order)) throw new Error("Orden no encontrada");
   if (!isEstimate(order)) throw new Error("Esa orden ya no es presupuesto");
   const lines = db().select().from(workOrderLines).where(eq(workOrderLines.workOrderId, id)).all();
   const run = getSqlite().transaction(() => {
@@ -2657,7 +2680,7 @@ function removeWorkOrderLine(lineId) {
   const line = db().select().from(workOrderLines).where(eq(workOrderLines.id, lineId)).get();
   if (!line) throw new Error("Línea no encontrada");
   const order = db().select().from(workOrders).where(eq(workOrders.id, line.workOrderId)).get();
-  if (!order || order.status === "entregada") throw new Error("No se puede modificar una orden entregada");
+  if (!order || isGone(order) || order.status === "entregada") throw new Error("No se puede modificar una orden entregada");
 
   const run = getSqlite().transaction(() => {
     if (!isEstimate(order) && Number(line.authorized) !== 0) restorePartStock(order, line);
@@ -2670,6 +2693,7 @@ function removeWorkOrderLine(lineId) {
 function removeWorkOrder(id) {
   const order = getWorkOrder(id);
   if (!order) throw new Error("Orden no encontrada");
+  if (isGone(order)) return { id };
   if (order.status === "entregada") throw new Error("La orden ya fue entregada");
   if (!isEstimate(order) && order.status !== "recepcion" && !(isSimpleOrder(order) && order.status === "en_taller")) {
     throw new Error("Solo se puede borrar un presupuesto o una OT recién abierta");
@@ -2680,9 +2704,7 @@ function removeWorkOrder(id) {
     if (!isEstimate(order)) {
       for (const line of lines) restorePartStock(order, line);
     }
-    db().delete(workOrderPayments).where(eq(workOrderPayments.workOrderId, id)).run();
-    db().delete(workOrderLines).where(eq(workOrderLines.workOrderId, id)).run();
-    db().delete(workOrders).where(eq(workOrders.id, id)).run();
+    markDeleted(workOrders, id, { updatedAt: nowIso() });
   });
   run();
   return { id };
@@ -2690,7 +2712,7 @@ function removeWorkOrder(id) {
 
 function deliverWorkOrder(id, data = {}) {
   const order = getWorkOrder(id);
-  if (!order) throw new Error("Orden no encontrada");
+  if (!order || isGone(order)) throw new Error("Orden no encontrada");
   if (order.status === "entregada") return order;
   if (isEstimate(order)) throw new Error("Convierte el presupuesto a OT antes de entregar");
   if (Number(order.balance) > 0.009 && !Number(order.customer?.accountOpen) && !data.force) {
@@ -2711,7 +2733,7 @@ function deliverWorkOrder(id, data = {}) {
 
 function addWorkOrderPayment(id, data) {
   const order = getWorkOrder(id);
-  if (!order) throw new Error("Orden no encontrada");
+  if (!order || isGone(order)) throw new Error("Orden no encontrada");
   if (isEstimate(order)) throw new Error("Convierte el presupuesto a OT para cobrar");
   const due = Number(order.balance) || 0;
   if (order.status === "entregada" && due <= 0.009) throw new Error("La OT ya está pagada y entregada");
@@ -2882,7 +2904,7 @@ function listStaff(opts = {}) {
     .select()
     .from(users)
     .all()
-    .filter((u) => u.active)
+    .filter((u) => u.active && !isGone(u))
     .map((u) => ({
       id: u.id,
       name: u.name,
@@ -2905,14 +2927,14 @@ function listStaff(opts = {}) {
 }
 
 function dashboardKpis() {
-  const inStock = db().select({ n: sql`count(*)` }).from(vehicles).where(eq(vehicles.status, "en_stock")).get();
-  const reserved = db().select({ n: sql`count(*)` }).from(vehicles).where(eq(vehicles.status, "reservado")).get();
+  const inStock = db().select({ n: sql`count(*)` }).from(vehicles).where(and(eq(vehicles.status, "en_stock"), alive(vehicles))).get();
+  const reserved = db().select({ n: sql`count(*)` }).from(vehicles).where(and(eq(vehicles.status, "reservado"), alive(vehicles))).get();
   const start = monthStartIso();
   const monthSales = db()
     .select()
     .from(sales)
     .all()
-    .filter((s) => (s.closedAt || s.createdAt) >= start && s.status !== "borrador");
+    .filter((s) => !isGone(s) && (s.closedAt || s.createdAt) >= start && s.status !== "borrador");
   const salesPretax = monthSales.reduce((s, row) => s + Number(row.price || 0), 0);
   const salesAmount = monthSales.reduce((s, row) => {
     const tax = roundMoney(row.tax != null ? row.tax : Number(row.price || 0) * (Number(row.taxRate) || 0) / 100);
@@ -2922,14 +2944,14 @@ function dashboardKpis() {
     const v = getVehicle(row.vehicleId);
     return s + Number(v?.cost || 0);
   }, 0);
-  const allParts = db().select().from(parts).all().map(decoratePart);
+  const allParts = db().select().from(parts).all().filter((p) => !isGone(p)).map(decoratePart);
   const lowStock = allParts.filter((p) => p.low);
   const deliveredWo = attachWorkOrders(
     db()
       .select()
       .from(workOrders)
       .all()
-      .filter((o) => o.status === "entregada" && (o.deliveredAt || o.createdAt) >= start)
+      .filter((o) => !isGone(o) && o.status === "entregada" && (o.deliveredAt || o.createdAt) >= start)
   );
   const woRevenue = deliveredWo.reduce((s, o) => s + Number(o.total || 0), 0);
   const woPretax = deliveredWo.reduce((s, o) => s + Number(o.total || 0) - Number(o.tax || 0), 0);
@@ -2938,7 +2960,7 @@ function dashboardKpis() {
     db()
       .select()
       .from(workOrders)
-      .where(ne(workOrders.status, "entregada"))
+      .where(and(ne(workOrders.status, "entregada"), alive(workOrders)))
       .all()
   );
   const shopOpen = openDetailed.filter((o) => !isWashOrder(o));
@@ -2992,7 +3014,8 @@ function financeSummary(period) {
     .map((p) => {
       const sale = attachSaleExtras(db().select().from(sales).where(eq(sales.id, p.saleId)).get());
       return { ...p, sale };
-    });
+    })
+    .filter((p) => p.sale && !isGone(p.sale));
   const woPayments = db()
     .select()
     .from(workOrderPayments)
@@ -3001,10 +3024,11 @@ function financeSummary(period) {
     .filter((p) => inPeriod(p.paidAt, bounds))
     .map((p) => {
       const order = db().select().from(workOrders).where(eq(workOrders.id, p.workOrderId)).get();
-      return { ...p, workOrder: order ? { id: order.id, number: order.number } : null };
-    });
-  const expenseRows = db().select().from(expenses).orderBy(desc(expenses.spentAt)).all().filter((e) => inPeriod(e.spentAt, bounds));
-  const incomeRows = db().select().from(incomes).orderBy(desc(incomes.receivedAt)).all().filter((e) => inPeriod(e.receivedAt, bounds));
+      return { ...p, workOrder: order && !isGone(order) ? { id: order.id, number: order.number } : null };
+    })
+    .filter((p) => p.workOrder);
+  const expenseRows = db().select().from(expenses).orderBy(desc(expenses.spentAt)).all().filter((e) => !isGone(e) && inPeriod(e.spentAt, bounds));
+  const incomeRows = db().select().from(incomes).orderBy(desc(incomes.receivedAt)).all().filter((e) => !isGone(e) && inPeriod(e.receivedAt, bounds));
 
   const collectedSales = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
   const collectedShop = woPayments.reduce((s, p) => s + Number(p.amount || 0), 0);
@@ -3030,7 +3054,7 @@ function financeSummary(period) {
     net: roundMoney(inByMethod[method] - outByMethod[method]),
   }));
 
-  const allOrders = db().select().from(workOrders).all().map(attachWorkOrder);
+  const allOrders = db().select().from(workOrders).all().filter((o) => !isGone(o)).map(attachWorkOrder);
   const postedOrders = allOrders.filter(
     (o) => o.kind !== "presupuesto" && o.status === "entregada" && inPeriod(o.deliveredAt || o.createdAt, bounds)
   );
@@ -3048,7 +3072,7 @@ function financeSummary(period) {
       since: o.createdAt,
       bucket: agingBucket(o.createdAt),
     }));
-  const allSales = db().select().from(sales).all().map(attachSaleExtras);
+  const allSales = db().select().from(sales).all().filter((s) => !isGone(s)).map(attachSaleExtras);
   const saleReceivables = allSales
     .filter((s) => (s.status === "cerrada" || s.status === "entregada") && Number(s.balance || 0) > 0.009)
     .map((s) => ({
@@ -3319,8 +3343,8 @@ function createExpense(data) {
 function removeExpense(id) {
   const row = db().select().from(expenses).where(eq(expenses.id, id)).get();
   if (!row) throw new Error("Gasto no encontrado");
-  db().delete(expenses).where(eq(expenses.id, id)).run();
-  return { id };
+  if (isGone(row)) return { id };
+  return markDeleted(expenses, id);
 }
 
 function createIncome(data) {
@@ -3346,8 +3370,8 @@ function createIncome(data) {
 function removeIncome(id) {
   const row = db().select().from(incomes).where(eq(incomes.id, id)).get();
   if (!row) throw new Error("Ingreso no encontrado");
-  db().delete(incomes).where(eq(incomes.id, id)).run();
-  return { id };
+  if (isGone(row)) return { id };
+  return markDeleted(incomes, id);
 }
 
 function collectMoney(data) {
@@ -3363,15 +3387,15 @@ function collectMoney(data) {
 }
 
 function isEmpty() {
-  const c = db().select({ n: sql`count(*)` }).from(customers).get();
-  const v = db().select({ n: sql`count(*)` }).from(vehicles).get();
-  const p = db().select({ n: sql`count(*)` }).from(parts).get();
+  const c = db().select({ n: sql`count(*)` }).from(customers).where(alive(customers)).get();
+  const v = db().select({ n: sql`count(*)` }).from(vehicles).where(alive(vehicles)).get();
+  const p = db().select({ n: sql`count(*)` }).from(parts).where(alive(parts)).get();
   return Number(c?.n) === 0 && Number(v?.n) === 0 && Number(p?.n) === 0;
 }
 
 function listOpCodes(q, opts = {}) {
   const query = String(q || "").trim();
-  let rows = db().select().from(opCodes).orderBy(opCodes.code).all();
+  let rows = db().select().from(opCodes).orderBy(opCodes.code).all().filter((r) => !isGone(r));
   if (opts.activeOnly) rows = rows.filter((r) => r.active);
   if (opts.serviceLine === "lavado" || opts.serviceLine === "taller") {
     rows = rows.filter((r) => {
@@ -3391,7 +3415,7 @@ function opcodeParts(opCodeId) {
   const out = [];
   for (const row of rows) {
     const part = decoratePart(db().select().from(parts).where(eq(parts.id, row.partId)).get());
-    if (!part) continue;
+    if (!part || isGone(part)) continue;
     out.push({
       id: row.id,
       opCodeId,
@@ -3452,8 +3476,11 @@ function createOpCode(data) {
   if (!/^[A-Z0-9][A-Z0-9/_-]{0,15}$/.test(code)) {
     throw new Error("El código debe ser corto (letras, números, - / _)");
   }
-  if (db().select().from(opCodes).where(eq(opCodes.code, code)).get()) {
-    throw new Error("Ya existe ese Op Code");
+  const existing = db().select().from(opCodes).where(eq(opCodes.code, code)).get();
+  if (existing && !isGone(existing)) throw new Error("Ya existe ese Op Code");
+  if (existing && isGone(existing)) {
+    db().update(opCodes).set({ deleted: 0, active: 1 }).where(eq(opCodes.id, existing.id)).run();
+    return updateOpCode(existing.id, { ...data, active: 1 });
   }
   const laborHours = Number(data.laborHours) || 1;
   const laborRate = Number(data.laborRate) || 0;
@@ -3488,8 +3515,9 @@ function updateOpCode(id, data) {
   const current = getOpCode(id);
   if (!current) throw new Error("Op Code no encontrado");
   const code = data.code != null ? String(data.code).trim().toUpperCase() : current.code;
-  if (code !== current.code && db().select().from(opCodes).where(eq(opCodes.code, code)).get()) {
-    throw new Error("Ya existe ese Op Code");
+  if (code !== current.code) {
+    const clash = db().select().from(opCodes).where(eq(opCodes.code, code)).get();
+    if (clash && asId(clash.id) !== asId(id)) throw new Error("Ya existe ese Op Code");
   }
   const laborHours = data.laborHours != null ? Number(data.laborHours) : current.laborHours;
   const laborRate = data.laborRate != null ? Number(data.laborRate) : current.laborRate;
@@ -3521,14 +3549,10 @@ function updateOpCode(id, data) {
 }
 
 function removeOpCode(id) {
-  const used = db().select({ n: sql`count(*)` }).from(workOrderLines).where(eq(workOrderLines.opCodeId, id)).get();
-  if (Number(used?.n) > 0) {
-    db().update(opCodes).set({ active: 0 }).where(eq(opCodes.id, id)).run();
-    return { id, deactivated: true };
-  }
-  db().delete(opCodeParts).where(eq(opCodeParts.opCodeId, id)).run();
-  db().delete(opCodes).where(eq(opCodes.id, id)).run();
-  return { id };
+  const current = db().select().from(opCodes).where(eq(opCodes.id, id)).get();
+  if (!current) throw new Error("Op Code no encontrado");
+  if (isGone(current)) return { id };
+  return markDeleted(opCodes, id, { active: 0 });
 }
 
 function linkKnownOpcodeParts() {

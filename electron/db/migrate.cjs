@@ -426,6 +426,15 @@ function migrate(sqlite) {
   addColumnIfMissing(sqlite, "work_orders", "service_line", "service_line TEXT NOT NULL DEFAULT 'taller'");
   addColumnIfMissing(sqlite, "sales", "tax_rate", "tax_rate REAL NOT NULL DEFAULT 0");
   addColumnIfMissing(sqlite, "sales", "tax", "tax REAL NOT NULL DEFAULT 0");
+  addColumnIfMissing(sqlite, "users", "deleted", "deleted INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(sqlite, "customers", "deleted", "deleted INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(sqlite, "vehicles", "deleted", "deleted INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(sqlite, "sales", "deleted", "deleted INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(sqlite, "parts", "deleted", "deleted INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(sqlite, "work_orders", "deleted", "deleted INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(sqlite, "op_codes", "deleted", "deleted INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(sqlite, "expenses", "deleted", "deleted INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(sqlite, "incomes", "deleted", "deleted INTEGER NOT NULL DEFAULT 0");
   ensureShopSettingsRow(sqlite);
   applyCanadaShopDefaults(sqlite);
   backfillCustomerNames(sqlite);

@@ -24,6 +24,7 @@ const users = sqliteTable("users", {
   canTech: integer("can_tech").notNull().default(1),
   canWash: integer("can_wash").notNull().default(0),
   active: integer("active").notNull().default(1),
+  deleted: integer("deleted").notNull().default(0),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -57,6 +58,7 @@ const customers = sqliteTable("customers", {
   birthday: text("birthday").notNull().default(""),
   marketing: integer("marketing").notNull().default(1),
   contactsJson: text("contacts_json").notNull().default("[]"),
+  deleted: integer("deleted").notNull().default(0),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull().default(""),
 });
@@ -104,6 +106,7 @@ const vehicles = sqliteTable("vehicles", {
   inspectionDue: text("inspection_due").notNull().default(""),
   productionDate: text("production_date").notNull().default(""),
   alert: text("alert").notNull().default(""),
+  deleted: integer("deleted").notNull().default(0),
   updatedAt: text("updated_at").notNull().default(""),
 });
 
@@ -129,6 +132,7 @@ const sales = sqliteTable("sales", {
   closedAt: text("closed_at"),
   deliveredAt: text("delivered_at"),
   createdAt: text("created_at").notNull(),
+  deleted: integer("deleted").notNull().default(0),
 });
 
 const salePayments = sqliteTable("sale_payments", {
@@ -165,6 +169,7 @@ const parts = sqliteTable("parts", {
   specialOrder: integer("special_order").notNull().default(0),
   notes: text("notes").notNull().default(""),
   updatedAt: text("updated_at").notNull().default(""),
+  deleted: integer("deleted").notNull().default(0),
 });
 
 const workOrders = sqliteTable("work_orders", {
@@ -194,6 +199,7 @@ const workOrders = sqliteTable("work_orders", {
   createdAt: text("created_at").notNull(),
   deliveredAt: text("delivered_at"),
   updatedAt: text("updated_at").notNull().default(""),
+  deleted: integer("deleted").notNull().default(0),
 });
 
 const workOrderLines = sqliteTable("work_order_lines", {
@@ -231,6 +237,7 @@ const opCodes = sqliteTable("op_codes", {
   active: integer("active").notNull().default(1),
   notes: text("notes").notNull().default(""),
   createdAt: text("created_at").notNull(),
+  deleted: integer("deleted").notNull().default(0),
 });
 
 const opCodeParts = sqliteTable("op_code_parts", {
@@ -278,6 +285,7 @@ const expenses = sqliteTable("expenses", {
   method: text("method").notNull().default("efectivo"),
   spentAt: text("spent_at").notNull(),
   notes: text("notes").notNull().default(""),
+  deleted: integer("deleted").notNull().default(0),
 });
 
 const incomes = sqliteTable("incomes", {
@@ -287,6 +295,7 @@ const incomes = sqliteTable("incomes", {
   receivedAt: text("received_at").notNull(),
   notes: text("notes").notNull().default(""),
   category: text("category").notNull().default("otros"),
+  deleted: integer("deleted").notNull().default(0),
 });
 
 const inventoryMovements = sqliteTable("inventory_movements", {

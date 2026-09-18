@@ -190,10 +190,6 @@ export default function Users() {
   }
 
   async function remove(row: AppUser) {
-    if (row.assigned) {
-      setError(t("users.deleteBlocked"));
-      return;
-    }
     if (!confirm(t("users.deleteConfirm"))) return;
     try {
       await call(window.dms.users.remove(row.id));

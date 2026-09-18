@@ -5,6 +5,10 @@ export type ChangelogRelease = {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: "1.0.7",
+    items: ["changelog.107.archive"],
+  },
+  {
     version: "1.0.6",
     items: ["changelog.106.click", "changelog.106.popup"],
   },

@@ -417,19 +417,35 @@ app.whenReady().then(async () => {
     techUserId: techEmp.id,
   });
   if (assignedWo.techUserId !== techEmp.id) throw new Error("No asignó el técnico a la OT");
-  let blockedDel = false;
-  try {
-    auth.removeUser(master, techEmp.id);
-  } catch (e) {
-    blockedDel = /asignad/i.test(String(e.message));
-  }
-  if (!blockedDel) throw new Error("No debe borrar empleado con OT asignadas");
   const off = auth.updateUser(master, techEmp.id, { active: 0 });
   if (off.active) throw new Error("No desactivó al técnico");
   if (!auth.listUsers(master).find((u) => u.id === techEmp.id)?.assigned) {
     throw new Error("El directorio no marca órdenes asignadas");
   }
+  auth.removeUser(master, techEmp.id);
+  if (auth.listUsers(master).some((u) => u.id === techEmp.id)) {
+    throw new Error("El directorio muestra un empleado borrado");
+  }
+  if (Number(auth.getUser(techEmp.id)?.deleted) !== 1) {
+    throw new Error("El empleado se borró del todo");
+  }
+  const revivedTech = auth.createUser(master, {
+    firstName: "Técnico",
+    middleName: "Luis",
+    lastName: "Uno",
+    username: "tecnico1",
+    password: "tecnic1",
+    role: "empleado",
+    job: "tecnico",
+  });
+  if (revivedTech.id !== techEmp.id) throw new Error("Reusar usuario no restauró el registro");
   auth.removeUser(master, salesEmp.id);
+  if (auth.listUsers(master).some((u) => u.id === salesEmp.id)) {
+    throw new Error("El empleado borrado sigue en la lista");
+  }
+  if (Number(auth.getUser(salesEmp.id)?.deleted) !== 1) {
+    throw new Error("El empleado de ventas se borró del todo");
+  }
 
   const due = repo.getWorkOrder(openWo.id);
   if (Number(due.balance) > 50) {
@@ -569,6 +585,68 @@ app.whenReady().then(async () => {
   const simpleWo = repo.createWorkOrder({ customerId: plated.customerId, vehicleId: plated.id, complaint: "Modo sencillo" });
   if (simpleWo.status !== "en_taller" || !simpleWo.authorizedAt) throw new Error("Modo sencillo no abre la OT en taller");
   repo.removeWorkOrder(simpleWo.id);
+  if (repo.listWorkOrders().some((o) => o.id === simpleWo.id)) throw new Error("La lista de OT muestra una borrada");
+  if (Number(repo.getWorkOrder(simpleWo.id)?.deleted) !== 1) throw new Error("La OT se borró del todo");
+
+  const ghostCust = repo.createCustomer({ firstName: "Archivo", lastName: "Cliente" });
+  repo.removeCustomer(ghostCust.id);
+  if (repo.listCustomers().some((c) => c.id === ghostCust.id)) throw new Error("La lista de clientes muestra uno borrado");
+  if (Number(repo.getCustomer(ghostCust.id)?.deleted) !== 1) throw new Error("El cliente se borró del todo");
+
+  const ghostVin = "ZZSOFTDELETE00001";
+  const ghostCar = repo.createVehicle({
+    vin: ghostVin,
+    make: "Honda",
+    model: "Civic",
+    year: 2010,
+    status: "cliente",
+    customerId: plated.customerId,
+  });
+  repo.removeVehicle(ghostCar.id);
+  if (repo.listVehicles().some((v) => v.id === ghostCar.id)) throw new Error("La lista de vehículos muestra uno borrado");
+  if (Number(repo.getVehicle(ghostCar.id)?.deleted) !== 1) throw new Error("El vehículo se borró del todo");
+  const revivedCar = repo.createVehicle({
+    vin: ghostVin,
+    make: "Honda",
+    model: "Civic",
+    year: 2012,
+    status: "cliente",
+    customerId: plated.customerId,
+  });
+  if (revivedCar.id !== ghostCar.id || Number(revivedCar.deleted) === 1) {
+    throw new Error("Reusar VIN no restauró el vehículo");
+  }
+
+  const ghostPart = repo.createPart({ sku: "DEL-SOFT-1", name: "Tornillo archivo", stock: 1, cost: 1, price: 2 });
+  repo.removePart(ghostPart.id);
+  if (repo.listParts().some((p) => p.id === ghostPart.id)) throw new Error("La lista de partes muestra una borrada");
+  if (Number(repo.getPart(ghostPart.id)?.deleted) !== 1) throw new Error("La parte se borró del todo");
+  const revivedPart = repo.createPart({ sku: "DEL-SOFT-1", name: "Tornillo archivo", stock: 3, cost: 1, price: 2 });
+  if (revivedPart.id !== ghostPart.id || Number(revivedPart.deleted) === 1) {
+    throw new Error("Reusar SKU no restauró la parte");
+  }
+
+  repo.removeOpCode(custom.id);
+  if (repo.listOpCodes().some((o) => o.id === custom.id)) throw new Error("La lista de Op Codes muestra uno borrado");
+  if (Number(repo.getOpCode(custom.id)?.deleted) !== 1) throw new Error("El Op Code se borró del todo");
+  const revivedOp = repo.createOpCode({
+    code: "CUST1",
+    description: "Operación restaurada",
+    category: "otros",
+    payType: "cliente",
+    laborHours: 1,
+    laborRate: 800,
+  });
+  if (revivedOp.id !== custom.id || Number(revivedOp.deleted) === 1) {
+    throw new Error("Reusar Op Code no restauró el registro");
+  }
+
+  const ghostExp = repo.createExpense({ amount: 11, category: "otros", method: "efectivo", notes: "archivo" });
+  repo.removeExpense(ghostExp.id);
+  const booksAfter = repo.financeSummary("month");
+  if (booksAfter.expenses.some((e) => e.id === ghostExp.id)) throw new Error("Contaduría muestra un gasto borrado");
+  const archivedExp = repo.sqlQuery(`SELECT deleted FROM expenses WHERE id = '${ghostExp.id}'`);
+  if (Number(archivedExp.rows[0]?.deleted) !== 1) throw new Error("El gasto se borró del todo");
   repo.saveSettings({ ...savedShop, serviceMode: "completo" });
   if (repo.getSettings().serviceMode !== "completo") throw new Error("No se restauró el modo completo");
   const sqlOne = repo.sqlQuery("SELECT 1 AS n");

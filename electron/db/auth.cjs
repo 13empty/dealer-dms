@@ -164,7 +164,7 @@ function canManage(actor, target) {
 
 function countUsers(role, onlyActive = false) {
   const rows = db().select().from(users).all();
-  return rows.filter((u) => (!role || u.role === role) && (!onlyActive || u.active === 1)).length;
+  return rows.filter((u) => Number(u.deleted) !== 1 && (!role || u.role === role) && (!onlyActive || u.active === 1)).length;
 }
 
 function userCount() {
@@ -175,9 +175,10 @@ function listUsers(actor, q) {
   const query = String(q || "").trim().toLowerCase();
   const assigned = new Set(
     db()
-      .select({ techUserId: workOrders.techUserId })
+      .select()
       .from(workOrders)
       .all()
+      .filter((row) => Number(row.deleted) !== 1)
       .map((row) => row.techUserId)
       .filter(Boolean)
   );
@@ -186,6 +187,7 @@ function listUsers(actor, q) {
     .from(users)
     .orderBy(desc(users.createdAt))
     .all()
+    .filter((row) => Number(row.deleted) !== 1)
     .map((row) => ({ ...stripUser(row), assigned: assigned.has(row.id) }));
   if (actor.role === "master") rows = rows.filter((u) => u.role !== "admin");
   if (actor.role === "gerente") rows = rows.filter((u) => u.role === "empleado");
@@ -230,8 +232,37 @@ function createUser(actor, data) {
   } else if (role !== "admin") {
     throw new Error("El primer usuario debe ser Admin (dueño de la app)");
   }
-  if (getUserByUsername(username)) throw new Error("Ese usuario ya existe");
+  const existing = getUserByUsername(username);
+  if (existing && Number(existing.deleted) !== 1) throw new Error("Ese usuario ya existe");
   const job = jobOf(data.job, role);
+  if (existing) {
+    db()
+      .update(users)
+      .set({
+        ...profile,
+        username,
+        passwordHash: hashPassword(password),
+        role,
+        job,
+        phone: textField(data.phone),
+        email: textField(data.email),
+        document: textField(data.document),
+        address: textField(data.address),
+        city: textField(data.city),
+        state: textField(data.state),
+        zip: textField(data.zip),
+        notes: textField(data.notes),
+        laborRate: Math.max(0, Number(data.laborRate) || 0),
+        canTech: canTechOf(data, job),
+        canWash: canWashOf(data, job),
+        active: 1,
+        deleted: 0,
+        updatedAt: nowIso(),
+      })
+      .where(eq(users.id, existing.id))
+      .run();
+    return stripUser(getUser(existing.id));
+  }
   const id = crypto.randomUUID();
   db()
     .insert(users)
@@ -326,22 +357,19 @@ function setPassword(actor, id, password) {
 function removeUser(actor, id) {
   const target = getUser(id);
   if (!target) throw new Error("Usuario no encontrado");
+  if (Number(target.deleted) === 1) return { id };
   if (actor.id === id) throw new Error("No puedes borrar tu propia cuenta");
   if (!canManage(actor, target)) throw new Error("Sin permiso");
   if (target.role === "admin" && countUsers("admin", true) <= 1) {
     throw new Error("Debe quedar al menos un Admin");
   }
-  const assigned = db().select().from(workOrders).where(eq(workOrders.techUserId, id)).get();
-  if (assigned) {
-    throw new Error("Este empleado tiene órdenes asignadas. Desactívalo en lugar de borrarlo.");
-  }
-  db().delete(users).where(eq(users.id, id)).run();
+  db().update(users).set({ deleted: 1, active: 0, updatedAt: nowIso() }).where(eq(users.id, id)).run();
   return { id };
 }
 
 function login(username, password) {
   const user = getUserByUsername(username);
-  if (!user || !verifyPassword(password, user.passwordHash)) {
+  if (!user || Number(user.deleted) === 1 || !verifyPassword(password, user.passwordHash)) {
     throw new Error("Usuario o contraseña incorrectos");
   }
   if (!user.active) throw new Error("Esta cuenta está desactivada");

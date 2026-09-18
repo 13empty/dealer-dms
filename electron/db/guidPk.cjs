@@ -45,6 +45,7 @@ CREATE TABLE users (
   can_tech INTEGER NOT NULL DEFAULT 1,
   can_wash INTEGER NOT NULL DEFAULT 0,
   active INTEGER NOT NULL DEFAULT 1,
+  deleted INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -77,6 +78,7 @@ CREATE TABLE customers (
   birthday TEXT NOT NULL DEFAULT '',
   marketing INTEGER NOT NULL DEFAULT 1,
   contacts_json TEXT NOT NULL DEFAULT '[]',
+  deleted INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT ''
 );
@@ -124,6 +126,7 @@ CREATE TABLE vehicles (
   production_date TEXT NOT NULL DEFAULT '',
   alert TEXT NOT NULL DEFAULT '',
   updated_at TEXT NOT NULL DEFAULT '',
+  deleted INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (customer_id) REFERENCES customers(id)
 );
 CREATE TABLE vehicle_notes (
@@ -158,7 +161,8 @@ CREATE TABLE parts (
   status TEXT NOT NULL DEFAULT 'activo',
   special_order INTEGER NOT NULL DEFAULT 0,
   notes TEXT NOT NULL DEFAULT '',
-  updated_at TEXT NOT NULL DEFAULT ''
+  updated_at TEXT NOT NULL DEFAULT '',
+  deleted INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE op_codes (
   id TEXT PRIMARY KEY,
@@ -177,7 +181,8 @@ CREATE TABLE op_codes (
   popular INTEGER NOT NULL DEFAULT 0,
   active INTEGER NOT NULL DEFAULT 1,
   notes TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  deleted INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE sales (
   id TEXT PRIMARY KEY,
@@ -193,6 +198,7 @@ CREATE TABLE sales (
   closed_at TEXT,
   delivered_at TEXT,
   created_at TEXT NOT NULL,
+  deleted INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (customer_id) REFERENCES customers(id),
   FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
 );
@@ -232,6 +238,7 @@ CREATE TABLE work_orders (
   created_at TEXT NOT NULL,
   delivered_at TEXT,
   updated_at TEXT NOT NULL DEFAULT '',
+  deleted INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (customer_id) REFERENCES customers(id),
   FOREIGN KEY (vehicle_id) REFERENCES vehicles(id),
   FOREIGN KEY (tech_user_id) REFERENCES users(id)
@@ -302,7 +309,8 @@ CREATE TABLE expenses (
   category TEXT NOT NULL DEFAULT 'otros',
   method TEXT NOT NULL DEFAULT 'efectivo',
   spent_at TEXT NOT NULL,
-  notes TEXT NOT NULL DEFAULT ''
+  notes TEXT NOT NULL DEFAULT '',
+  deleted INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX idx_vehicles_status ON vehicles(status);
 CREATE INDEX idx_vehicles_customer ON vehicles(customer_id);
