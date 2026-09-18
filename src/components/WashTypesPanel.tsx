@@ -175,11 +175,13 @@ export function WashTypePicker({
   selectedIds,
   onToggle,
   disabled,
+  compact,
 }: {
   types: WashType[];
   selectedIds: string[];
   onToggle: (id: string) => void;
   disabled?: boolean;
+  compact?: boolean;
 }) {
   const { t } = useI18n();
   const active = types.filter((row) => row.active);
@@ -187,7 +189,7 @@ export function WashTypePicker({
     return <p className="text-sm text-slate-500">{t("wash.noTypesYet")}</p>;
   }
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
+    <div className={compact ? "flex flex-wrap gap-1.5" : "grid gap-2 sm:grid-cols-2"}>
       {active.map((row) => {
         const on = selectedIds.includes(row.id);
         return (
@@ -196,17 +198,26 @@ export function WashTypePicker({
             type="button"
             disabled={disabled}
             onClick={() => onToggle(row.id)}
-            className={`rounded-xl border px-3 py-3 text-left transition ${
+            className={`${
+              compact ? "rounded-md border px-2 py-1 text-left text-xs" : "rounded-xl border px-3 py-3 text-left"
+            } transition ${
               on ? "border-cyan-400/70 bg-cyan-400/10" : "border-ink-600 bg-ink-900/60 hover:border-ink-500"
             } ${disabled ? "opacity-50" : ""}`}
           >
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="font-medium text-slate-100">{row.name}</div>
-                <div className="mt-0.5 text-xs text-slate-500">{t(k(`op.${row.category}`))}</div>
+            {compact ? (
+              <span>
+                <span className="font-medium text-slate-100">{row.name}</span>
+                <span className="ml-1.5 text-cyan-200">{money(row.price)}</span>
+              </span>
+            ) : (
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-medium text-slate-100">{row.name}</div>
+                  <div className="mt-0.5 text-xs text-slate-500">{t(k(`op.${row.category}`))}</div>
+                </div>
+                <div className="shrink-0 text-sm font-medium text-cyan-200">{money(row.price)}</div>
               </div>
-              <div className="shrink-0 text-sm font-medium text-cyan-200">{money(row.price)}</div>
-            </div>
+            )}
           </button>
         );
       })}

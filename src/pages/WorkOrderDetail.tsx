@@ -6,6 +6,7 @@ import { Badge, Button, Card, ErrorText, Field, Page, PageHeader, GuidCopy } fro
 import { SHOP_DEFAULTS } from "../lib/canada";
 import { call, customerName, dateEs, fromDateTimeLocal, isWashCategory, money, toDateTimeLocal, vehicleLabel, workOrderListPath, workOrderPath } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
+import { useShop } from "../lib/shop-context";
 import type { StaffUser, WashType, WorkOrder, WorkOrderLine, WorkOrderStatus } from "../vite-env";
 
 const FULL_FLOW: WorkOrderStatus[] = ["recepcion", "autorizacion", "espera_partes", "en_taller", "en_espera", "lista"];
@@ -24,6 +25,7 @@ export default function WorkOrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useI18n();
+  const { offerWash } = useShop();
   const [order, setOrder] = useState<WorkOrder | null>(null);
   const [staff, setStaff] = useState<StaffUser[]>([]);
   const [taxLabel, setTaxLabel] = useState(SHOP_DEFAULTS.taxLabel);
@@ -57,13 +59,11 @@ export default function WorkOrderDetail() {
   async function load() {
     try {
       setError(null);
-      const [wo, settings, types] = await Promise.all([
+      const [wo, settings] = await Promise.all([
         call(window.dms.workOrders.get(String(id || ""))),
         call(window.dms.settings.get()),
-        call(window.dms.washTypes.list({ activeOnly: true })),
       ]);
       setOrder(wo);
-      setWashTypes(Array.isArray(types) ? types : []);
       if (!wo) throw new Error(t("workshop.missing"));
       const staffRows = await call(window.dms.staff.list({ line: "taller" }));
       setStaff(() => {
@@ -112,6 +112,16 @@ export default function WorkOrderDetail() {
     setSelectedLineId(null);
     void load();
   }, [id]);
+
+  useEffect(() => {
+    if (!offerWash) {
+      setWashTypes([]);
+      return;
+    }
+    void call(window.dms.washTypes.list({ activeOnly: true }))
+      .then((types) => setWashTypes(Array.isArray(types) ? types : []))
+      .catch(() => setWashTypes([]));
+  }, [offerWash]);
 
   async function act(fn: () => Promise<WorkOrder>) {
     try {
@@ -501,38 +511,6 @@ export default function WorkOrderDetail() {
         </div>
       </Card>
 
-      <Card className="p-4">
-        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-          <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{t("wash.addToRo")}</div>
-          <Link className="text-xs text-gold-400 hover:underline" to="/lavado?tipos=1">
-            {t("wash.manageTypes")}
-          </Link>
-        </div>
-        <p className="mb-3 text-xs text-slate-500">{t("wash.addToRoHint")}</p>
-        <WashTypePicker
-          types={washTypes}
-          selectedIds={(order.lines || []).map((line) => line.opCodeId || "").filter(Boolean)}
-          disabled={locked}
-          onToggle={(typeId) => {
-            const existing = (order.lines || []).find((line) => line.opCodeId === typeId);
-            if (existing) {
-              if (!confirm(t("workshop.removeLine"))) return;
-              void act(() => call(window.dms.workOrders.removeLine(existing.id)));
-              return;
-            }
-            void addAndSelect(() =>
-              call(
-                window.dms.workOrders.addLine(order.id, {
-                  type: "labor",
-                  opCodeId: typeId,
-                  payType: "cliente",
-                })
-              )
-            );
-          }}
-        />
-      </Card>
-
       {simple && !selectedLine ? null : (
       <Card className="p-3">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -650,8 +628,8 @@ export default function WorkOrderDetail() {
                     onClick={() => selectLine(line)}
                   >
                     <td className="px-4 py-2">
-                      {isWashCategory(line.opcode?.category)
-                        ? t("wash.addToRo")
+                      {offerWash && isWashCategory(line.opcode?.category)
+                        ? t(k(`op.${line.opcode?.category === "detailing" ? "detailing" : "lavado"}`))
                         : line.type === "part"
                           ? t("workshop.part")
                           : line.opcode
@@ -851,6 +829,38 @@ export default function WorkOrderDetail() {
               </div>
             </div>
           </div>
+          {offerWash && !locked ? (
+            <details className="border-t border-ink-600 px-3 py-2">
+              <summary className="cursor-pointer select-none text-xs text-slate-500 hover:text-slate-300">
+                {t("wash.addToRo")}
+              </summary>
+              <p className="mt-2 text-xs text-slate-500">{t("wash.addToRoHint")}</p>
+              <div className="mt-2">
+                <WashTypePicker
+                  compact
+                  types={washTypes}
+                  selectedIds={(order.lines || []).map((line) => line.opCodeId || "").filter(Boolean)}
+                  onToggle={(typeId) => {
+                    const existing = (order.lines || []).find((line) => line.opCodeId === typeId);
+                    if (existing) {
+                      if (!confirm(t("workshop.removeLine"))) return;
+                      void act(() => call(window.dms.workOrders.removeLine(existing.id)));
+                      return;
+                    }
+                    void addAndSelect(() =>
+                      call(
+                        window.dms.workOrders.addLine(order.id, {
+                          type: "labor",
+                          opCodeId: typeId,
+                          payType: "cliente",
+                        })
+                      )
+                    );
+                  }}
+                />
+              </div>
+            </details>
+          ) : null}
         </Card>
 
         <div className="space-y-3 xl:sticky xl:top-3 xl:self-start">
