@@ -22,6 +22,7 @@ const users = sqliteTable("users", {
   notes: text("notes").notNull().default(""),
   laborRate: real("labor_rate").notNull().default(0),
   canTech: integer("can_tech").notNull().default(1),
+  canWash: integer("can_wash").notNull().default(0),
   active: integer("active").notNull().default(1),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
@@ -173,6 +174,7 @@ const workOrders = sqliteTable("work_orders", {
   vehicleId: text("vehicle_id").notNull(),
   status: text("status").notNull().default("recepcion"),
   kind: text("kind").notNull().default("orden"),
+  serviceLine: text("service_line").notNull().default("taller"),
   complaint: text("complaint").notNull().default(""),
   cause: text("cause").notNull().default(""),
   correction: text("correction").notNull().default(""),
@@ -266,6 +268,7 @@ const shopSettings = sqliteTable("shop_settings", {
   partCategories: text("part_categories").notNull().default(""),
   partUoms: text("part_uoms").notNull().default(""),
   allowUpdates: integer("allow_updates").notNull().default(0),
+  offerWash: integer("offer_wash").notNull().default(0),
 });
 
 const expenses = sqliteTable("expenses", {

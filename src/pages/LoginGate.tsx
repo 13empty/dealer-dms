@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppearanceStrip } from "../components/Appearance";
 import { BrandMark } from "../components/BrandMark";
 import { Button, Card, ErrorText, Field } from "../components/ui";
 import { useAuth } from "../lib/auth";
+import { call } from "../lib/format";
 import { LanguageSelect, useI18n } from "../lib/i18n";
 
 export default function LoginGate() {
@@ -13,6 +14,13 @@ export default function LoginGate() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [appVersion, setAppVersion] = useState("");
+
+  useEffect(() => {
+    void call(window.dms.meta.version())
+      .then((v) => setAppVersion(String(v || "")))
+      .catch(() => {});
+  }, []);
 
   async function submit() {
     setBusy(true);
@@ -66,6 +74,9 @@ export default function LoginGate() {
           </Button>
         </form>
       </Card>
+      {appVersion ? (
+        <div className="absolute bottom-4 left-6 text-[11px] tabular-nums text-slate-500">{t("nav.version", { version: appVersion })}</div>
+      ) : null}
     </div>
   );
 }

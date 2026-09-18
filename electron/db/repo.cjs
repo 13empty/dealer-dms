@@ -1331,6 +1331,71 @@ const PART_UOMS = ["pza", "juego", "litro", "galon", "metro"];
 const PART_ADJUST_REASONS = ["conteo", "merma", "dano", "devolucion_proveedor", "correccion", "entrada"];
 const OP_CATEGORIES = ["mantenimiento", "frenos", "motor", "transmision", "electrico", "suspension", "diagnostico", "climatizacion", "carroceria", "llantas", "otros"];
 const OP_PAY_TYPES = ["cliente", "garantia", "interno", "sublet"];
+const WASH_CATEGORIES = ["lavado", "detailing"];
+const WASH_OP_CODES = [
+  {
+    code: "WASH-X",
+    description: "Lavado exterior",
+    category: "lavado",
+    laborHours: 0.3,
+    price: 35,
+    concern: "Exterior sucio",
+    cause: "Polvo y suciedad de calle",
+    correction: "Lavado y secado exterior",
+  },
+  {
+    code: "WASH-I",
+    description: "Lavado interior",
+    category: "lavado",
+    laborHours: 0.4,
+    price: 40,
+    concern: "Interior sucio",
+    cause: "Uso diario",
+    correction: "Aspirado y limpia interior",
+  },
+  {
+    code: "WASH-F",
+    description: "Lavado completo",
+    category: "lavado",
+    laborHours: 0.6,
+    price: 65,
+    popular: 1,
+    concern: "Lavado completo",
+    cause: "Mantenimiento de presentación",
+    correction: "Lavado interior y exterior",
+  },
+  {
+    code: "DET-X",
+    description: "Detailing express",
+    category: "detailing",
+    laborHours: 1.5,
+    price: 149,
+    popular: 1,
+    concern: "Presentación",
+    cause: "Suciedad incrustada",
+    correction: "Detailing express interior y exterior",
+  },
+  {
+    code: "DET-F",
+    description: "Detailing completo",
+    category: "detailing",
+    laborHours: 3,
+    price: 299,
+    concern: "Detailing completo",
+    cause: "Vehículo opaco o sucio a fondo",
+    correction: "Detailing interior y exterior completo",
+  },
+  {
+    code: "WAX",
+    description: "Encerado",
+    category: "detailing",
+    laborHours: 0.8,
+    price: 89,
+    concern: "Pintura opaca",
+    cause: "Desgaste de cera",
+    correction: "Aplicar cera protectora",
+  },
+];
 
 function catalogKey(value) {
   return String(value || "")
@@ -1444,6 +1509,32 @@ function saveCatalogs(data) {
   }
   if (Object.keys(patch).length) patchSettings(patch);
   return getCatalogs();
+}
+
+function ensureWashSetup() {
+  const cats = getCatalogs();
+  const nextOp = cats.opcodeCategories.map((item) => item.id);
+  for (const id of ["lavado", "detailing"]) {
+    if (!nextOp.some((item) => catalogKey(item) === catalogKey(id))) nextOp.push(id);
+  }
+  const nextPart = cats.partCategories.map((item) => item.id);
+  if (!nextPart.some((item) => catalogKey(item) === catalogKey("detailing"))) nextPart.push("detailing");
+  saveCatalogs({ opcodeCategories: nextOp, partCategories: nextPart });
+  const have = new Set(
+    db()
+      .select()
+      .from(opCodes)
+      .all()
+      .map((row) => String(row.code || "").toUpperCase())
+  );
+  for (const op of WASH_OP_CODES) {
+    if (have.has(op.code)) continue;
+    try {
+      createOpCode(op);
+    } catch {
+      /* already exists or catalog write race */
+    }
+  }
 }
 
 function ensureCatalogValue(column, defaults, value, fallback) {
@@ -1751,6 +1842,14 @@ function isSimpleShop() {
   return serviceModeOf(readSettingsRow()) === "sencillo";
 }
 
+function isWashOrder(order) {
+  return (order?.serviceLine || "taller") === "lavado";
+}
+
+function isSimpleOrder(order) {
+  return isSimpleShop() || isWashOrder(order);
+}
+
 function readSettingsRow() {
   let row = db().select().from(shopSettings).get();
   if (!row) {
@@ -1773,6 +1872,7 @@ function readSettingsRow() {
         invoiceNotes: "Prices in CAD. GST 5% (Alberta — no provincial sales tax).",
         serviceMode: "completo",
         allowUpdates: 0,
+        offerWash: 0,
       })
       .run();
     row = db().select().from(shopSettings).where(eq(shopSettings.id, id)).get();
@@ -1784,11 +1884,16 @@ function readSettingsRow() {
     woPad: woPadOf(row),
     serviceMode: serviceModeOf(row),
     allowUpdates: Number(row.allowUpdates) === 1 ? 1 : 0,
+    offerWash: Number(row.offerWash) === 1 ? 1 : 0,
   };
 }
 
 function updatesAllowed() {
   return Number(readSettingsRow().allowUpdates) === 1;
+}
+
+function offerWashOn() {
+  return Number(readSettingsRow().offerWash) === 1;
 }
 
 function setUpdatesAllowed(on) {
@@ -1844,6 +1949,7 @@ function lineCost(line) {
 
 const WO_STATUSES = ["recepcion", "autorizacion", "espera_partes", "en_taller", "en_espera", "lista", "entregada"];
 const WO_KINDS = ["orden", "presupuesto"];
+const WO_SERVICE_LINES = ["taller", "lavado"];
 const LINE_PAYS = ["cliente", "garantia", "interno", "sublet"];
 
 function isEstimate(order) {
@@ -1912,6 +2018,7 @@ function lightWorkOrder(order) {
     number: order.number,
     status: order.status,
     kind: order.kind || "orden",
+    serviceLine: order.serviceLine || "taller",
     complaint: order.complaint,
     createdAt: order.createdAt,
     deliveredAt: order.deliveredAt,
@@ -1976,6 +2083,7 @@ function attachWorkOrders(orders) {
     return {
       ...order,
       kind: order.kind || "orden",
+      serviceLine: order.serviceLine || "taller",
       priority: order.priority || "normal",
       customer: customerBy.get(order.customerId) || null,
       vehicle: vehicleBy.get(order.vehicleId) || null,
@@ -1997,6 +2105,9 @@ function attachWorkOrder(order) {
 function listWorkOrders(q, opts = {}) {
   const filters = [];
   if (opts.kind) filters.push(eq(workOrders.kind, String(opts.kind)));
+  if (opts.serviceLine === "lavado" || opts.serviceLine === "taller") {
+    filters.push(eq(workOrders.serviceLine, opts.serviceLine));
+  }
   if (opts.status) filters.push(eq(workOrders.status, String(opts.status)));
   if (opts.techUserId) filters.push(eq(workOrders.techUserId, asId(opts.techUserId)));
   if (opts.open) filters.push(ne(workOrders.status, "entregada"));
@@ -2009,7 +2120,7 @@ function listWorkOrders(q, opts = {}) {
   const query = String(q || "").trim().toLowerCase();
   if (query) {
     detailed = detailed.filter((o) => {
-      const hay = `${o.number} ${o.id || ""} ${o.customer?.name || ""} ${o.customer?.company || ""} ${o.vehicle?.make || ""} ${o.vehicle?.model || ""} ${o.vehicle?.plate || ""} ${o.vehicle?.vin || ""} ${o.status} ${o.kind} ${o.complaint} ${o.poNumber || ""}`.toLowerCase();
+      const hay = `${o.number} ${o.id || ""} ${o.customer?.name || ""} ${o.customer?.company || ""} ${o.vehicle?.make || ""} ${o.vehicle?.model || ""} ${o.vehicle?.plate || ""} ${o.vehicle?.vin || ""} ${o.status} ${o.kind} ${o.serviceLine || ""} ${o.complaint} ${o.poNumber || ""}`.toLowerCase();
       return hay.includes(query);
     });
   }
@@ -2045,9 +2156,10 @@ function createWorkOrder(data) {
   const settings = getSettings();
   const kmIn = data.kmIn != null ? Number(data.kmIn) || 0 : Number(vehicle.km) || 0;
   const kind = pickEnum(data.kind, WO_KINDS, "orden");
+  const serviceLine = pickEnum(data.serviceLine, WO_SERVICE_LINES, "taller");
   const createdAt = nowIso();
   const id = newGuid();
-  const simple = settings.serviceMode === "sencillo" && kind !== "presupuesto";
+  const simple = (settings.serviceMode === "sencillo" || serviceLine === "lavado") && kind !== "presupuesto";
   const run = getSqlite().transaction(() => {
     if (!vehicle.customerId) {
       db().update(vehicles).set({ customerId }).where(eq(vehicles.id, vehicleId)).run();
@@ -2061,6 +2173,7 @@ function createWorkOrder(data) {
         vehicleId,
         status: simple ? "en_taller" : "recepcion",
         kind,
+        serviceLine,
         complaint: String(data.complaint || "").trim(),
         cause: String(data.cause || "").trim(),
         correction: String(data.correction || "").trim(),
@@ -2075,7 +2188,7 @@ function createWorkOrder(data) {
         priority: pickEnum(data.priority, ["normal", "urgente"], "normal"),
         poNumber: String(data.poNumber || "").trim(),
         authorizedAt: simple ? createdAt : null,
-        authorizedBy: simple ? "taller" : "",
+        authorizedBy: simple ? (serviceLine === "lavado" ? "lavado" : "taller") : "",
         holdReason: "",
         createdAt,
         updatedAt: createdAt,
@@ -2101,6 +2214,7 @@ function updateWorkOrder(id, data) {
       correction: data.correction != null ? String(data.correction).trim() : current.correction || "",
       notes: data.notes != null ? String(data.notes).trim() : current.notes,
       status: data.status != null ? pickEnum(data.status, WO_STATUSES, current.status) : current.status,
+      serviceLine: data.serviceLine != null ? pickEnum(data.serviceLine, WO_SERVICE_LINES, current.serviceLine || "taller") : current.serviceLine || "taller",
       kmIn: data.kmIn != null ? Number(data.kmIn) || 0 : current.kmIn,
       kmOut: data.kmOut != null ? Number(data.kmOut) || 0 : current.kmOut || 0,
       promisedAt: data.promisedAt !== undefined ? (data.promisedAt ? String(data.promisedAt) : null) : current.promisedAt,
@@ -2127,9 +2241,9 @@ function setWorkOrderStatus(id, status) {
   }
   if (status === "entregada") return deliverWorkOrder(id);
   const patch = { status, updatedAt: nowIso() };
-  if (isSimpleShop() && !isEstimate(current) && !current.authorizedAt) {
+  if (isSimpleOrder(current) && !isEstimate(current) && !current.authorizedAt) {
     patch.authorizedAt = nowIso();
-    patch.authorizedBy = current.authorizedBy || "taller";
+    patch.authorizedBy = current.authorizedBy || (isWashOrder(current) ? "lavado" : "taller");
   }
   db().update(workOrders).set(patch).where(eq(workOrders.id, id)).run();
   return getWorkOrder(id);
@@ -2407,9 +2521,9 @@ function convertEstimate(id) {
       .update(workOrders)
       .set({
         kind: "orden",
-        status: isSimpleShop() || order.authorizedAt ? "en_taller" : "recepcion",
-        authorizedAt: isSimpleShop() ? order.authorizedAt || nowIso() : order.authorizedAt,
-        authorizedBy: isSimpleShop() ? order.authorizedBy || "taller" : order.authorizedBy,
+        status: isSimpleOrder(order) || order.authorizedAt ? "en_taller" : "recepcion",
+        authorizedAt: isSimpleOrder(order) ? order.authorizedAt || nowIso() : order.authorizedAt,
+        authorizedBy: isSimpleOrder(order) ? order.authorizedBy || (isWashOrder(order) ? "lavado" : "taller") : order.authorizedBy,
         updatedAt: nowIso(),
       })
       .where(eq(workOrders.id, id))
@@ -2437,7 +2551,7 @@ function removeWorkOrder(id) {
   const order = getWorkOrder(id);
   if (!order) throw new Error("Orden no encontrada");
   if (order.status === "entregada") throw new Error("La orden ya fue entregada");
-  if (!isEstimate(order) && order.status !== "recepcion" && !(isSimpleShop() && order.status === "en_taller")) {
+  if (!isEstimate(order) && order.status !== "recepcion" && !(isSimpleOrder(order) && order.status === "en_taller")) {
     throw new Error("Solo se puede borrar un presupuesto o una OT recién abierta");
   }
   if (Number(order.paid) > 0.009) throw new Error("Esta OT ya tiene cobros. No se puede borrar.");
@@ -2518,6 +2632,7 @@ function getSettings() {
     partUoms: catalogs.partUoms.map((item) => item.id),
     catalogs,
     allowUpdates: updatesAllowed(),
+    offerWash: offerWashOn(),
   };
 }
 
@@ -2525,6 +2640,7 @@ function saveSettings(data) {
   const current = readSettingsRow();
   const taxRate = data.taxRate != null ? Math.max(0, Number(data.taxRate) || 0) : Math.max(0, Number(current.taxRate) || 0);
   const laborRate = data.laborRate != null ? Math.max(0, Number(data.laborRate) || 0) : Math.max(0, Number(current.laborRate) || 0);
+  const offerWash = data.offerWash != null ? (data.offerWash ? 1 : 0) : Number(current.offerWash) === 1 ? 1 : 0;
   patchSettings({
     name: String(data.name || current.name || "Dealer DMS").trim() || "Dealer DMS",
     phone: data.phone != null ? String(data.phone).trim() : current.phone || "",
@@ -2536,7 +2652,9 @@ function saveSettings(data) {
     laborRate,
     invoiceNotes: data.invoiceNotes != null ? String(data.invoiceNotes).trim() : current.invoiceNotes || "",
     serviceMode: serviceModeOf({ serviceMode: data.serviceMode != null ? data.serviceMode : current.serviceMode }),
+    offerWash,
   });
+  if (offerWash) ensureWashSetup();
   return getSettings();
 }
 
@@ -2610,13 +2728,14 @@ function searchGlobal(q) {
     workOrders: workOrderRows.map((o) => ({
       type: "workOrder",
       id: o.id,
-      href: `/taller/${o.id}`,
+      href: o.serviceLine === "lavado" ? `/lavado/${o.id}` : `/taller/${o.id}`,
       label: o.number,
       hint: [
         customerLabel(o.customer),
         [o.vehicle?.year, o.vehicle?.make, o.vehicle?.model].filter(Boolean).join(" "),
         o.vehicle?.plate,
         o.kind === "presupuesto" ? "presupuesto" : o.status,
+        o.serviceLine === "lavado" ? "lavado" : "",
       ]
         .filter(Boolean)
         .join(" · "),
@@ -2638,7 +2757,7 @@ function searchGlobal(q) {
   };
 }
 
-function listStaff() {
+function listStaff(opts = {}) {
   const rows = db()
     .select()
     .from(users)
@@ -2652,8 +2771,15 @@ function listStaff() {
       job: u.job || "tecnico",
       laborRate: Number(u.laborRate) || 0,
       canTech: Number(u.canTech) ? 1 : 0,
+      canWash: Number(u.canWash) ? 1 : 0,
       active: u.active,
     }));
+  const line = opts.line === "lavado" ? "lavado" : "taller";
+  if (line === "lavado") {
+    const washers = rows.filter((u) => u.canWash);
+    if (washers.length) return washers;
+    return rows.filter((u) => u.canTech);
+  }
   const techs = rows.filter((u) => u.canTech);
   return techs.length ? techs : rows;
 }
@@ -2676,11 +2802,6 @@ function dashboardKpis() {
     const v = getVehicle(row.vehicleId);
     return s + Number(v?.cost || 0);
   }, 0);
-  const openOrders = db()
-    .select({ n: sql`count(*)` })
-    .from(workOrders)
-    .where(ne(workOrders.status, "entregada"))
-    .get();
   const allParts = db().select().from(parts).all().map(decoratePart);
   const lowStock = allParts.filter((p) => p.low);
   const deliveredWo = attachWorkOrders(
@@ -2693,11 +2814,6 @@ function dashboardKpis() {
   const woRevenue = deliveredWo.reduce((s, o) => s + Number(o.total || 0), 0);
   const woPretax = deliveredWo.reduce((s, o) => s + Number(o.total || 0) - Number(o.tax || 0), 0);
   const woCost = deliveredWo.reduce((s, o) => s + Number(o.cost || 0), 0);
-  const readyOrders = db()
-    .select({ n: sql`count(*)` })
-    .from(workOrders)
-    .where(eq(workOrders.status, "lista"))
-    .get();
   const openDetailed = attachWorkOrders(
     db()
       .select()
@@ -2705,13 +2821,16 @@ function dashboardKpis() {
       .where(ne(workOrders.status, "entregada"))
       .all()
   );
-  const unpaidOpen = openDetailed.filter((o) => o.kind !== "presupuesto" && o.balance > 0.009).length;
-  const unpaidAmount = openDetailed.filter((o) => o.kind !== "presupuesto").reduce((s, o) => s + Math.max(0, Number(o.balance || 0)), 0);
-  const inShopCount = openDetailed.filter((o) => o.status === "en_taller").length;
-  const waitingPartsCount = openDetailed.filter((o) => o.status === "espera_partes").length;
-  const waitingAuthCount = openDetailed.filter((o) => o.status === "autorizacion").length;
-  const estimatesOpen = openDetailed.filter((o) => o.kind === "presupuesto").length;
-  const overdueCount = openDetailed.filter((o) => o.overdue).length;
+  const shopOpen = openDetailed.filter((o) => !isWashOrder(o));
+  const washOpenRows = openDetailed.filter((o) => isWashOrder(o));
+  const unpaidOpen = shopOpen.filter((o) => o.kind !== "presupuesto" && o.balance > 0.009).length;
+  const unpaidAmount = shopOpen.filter((o) => o.kind !== "presupuesto").reduce((s, o) => s + Math.max(0, Number(o.balance || 0)), 0);
+  const inShopCount = shopOpen.filter((o) => o.status === "en_taller").length;
+  const waitingPartsCount = shopOpen.filter((o) => o.status === "espera_partes").length;
+  const waitingAuthCount = shopOpen.filter((o) => o.status === "autorizacion").length;
+  const estimatesOpen = shopOpen.filter((o) => o.kind === "presupuesto").length;
+  const overdueCount = shopOpen.filter((o) => o.overdue).length;
+  const washOpen = washOpenRows.length;
 
   return {
     vehiclesInStock: Number(inStock?.n) || 0,
@@ -2719,8 +2838,8 @@ function dashboardKpis() {
     salesThisMonth: monthSales.length,
     salesAmount,
     salesMargin: salesPretax - salesCost,
-    openWorkOrders: Number(openOrders?.n) || 0,
-    readyWorkOrders: Number(readyOrders?.n) || 0,
+    openWorkOrders: shopOpen.length,
+    readyWorkOrders: shopOpen.filter((o) => o.status === "lista").length,
     unpaidOpenOrders: unpaidOpen,
     unpaidAmount,
     lowStockCount: lowStock.length,
@@ -2733,6 +2852,8 @@ function dashboardKpis() {
     waitingAuthCount,
     estimatesOpen,
     overdueCount,
+    washOpen,
+    offerWash: offerWashOn(),
     deliveredThisMonth: deliveredWo.length,
   };
 }
@@ -3132,6 +3253,12 @@ function listOpCodes(q, opts = {}) {
   const query = String(q || "").trim();
   let rows = db().select().from(opCodes).orderBy(opCodes.code).all();
   if (opts.activeOnly) rows = rows.filter((r) => r.active);
+  if (offerWashOn() && (opts.serviceLine === "lavado" || opts.serviceLine === "taller")) {
+    rows = rows.filter((r) => {
+      const washCat = WASH_CATEGORIES.includes(catalogKey(r.category));
+      return opts.serviceLine === "lavado" ? washCat : !washCat;
+    });
+  }
   if (query) {
     const p = query.toLowerCase();
     rows = rows.filter((r) => `${r.code} ${r.description} ${r.category} ${r.concern}`.toLowerCase().includes(p));

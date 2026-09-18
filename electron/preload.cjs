@@ -91,7 +91,7 @@ contextBridge.exposeInMainWorld("dms", {
     global: (q) => invoke("search:global", q),
   },
   staff: {
-    list: () => invoke("staff:list"),
+    list: (opts) => invoke("staff:list", opts || {}),
   },
   opCodes: {
     list: (q, opts) => invoke("opCodes:list", { q, ...(opts || {}) }),

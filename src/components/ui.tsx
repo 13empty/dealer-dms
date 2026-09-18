@@ -64,6 +64,7 @@ export function Badge({ status, label }: { status: string; label: string }) {
       en_espera: "bg-orange-500/15 text-orange-300",
       presupuesto: "bg-sky-500/15 text-sky-300",
       urgente: "bg-red-500/15 text-red-300",
+      lavado: "bg-cyan-500/15 text-cyan-300",
       consignacion: "bg-violet-500/15 text-violet-300",
       nuevo: "bg-emerald-500/15 text-emerald-300",
       certificado: "bg-sky-500/15 text-sky-300",

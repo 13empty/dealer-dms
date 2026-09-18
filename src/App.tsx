@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -7,6 +8,7 @@ import { AppearanceStrip } from "./components/Appearance";
 import { Badge, Button } from "./components/ui";
 import { BrandMark } from "./components/BrandMark";
 import { LanguageSelect, k, useI18n } from "./lib/i18n";
+import { call } from "./lib/format";
 import { usePrefs } from "./lib/prefs-context";
 import LoginGate from "./pages/LoginGate";
 import Dashboard from "./pages/Dashboard";
@@ -34,10 +36,18 @@ function Shell() {
   const { user, can, logout } = useAuth();
   const { t } = useI18n();
   const { prefs } = usePrefs();
+  const [appVersion, setAppVersion] = useState("");
+
+  useEffect(() => {
+    void call(window.dms.meta.version())
+      .then((v) => setAppVersion(String(v || "")))
+      .catch(() => {});
+  }, []);
 
   const ops = [
     { to: "/", label: t("nav.home"), icon: "home" as const, show: true },
     { to: "/taller", label: t("nav.workshop"), icon: "wrench" as const, show: true, end: true },
+    { to: "/lavado", label: t("nav.wash"), icon: "droplet" as const, show: true, end: true },
     { to: "/clientes", label: t("nav.customers"), icon: "users" as const, show: true },
     { to: "/partes", label: t("nav.parts"), icon: "box" as const, show: true },
     { to: "/taller/opcodes", label: t("nav.opcodes"), icon: "list" as const, show: true },
@@ -113,6 +123,11 @@ function Shell() {
             <Icon name="logout" className="h-4 w-4" />
             {t("nav.logout")}
           </Button>
+          {appVersion ? (
+            <div className="mt-3 text-center text-[11px] tabular-nums text-slate-500">
+              {t("nav.version", { version: appVersion })}
+            </div>
+          ) : null}
         </div>
       </aside>
       <main className="min-w-0 flex-1 overflow-auto bg-ink-950">
@@ -136,6 +151,9 @@ function Shell() {
             <Route path="/taller/opcodes" element={<OpCodes />} />
             <Route path="/taller/:id/imprimir" element={<Invoice />} />
             <Route path="/taller/:id" element={<WorkOrderDetail />} />
+            <Route path="/lavado" element={<Workshop />} />
+            <Route path="/lavado/:id/imprimir" element={<Invoice />} />
+            <Route path="/lavado/:id" element={<WorkOrderDetail />} />
             <Route path="/finanzas" element={can.finance ? <Finance /> : <Navigate to="/" replace />} />
             <Route path="/ajustes" element={can.finance ? <Settings /> : <Navigate to="/" replace />} />
             <Route path="/sql" element={can.options ? <SqlStudio /> : <Navigate to="/" replace />} />

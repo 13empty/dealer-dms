@@ -11,7 +11,8 @@ export type IconName =
   | "terminal"
   | "shield"
   | "search"
-  | "logout";
+  | "logout"
+  | "droplet";
 
 const paths: Record<IconName, string> = {
   home: "M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z",
@@ -28,6 +29,7 @@ const paths: Record<IconName, string> = {
   shield: "M12 3 5 6v6c0 4.2 2.8 7.2 7 8.5 4.2-1.3 7-4.3 7-8.5V6l-7-3Z",
   search: "M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Zm9 2-4-4",
   logout: "M10 6H6v12h4M10 12h9m-3-4 4 4-4 4",
+  droplet: "M12 3.2S6 9.2 6 13.5a6 6 0 0 0 12 0C18 9.2 12 3.2 12 3.2Z",
 };
 
 export function Icon({ name, className = "h-4 w-4" }: { name: IconName; className?: string }) {

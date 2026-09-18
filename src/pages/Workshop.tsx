@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { SearchPicker, type SearchOption } from "../components/SearchPicker";
 import {
   customerDraftFromQuery,
@@ -12,7 +12,7 @@ import {
   type VehicleDraft,
 } from "../components/CustomerForm";
 import { Badge, Button, Card, ErrorText, Field, FormSection, Modal, Page, PageHeader, Toolbar } from "../components/ui";
-import { call, customerName, customerSearchHint, dateTimeEs, fromDateTimeLocal, money, vehicleLabel, vehicleSearchHint } from "../lib/format";
+import { call, customerName, customerSearchHint, dateTimeEs, fromDateTimeLocal, money, vehicleLabel, vehicleSearchHint, workOrderPath } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
 import { defaultPromisedAt } from "../lib/prefs";
@@ -64,18 +64,22 @@ const emptyForm = {
   waiter: false,
   priority: "normal" as "normal" | "urgente",
   poNumber: "",
+  serviceLine: "taller" as "taller" | "lavado",
 };
 
 export default function Workshop() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [params, setParams] = useSearchParams();
   const { t } = useI18n();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const { prefs } = usePrefs();
+  const washLane = location.pathname.startsWith("/lavado");
   const [rows, setRows] = useState<WorkOrder[]>([]);
   const [q, setQ] = useState(() => params.get("q") || "");
   const [view, setView] = useState<"board" | "list">(readWorkshopView);
   const [simple, setSimple] = useState(false);
+  const [offerWash, setOfferWash] = useState<boolean | null>(null);
   const [status, setStatus] = useState(() => params.get("status") || "");
   const [kind, setKind] = useState(() => params.get("kind") || "");
   const [unpaid, setUnpaid] = useState(() => params.get("unpaid") === "1");
@@ -108,18 +112,20 @@ export default function Workshop() {
           window.dms.workOrders.list(q, {
             status: status || undefined,
             kind: kind || undefined,
+            serviceLine: washLane ? "lavado" : "taller",
             unpaid: unpaid || undefined,
             overdue: overdue || undefined,
             open: showDelivered ? undefined : true,
           })
         ),
-        call(window.dms.staff.list()),
+        call(window.dms.staff.list({ line: washLane ? "lavado" : "taller" })),
         call(window.dms.settings.get()),
       ]);
       setRows(Array.isArray(orders) ? orders : []);
       setStaff(Array.isArray(staffRows) ? staffRows : []);
-      const nextSimple = settings?.serviceMode === "sencillo";
+      const nextSimple = settings?.serviceMode === "sencillo" || washLane;
       setSimple(nextSimple);
+      setOfferWash(Boolean(settings?.offerWash));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -127,7 +133,7 @@ export default function Workshop() {
 
   useEffect(() => {
     void load();
-  }, [q, status, kind, unpaid, overdue, showDelivered]);
+  }, [q, status, kind, unpaid, overdue, showDelivered, washLane]);
 
   useEffect(() => {
     const cliente = params.get("cliente") || "";
@@ -144,6 +150,8 @@ export default function Workshop() {
         const owner = customer || vehicle?.customer || null;
         setForm({
           ...emptyForm,
+          serviceLine: washLane ? "lavado" : "taller",
+          complaint: washLane ? t("workshop.washComplaint") : "",
           customerId: owner ? String(owner.id) : "",
           vehicleId: chosen ? String(chosen.id) : "",
           kmIn: chosen ? String(chosen.km || 0) : "",
@@ -179,9 +187,19 @@ export default function Workshop() {
   }, [params.get("cliente"), params.get("vehiculo")]);
 
   useEffect(() => {
+    if (washLane) return;
+    if (params.get("linea") !== "lavado" && params.get("nueva") !== "lavado") return;
+    const next = new URLSearchParams(params);
+    next.delete("linea");
+    if (next.get("nueva") === "lavado") next.set("nueva", "1");
+    navigate({ pathname: "/lavado", search: next.toString() ? `?${next}` : "" }, { replace: true });
+  }, [washLane, params, navigate]);
+
+  useEffect(() => {
     const nueva = params.get("nueva");
     if (!nueva) return;
-    startCreate(nueva === "presupuesto" ? "presupuesto" : "orden");
+    if (washLane && offerWash !== true) return;
+    startCreate(nueva === "presupuesto" ? "presupuesto" : "orden", washLane ? "lavado" : "taller");
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -190,7 +208,7 @@ export default function Workshop() {
       },
       { replace: true }
     );
-  }, [params.get("nueva")]);
+  }, [params.get("nueva"), washLane, offerWash]);
 
   async function save() {
     try {
@@ -240,6 +258,7 @@ export default function Workshop() {
           waiter: form.waiter ? 1 : 0,
           priority: form.priority,
           poNumber: form.poNumber,
+          serviceLine: form.serviceLine,
         })
       );
       setOpen(false);
@@ -251,7 +270,7 @@ export default function Workshop() {
       setCustomerDraft(emptyCustomerForm());
       setCustomerDupes([]);
       setCustomerForce(false);
-      navigate(`/taller/${created.id}`);
+      navigate(workOrderPath(created));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -269,10 +288,12 @@ export default function Workshop() {
     setError(null);
   }
 
-  function startCreate(kind: "orden" | "presupuesto") {
+  function startCreate(kind: "orden" | "presupuesto", line: "taller" | "lavado" = "taller") {
     setForm({
       ...emptyForm,
       kind,
+      serviceLine: line,
+      complaint: line === "lavado" ? t("workshop.washComplaint") : "",
       promisedAt: defaultPromisedAt(prefs.promisedDays),
       techUserId: user?.id && staff.some((u) => u.id === user.id) ? String(user.id) : "",
     });
@@ -375,12 +396,14 @@ export default function Workshop() {
     return (
       <Link
         key={row.id}
-        to={`/taller/${row.id}`}
+        to={workOrderPath(row)}
         className="block rounded-lg border border-ink-600 border-t-2 bg-ink-900/90 p-3 shadow-sm shadow-black/20 transition hover:border-gold-400/40"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="font-mono text-xs text-gold-400">{row.number}</div>
-          {row.priority === "urgente" ? <Badge status="urgente" label={t("workshop.priority.urgente")} /> : null}
+          <span className="flex items-center gap-1">
+            {row.priority === "urgente" ? <Badge status="urgente" label={t("workshop.priority.urgente")} /> : null}
+          </span>
         </div>
         <div className="mt-1 text-sm">{customerName(row.customer)}</div>
         <div className="text-xs text-slate-400">
@@ -400,23 +423,60 @@ export default function Workshop() {
     );
   }
 
+  async function enableWash() {
+    try {
+      setError(null);
+      const settings = await call(window.dms.settings.get());
+      await call(window.dms.settings.save({ ...settings, offerWash: true }));
+      window.dispatchEvent(new Event("dms-shop"));
+      setOfferWash(true);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  if (washLane && offerWash === false) {
+    return (
+      <Page>
+        <PageHeader title={t("wash.title")} subtitle={t("wash.subtitle")} />
+        <ErrorText error={error} />
+        <Card className="max-w-xl p-5">
+          <h2 className="text-lg font-medium">{t("wash.turnOn")}</h2>
+          <p className="mt-2 text-sm text-slate-400">{t("wash.turnOnHint")}</p>
+          {can.finance ? (
+            <Button className="mt-4" onClick={() => void enableWash()}>
+              {t("wash.turnOnAction")}
+            </Button>
+          ) : (
+            <p className="mt-4 text-sm text-slate-400">{t("wash.askManager")}</p>
+          )}
+        </Card>
+      </Page>
+    );
+  }
+
   return (
     <Page>
       <PageHeader
-        title={t("workshop.title")}
-        subtitle={t("workshop.subtitle")}
+        title={washLane ? t("wash.title") : t("workshop.title")}
+        subtitle={washLane ? t("wash.subtitle") : t("workshop.subtitle")}
         actions={
           <>
-            <Button variant="ghost" onClick={() => navigate("/taller/opcodes")}>
-              {t("opcodes.title")}
-            </Button>
+            {washLane ? null : (
+              <Button variant="ghost" onClick={() => navigate("/taller/opcodes")}>
+                {t("opcodes.title")}
+              </Button>
+            )}
             <Button
               variant="ghost"
-              onClick={() => startCreate("presupuesto")}
+              onClick={() => startCreate("presupuesto", washLane ? "lavado" : "taller")}
             >
               {t("workshop.newEstimate")}
             </Button>
-            <Button onClick={() => startCreate("orden")}>{t("workshop.new")}</Button>
+            <Button onClick={() => startCreate("orden", washLane ? "lavado" : "taller")}>
+              {washLane ? t("workshop.newWash") : t("workshop.new")}
+            </Button>
           </>
         }
       />
@@ -521,7 +581,7 @@ export default function Workshop() {
               {rows.map((row) => (
                 <tr key={row.id} className="border-t border-ink-600">
                   <td className="px-4 py-3 font-mono text-xs">
-                    <Link className="text-gold-400 hover:underline" to={`/taller/${row.id}`}>
+                    <Link className="text-gold-400 hover:underline" to={workOrderPath(row)}>
                       {row.number}
                     </Link>
                     {row.kind === "presupuesto" ? <div className="text-sky-300">{t("workshop.estimate")}</div> : null}
@@ -543,7 +603,7 @@ export default function Workshop() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Link className="text-gold-400" to={`/taller/${row.id}`}>
+                    <Link className="text-gold-400" to={workOrderPath(row)}>
                       {t("common.open")}
                     </Link>
                   </td>
@@ -556,7 +616,13 @@ export default function Workshop() {
       {open ? (
         <Modal
           xl
-          title={form.kind === "presupuesto" ? t("workshop.newEstimate") : t("workshop.newTitle")}
+          title={
+            form.kind === "presupuesto"
+              ? t("workshop.newEstimate")
+              : form.serviceLine === "lavado"
+                ? t("workshop.newWash")
+                : t("workshop.newTitle")
+          }
           onClose={() => setOpen(false)}
           footer={
             <>
@@ -590,7 +656,7 @@ export default function Workshop() {
                     </select>
                   </Field>
                 ) : null}
-                <Field label={t("workshop.tech")}>
+                <Field label={washLane ? t("workshop.washTech") : t("workshop.tech")}>
                   <select value={form.techUserId} onChange={(e) => setForm({ ...form, techUserId: e.target.value })}>
                     <option value="">{t("workshop.noTech")}</option>
                     {staff.map((u) => (

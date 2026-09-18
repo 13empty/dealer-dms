@@ -53,7 +53,7 @@ function verifyPassword(password, stored) {
   return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(test, "hex"));
 }
 
-const JOBS = ["tecnico", "asesor", "partes", "ventas", "caja", "otro"];
+const JOBS = ["tecnico", "asesor", "lavado", "partes", "ventas", "caja", "otro"];
 
 function jobOf(raw, role) {
   const value = String(raw || "").toLowerCase();
@@ -66,6 +66,11 @@ function jobOf(raw, role) {
 function canTechOf(data, job) {
   if (data && data.canTech != null) return Number(data.canTech) ? 1 : 0;
   return job === "tecnico" || job === "asesor" ? 1 : 0;
+}
+
+function canWashOf(data, job) {
+  if (data && data.canWash != null) return Number(data.canWash) ? 1 : 0;
+  return job === "lavado" ? 1 : 0;
 }
 
 function textField(value) {
@@ -125,6 +130,7 @@ function stripUser(user) {
     notes: String(user.notes || ""),
     laborRate: Number(user.laborRate) || 0,
     canTech: Number(user.canTech) ? 1 : 0,
+    canWash: Number(user.canWash) ? 1 : 0,
     roleLabel: roleLabel(user.role),
     permissions: permissionsFor(user.role),
   };
@@ -246,6 +252,7 @@ function createUser(actor, data) {
       notes: textField(data.notes),
       laborRate: Math.max(0, Number(data.laborRate) || 0),
       canTech: canTechOf(data, job),
+      canWash: canWashOf(data, job),
       active: 1,
       createdAt: nowIso(),
       updatedAt: nowIso(),
@@ -292,9 +299,11 @@ function updateUser(actor, id, data) {
     if (data.job != null) {
       patch.job = jobOf(data.job, data.role || target.role);
       if (data.canTech == null) patch.canTech = canTechOf({}, patch.job);
+      if (data.canWash == null) patch.canWash = canWashOf({}, patch.job);
     }
     if (data.laborRate != null) patch.laborRate = Math.max(0, Number(data.laborRate) || 0);
     if (data.canTech != null) patch.canTech = Number(data.canTech) ? 1 : 0;
+    if (data.canWash != null) patch.canWash = Number(data.canWash) ? 1 : 0;
   }
   db().update(users).set(patch).where(eq(users.id, id)).run();
   return stripUser(getUser(id));

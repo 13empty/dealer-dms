@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { SearchPicker } from "../components/SearchPicker";
 import { Badge, Button, Card, ErrorText, Field, Page, PageHeader, GuidCopy } from "../components/ui";
 import { SHOP_DEFAULTS } from "../lib/canada";
-import { call, customerName, dateEs, fromDateTimeLocal, money, toDateTimeLocal, vehicleLabel } from "../lib/format";
+import { call, customerName, dateEs, fromDateTimeLocal, money, toDateTimeLocal, vehicleLabel, workOrderListPath, workOrderPath } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
 import type { StaffUser, WorkOrder, WorkOrderLine, WorkOrderStatus } from "../vite-env";
 
@@ -46,6 +46,7 @@ export default function WorkOrderDetail() {
     waiter: false,
     priority: "normal",
     discountPct: "0",
+    serviceLine: "taller" as "taller" | "lavado",
   });
   const [pay, setPay] = useState({ amount: "", method: "efectivo" });
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
@@ -54,13 +55,14 @@ export default function WorkOrderDetail() {
   async function load() {
     try {
       setError(null);
-      const [wo, staffRows, settings] = await Promise.all([
+      const [wo, settings] = await Promise.all([
         call(window.dms.workOrders.get(String(id || ""))),
-        call(window.dms.staff.list()),
         call(window.dms.settings.get()),
       ]);
       setOrder(wo);
       if (!wo) throw new Error(t("workshop.missing"));
+      const wash = wo.serviceLine === "lavado";
+      const staffRows = await call(window.dms.staff.list({ line: wash ? "lavado" : "taller" }));
       setStaff(() => {
         const list = Array.isArray(staffRows) ? [...staffRows] : [];
         if (wo?.tech && !list.some((u) => u.id === wo.tech?.id)) {
@@ -78,7 +80,7 @@ export default function WorkOrderDetail() {
       });
       setTaxLabel(settings?.taxLabel || SHOP_DEFAULTS.taxLabel);
       setLaborRate(Number(settings?.laborRate) || SHOP_DEFAULTS.laborRate);
-      setSimple(settings?.serviceMode === "sencillo");
+      setSimple(settings?.serviceMode === "sencillo" || wash);
       if (wo) {
         setJob({
           kmIn: String(wo.kmIn || 0),
@@ -94,6 +96,7 @@ export default function WorkOrderDetail() {
           waiter: Boolean(wo.waiter),
           priority: wo.priority || "normal",
           discountPct: String(wo.discountPct || 0),
+          serviceLine: wo.serviceLine === "lavado" ? "lavado" : "taller",
         });
         setPay((prev) => ({ ...prev, amount: wo.balance && wo.balance > 0 ? String(wo.balance) : prev.amount }));
       }
@@ -125,6 +128,7 @@ export default function WorkOrderDetail() {
         waiter: Boolean(next.waiter),
         priority: next.priority || "normal",
         discountPct: String(next.discountPct || 0),
+        serviceLine: next.serviceLine === "lavado" ? "lavado" : "taller",
       });
       if (next.balance && next.balance > 0) setPay((prev) => ({ ...prev, amount: String(next.balance) }));
       setSelectedLineId((current) => {
@@ -202,6 +206,7 @@ export default function WorkOrderDetail() {
           waiter: job.waiter ? 1 : 0,
           priority: job.priority as "normal" | "urgente",
           discountPct: Number(job.discountPct) || 0,
+          serviceLine: job.serviceLine,
         })
       );
       if (!selectedLineId) return next;
@@ -263,10 +268,10 @@ export default function WorkOrderDetail() {
         title={`${order.number}${estimate ? ` · ${t("workshop.estimate")}` : ""}`}
         actions={
           <>
-            <Link className="rounded-md border border-ink-600 px-3 py-2 text-sm" to="/taller">
+            <Link className="rounded-md border border-ink-600 px-3 py-2 text-sm" to={workOrderListPath(order)}>
               {t("opcodes.back")}
             </Link>
-            <Link className="rounded-md border border-ink-600 px-3 py-2 text-sm" to={`/taller/${order.id}/imprimir`}>
+            <Link className="rounded-md border border-ink-600 px-3 py-2 text-sm" to={`${workOrderPath(order)}/imprimir`}>
               {t("common.print")}
             </Link>
             {estimate && !locked ? (
@@ -279,7 +284,7 @@ export default function WorkOrderDetail() {
                   void act(async () => {
                     if (!confirm(t("workshop.deleteConfirm"))) return order;
                     await call(window.dms.workOrders.remove(order.id));
-                    navigate("/taller");
+                    navigate(workOrderListPath(order));
                     return order;
                   })
                 }
@@ -329,6 +334,7 @@ export default function WorkOrderDetail() {
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         <Badge status={estimate ? "presupuesto" : order.status} label={t(k(estimate ? "wo.presupuesto" : `wo.${order.status}`))} />
+        {order.serviceLine === "lavado" ? <Badge status="lavado" label={t("workshop.lineWash")} /> : null}
         {!estimate && paidOff && !locked ? <Badge status="pagada" label={t("workshop.paidOff")} /> : null}
         {order.priority === "urgente" ? <Badge status="urgente" label={t("workshop.priority.urgente")} /> : null}
         {!simple && order.waiter ? <Badge status="lista" label={t("workshop.waiter")} /> : null}
@@ -364,7 +370,7 @@ export default function WorkOrderDetail() {
           <Field label={t("workshop.kmOut")}>
             <input type="text" disabled={locked} value={job.kmOut} onChange={(e) => setJob({ ...job, kmOut: e.target.value })} />
           </Field>
-          <Field label={t("workshop.tech")}>
+          <Field label={order.serviceLine === "lavado" ? t("workshop.washTech") : t("workshop.tech")}>
             <select disabled={locked} value={job.techUserId} onChange={(e) => setJob({ ...job, techUserId: e.target.value })}>
               <option value="">{t("workshop.noTech")}</option>
               {staff.map((u) => (
@@ -415,6 +421,7 @@ export default function WorkOrderDetail() {
                           kmOut: Number(job.kmOut) || 0,
                           techUserId: job.techUserId || null,
                           discountPct: Number(job.discountPct) || 0,
+                          serviceLine: job.serviceLine,
                         })
                       );
                     }
@@ -440,7 +447,7 @@ export default function WorkOrderDetail() {
                 }}
                 search={async (query) => {
                   const [ops, foundParts] = await Promise.all([
-                    call(window.dms.opCodes.list(query, { activeOnly: true })),
+                    call(window.dms.opCodes.list(query, { activeOnly: true, serviceLine: order.serviceLine === "lavado" ? "lavado" : "taller" })),
                     call(window.dms.parts.list(query, { limit: 8, activeOnly: true })),
                   ]);
                   return [
@@ -553,7 +560,7 @@ export default function WorkOrderDetail() {
                 }}
                 search={async (query) => {
                   const [ops, foundParts] = await Promise.all([
-                    call(window.dms.opCodes.list(query, { activeOnly: true })),
+                    call(window.dms.opCodes.list(query, { activeOnly: true, serviceLine: order.serviceLine === "lavado" ? "lavado" : "taller" })),
                     call(window.dms.parts.list(query, { limit: 8, activeOnly: true })),
                   ]);
                   return [
@@ -688,7 +695,7 @@ export default function WorkOrderDetail() {
                   setOpPicked({ id: nextId, label: option?.label || "", payType: String((option?.raw as { payType?: string } | undefined)?.payType || "cliente") })
                 }
                 search={async (query) => {
-                  const found = await call(window.dms.opCodes.list(query, { activeOnly: true }));
+                  const found = await call(window.dms.opCodes.list(query, { activeOnly: true, serviceLine: order.serviceLine === "lavado" ? "lavado" : "taller" }));
                   return found.slice(0, 25).map((op) => ({
                     id: op.id,
                     label: `${op.popular ? "★ " : ""}${op.code} · ${op.description}`,
@@ -998,7 +1005,7 @@ export default function WorkOrderDetail() {
             <ul className="space-y-1 text-sm">
               {(order.history || []).map((h) => (
                 <li key={h.id} className="flex items-center justify-between gap-2">
-                  <Link className="truncate text-gold-400" to={`/taller/${h.id}`}>
+                  <Link className="truncate text-gold-400" to={workOrderPath(h)}>
                     {h.number}
                   </Link>
                   <span className="shrink-0 text-xs text-slate-500">{dateEs(h.createdAt)}</span>

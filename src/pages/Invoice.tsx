@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { PrintDoc, PrintShopHead } from "../components/PrintDoc";
 import { ErrorText } from "../components/ui";
-import { call, customerBillingName, dateEs, formatAddress, formatNumber, formatPhones, money, vehicleLabel } from "../lib/format";
+import { call, customerBillingName, dateEs, formatAddress, formatNumber, formatPhones, money, vehicleLabel, workOrderPath } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
 import type { ShopSettings, WorkOrder, WorkOrderLine } from "../vite-env";
 
@@ -92,7 +92,7 @@ export default function Invoice() {
   const date = dateEs(receipt ? order.deliveredAt || order.createdAt : order.createdAt);
 
   return (
-    <PrintDoc title={title} subtitle={t("invoice.subtitle")} backTo={`/taller/${order.id}`} backLabel={t("invoice.back")}>
+    <PrintDoc title={title} subtitle={t("invoice.subtitle")} backTo={workOrderPath(order)} backLabel={t("invoice.back")}>
       <ErrorText error={error} />
       <PrintShopHead
         shop={shop}

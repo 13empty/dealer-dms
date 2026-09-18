@@ -73,7 +73,7 @@ export type Customer = {
 
 export type UserRole = "admin" | "master" | "gerente" | "empleado";
 
-export type UserJob = "tecnico" | "asesor" | "partes" | "ventas" | "caja" | "otro";
+export type UserJob = "tecnico" | "asesor" | "lavado" | "partes" | "ventas" | "caja" | "otro";
 
 export type AppUser = {
   id: string;
@@ -95,6 +95,7 @@ export type AppUser = {
   notes?: string;
   laborRate?: number;
   canTech?: number;
+  canWash?: number;
   assigned?: boolean;
   active: number;
   createdAt: string;
@@ -342,6 +343,7 @@ export type WorkOrder = {
   vehicleId: string;
   status: WorkOrderStatus;
   kind?: "orden" | "presupuesto";
+  serviceLine?: "taller" | "lavado";
   complaint: string;
   cause?: string;
   correction?: string;
@@ -397,6 +399,7 @@ export type ShopSettings = {
   invoiceNotes?: string;
   serviceMode?: "sencillo" | "completo";
   allowUpdates?: boolean;
+  offerWash?: boolean;
   opcodeCategories?: string[];
   partCategories?: string[];
   partUoms?: string[];
@@ -440,6 +443,7 @@ export type StaffUser = {
   job?: string;
   laborRate?: number;
   canTech?: number;
+  canWash?: number;
   active: number;
 };
 
@@ -463,6 +467,8 @@ export type DashboardKpis = {
   waitingAuthCount?: number;
   estimatesOpen?: number;
   overdueCount?: number;
+  washOpen?: number;
+  offerWash?: boolean;
   deliveredThisMonth?: number;
 };
 
@@ -635,6 +641,7 @@ interface DmsApi {
       notes?: string;
       laborRate?: number;
       canTech?: number;
+      canWash?: number;
     }) => Result<AppUser>;
     update: (
       id: string,
@@ -659,6 +666,7 @@ interface DmsApi {
           | "notes"
           | "laborRate"
           | "canTech"
+          | "canWash"
         >
       >
     ) => Result<AppUser>;
@@ -714,7 +722,7 @@ interface DmsApi {
   workOrders: {
     list: (
       q?: string,
-      opts?: { status?: string; kind?: string; techUserId?: string; unpaid?: boolean; overdue?: boolean; open?: boolean; limit?: number }
+      opts?: { status?: string; kind?: string; serviceLine?: string; techUserId?: string; unpaid?: boolean; overdue?: boolean; open?: boolean; limit?: number }
     ) => Result<WorkOrder[]>;
     get: (id: string) => Result<WorkOrder | null>;
     create: (data: Partial<WorkOrder>) => Result<WorkOrder>;
@@ -748,10 +756,10 @@ interface DmsApi {
     global: (q: string) => Result<GlobalSearchResult>;
   };
   staff: {
-    list: () => Result<StaffUser[]>;
+    list: (opts?: { line?: "taller" | "lavado" }) => Result<StaffUser[]>;
   };
   opCodes: {
-    list: (q?: string, opts?: { activeOnly?: boolean }) => Result<OpCode[]>;
+    list: (q?: string, opts?: { activeOnly?: boolean; serviceLine?: string }) => Result<OpCode[]>;
     get: (id: string) => Result<OpCode | null>;
     create: (data: Partial<OpCode> & { parts?: Array<{ partId: string; qty?: number }> }) => Result<OpCode>;
     update: (id: string, data: Partial<OpCode> & { parts?: Array<{ partId: string; qty?: number }> }) => Result<OpCode>;

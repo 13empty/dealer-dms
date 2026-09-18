@@ -130,3 +130,11 @@ export function vehicleSearchHint(v?: { plate?: string; vin?: string; stockNumbe
   const owner = customerName(v.customer);
   return [v.stockNumber, v.plate, v.vin, owner].filter(Boolean).join(" · ");
 }
+
+export function workOrderPath(order: { id: string; serviceLine?: string | null }) {
+  return `${order.serviceLine === "lavado" ? "/lavado" : "/taller"}/${order.id}`;
+}
+
+export function workOrderListPath(order?: { serviceLine?: string | null } | null) {
+  return order?.serviceLine === "lavado" ? "/lavado" : "/taller";
+}

@@ -194,7 +194,7 @@ function registerIpc(app) {
   handle("settings:catalogs", wrap(() => repo.getCatalogs()));
   handle("settings:saveCatalogs", wrap((_u, data) => repo.saveCatalogs(data), { minRank: 50 }));
   handle("search:global", wrap((_u, q) => repo.searchGlobal(q)));
-  handle("staff:list", wrap(() => repo.listStaff()));
+  handle("staff:list", wrap((_u, opts) => repo.listStaff(opts || {})));
 
   handle("opCodes:list", wrap((_u, payload = {}) => repo.listOpCodes(payload.q, payload)));
   handle("opCodes:get", wrap((_u, id) => repo.getOpCode(id)));

@@ -70,6 +70,7 @@ export default function Settings() {
         labor: String(savedShop.laborRate ?? SHOP_DEFAULTS.laborRate),
       });
       setSaved(true);
+      window.dispatchEvent(new Event("dms-shop"));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -84,6 +85,22 @@ export default function Settings() {
       setSaved(false);
       setForm(await call(window.dms.settings.save(next)));
       setSaved(true);
+      window.dispatchEvent(new Event("dms-shop"));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function saveOfferWash(on: boolean) {
+    if (!form) return;
+    const next = { ...form, offerWash: on };
+    setForm(next);
+    try {
+      setError(null);
+      setSaved(false);
+      setForm(await call(window.dms.settings.save(next)));
+      setSaved(true);
+      window.dispatchEvent(new Event("dms-shop"));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -232,6 +249,22 @@ export default function Settings() {
                 );
               })}
             </div>
+          </Card>
+          <Card className="p-5">
+            <h2 className="text-lg font-medium">{t("settings.offerWash")}</h2>
+            <p className="mt-1 text-sm text-slate-400">{t("settings.offerWashHint")}</p>
+            <label className="mt-4 flex items-start gap-3 rounded-lg border border-ink-600 bg-ink-900/60 p-3">
+              <input
+                className="mt-1"
+                type="checkbox"
+                checked={Boolean(form.offerWash)}
+                onChange={(e) => void saveOfferWash(e.target.checked)}
+              />
+              <span>
+                <span className="block font-medium text-slate-100">{t("settings.offerWash")}</span>
+                <span className="mt-1 block text-xs text-slate-400">{t("settings.washMenuHint")}</span>
+              </span>
+            </label>
           </Card>
           {dbPath ? (
             <Card className="p-5">

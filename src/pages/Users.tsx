@@ -6,7 +6,7 @@ import { k, useI18n } from "../lib/i18n";
 import { CA_PROVINCES, SHOP_DEFAULTS } from "../lib/canada";
 import type { AppUser, UserJob, UserRole } from "../vite-env";
 
-const JOBS: UserJob[] = ["tecnico", "asesor", "partes", "ventas", "caja", "otro"];
+const JOBS: UserJob[] = ["tecnico", "asesor", "lavado", "partes", "ventas", "caja", "otro"];
 
 const emptyForm = {
   firstName: "",
@@ -26,6 +26,7 @@ const emptyForm = {
   notes: "",
   laborRate: "",
   canTech: true,
+  canWash: false,
 };
 
 function defaultJob(role: UserRole): UserJob {
@@ -36,6 +37,10 @@ function defaultJob(role: UserRole): UserJob {
 
 function defaultCanTech(job: UserJob) {
   return job === "tecnico" || job === "asesor";
+}
+
+function defaultCanWash(job: UserJob) {
+  return job === "lavado";
 }
 
 function directoryPayload(form: typeof emptyForm) {
@@ -96,6 +101,7 @@ export default function Users() {
       role,
       job,
       canTech: defaultCanTech(job),
+      canWash: defaultCanWash(job),
     });
     setNewPassword("");
     setOpen(true);
@@ -123,6 +129,7 @@ export default function Users() {
       notes: row.notes || "",
       laborRate: row.laborRate ? String(row.laborRate) : "",
       canTech: Boolean(row.canTech),
+      canWash: Boolean(row.canWash),
     });
     setNewPassword("");
     setOpen(true);
@@ -136,6 +143,7 @@ export default function Users() {
             job: form.job,
             laborRate: Number(form.laborRate) || 0,
             canTech: form.canTech ? 1 : 0,
+            canWash: form.canWash ? 1 : 0,
           }
         : {};
       const directory = directoryPayload(form);
@@ -369,7 +377,7 @@ export default function Users() {
                         onChange={(e) => {
                           const role = e.target.value as UserRole;
                           const job = defaultJob(role);
-                          setForm({ ...form, role, job, canTech: defaultCanTech(job) });
+                          setForm({ ...form, role, job, canTech: defaultCanTech(job), canWash: defaultCanWash(job) });
                         }}
                       >
                         {(editing && !can.assignableRoles.includes(editing.role)
@@ -389,7 +397,7 @@ export default function Users() {
                         value={form.job}
                         onChange={(e) => {
                           const job = e.target.value as UserJob;
-                          setForm({ ...form, job, canTech: defaultCanTech(job) });
+                          setForm({ ...form, job, canTech: defaultCanTech(job), canWash: defaultCanWash(job) });
                         }}
                       >
                         {JOBS.map((job) => (
@@ -418,6 +426,18 @@ export default function Users() {
                     <span>
                       <span className="block font-medium text-white">{t("users.canTech")}</span>
                       <span className="text-xs text-slate-500">{t("users.canTechHint")}</span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 text-sm text-slate-300">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={form.canWash}
+                      onChange={(e) => setForm({ ...form, canWash: e.target.checked })}
+                    />
+                    <span>
+                      <span className="block font-medium text-white">{t("users.canWash")}</span>
+                      <span className="text-xs text-slate-500">{t("users.canWashHint")}</span>
                     </span>
                   </label>
                 </div>

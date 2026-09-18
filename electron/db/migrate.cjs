@@ -398,6 +398,7 @@ function migrate(sqlite) {
   addColumnIfMissing(sqlite, "users", "phone", "phone TEXT NOT NULL DEFAULT ''");
   addColumnIfMissing(sqlite, "users", "labor_rate", "labor_rate REAL NOT NULL DEFAULT 0");
   addColumnIfMissing(sqlite, "users", "can_tech", "can_tech INTEGER NOT NULL DEFAULT 1");
+  addColumnIfMissing(sqlite, "users", "can_wash", "can_wash INTEGER NOT NULL DEFAULT 0");
   if (addedJob) {
     sqlite.exec(`
       UPDATE users SET
@@ -421,6 +422,8 @@ function migrate(sqlite) {
   addColumnIfMissing(sqlite, "users", "notes", "notes TEXT NOT NULL DEFAULT ''");
   addColumnIfMissing(sqlite, "shop_settings", "gst_number", "gst_number TEXT NOT NULL DEFAULT ''");
   addColumnIfMissing(sqlite, "shop_settings", "allow_updates", "allow_updates INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(sqlite, "shop_settings", "offer_wash", "offer_wash INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(sqlite, "work_orders", "service_line", "service_line TEXT NOT NULL DEFAULT 'taller'");
   addColumnIfMissing(sqlite, "sales", "tax_rate", "tax_rate REAL NOT NULL DEFAULT 0");
   addColumnIfMissing(sqlite, "sales", "tax", "tax REAL NOT NULL DEFAULT 0");
   ensureShopSettingsRow(sqlite);

@@ -303,6 +303,53 @@ app.whenReady().then(async () => {
   if (repo.setUpdatesAllowed(false) || repo.updatesAllowed()) throw new Error("No se desactivaron las actualizaciones");
   if (gerente.job !== "asesor" || !gerente.canTech) throw new Error("Gerente debe ser asesor de taller");
 
+  if (repo.getSettings().offerWash) throw new Error("Lavado debe nacer apagado");
+  repo.saveSettings({ ...repo.getSettings(), offerWash: true });
+  if (!repo.getSettings().offerWash) throw new Error("No activó lavado / detailing");
+  const washCats = repo.getCatalogs();
+  if (!washCats.opcodeCategories.some((c) => c.id === "lavado") || !washCats.opcodeCategories.some((c) => c.id === "detailing")) {
+    throw new Error("No agregó categorías de lavado");
+  }
+  const washOps = repo.listOpCodes();
+  if (!washOps.some((o) => o.code === "WASH-F") || !washOps.some((o) => o.code === "DET-X")) {
+    throw new Error("No sembraron operaciones de lavado");
+  }
+  const washWo = repo.createWorkOrder({
+    customerId: plated.customerId,
+    vehicleId: plated.id,
+    complaint: "Lavado / detailing",
+    serviceLine: "lavado",
+  });
+  if (washWo.serviceLine !== "lavado") throw new Error("No guardó la línea de lavado");
+  if (washWo.status !== "en_taller") throw new Error("Lavado debe abrir en bahía, sin recepción de taller");
+  if (repo.listWorkOrders("", { serviceLine: "taller" }).some((o) => o.id === washWo.id)) {
+    throw new Error("El taller no debe listar OT de lavado");
+  }
+  if (!repo.listWorkOrders("", { serviceLine: "lavado" }).some((o) => o.id === washWo.id)) {
+    throw new Error("El filtro de lavado no lista la OT");
+  }
+  const shopKpis = repo.dashboardKpis();
+  if (!shopKpis.offerWash) throw new Error("KPI no marca lavado activo");
+  if (shopKpis.washOpen < 1) throw new Error("KPI de lavado no cuenta OT abiertas");
+  const washer = auth.createUser(master, {
+    name: "Lavador Uno",
+    username: "lavado1",
+    password: "lavado1",
+    role: "empleado",
+    job: "lavado",
+  });
+  if (washer.job !== "lavado" || washer.canTech || !washer.canWash) {
+    throw new Error("El puesto lavado no quedó fuera del taller");
+  }
+  if (repo.listStaff().some((s) => s.id === washer.id)) throw new Error("Lavador no debe salir en técnicos de taller");
+  if (!repo.listStaff({ line: "lavado" }).some((s) => s.id === washer.id)) {
+    throw new Error("Lavador debe salir al asignar lavado");
+  }
+  repo.removeWorkOrder(washWo.id);
+  repo.saveSettings({ ...repo.getSettings(), offerWash: false });
+  if (repo.getSettings().offerWash) throw new Error("No se apagó lavado");
+  auth.removeUser(master, washer.id);
+
   const techEmp = auth.createUser(master, {
     firstName: "Técnico",
     middleName: "Luis",

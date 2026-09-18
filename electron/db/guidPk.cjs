@@ -43,6 +43,7 @@ CREATE TABLE users (
   notes TEXT NOT NULL DEFAULT '',
   labor_rate REAL NOT NULL DEFAULT 0,
   can_tech INTEGER NOT NULL DEFAULT 1,
+  can_wash INTEGER NOT NULL DEFAULT 0,
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -211,6 +212,7 @@ CREATE TABLE work_orders (
   vehicle_id TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'recepcion',
   kind TEXT NOT NULL DEFAULT 'orden',
+  service_line TEXT NOT NULL DEFAULT 'taller',
   complaint TEXT NOT NULL DEFAULT '',
   cause TEXT NOT NULL DEFAULT '',
   correction TEXT NOT NULL DEFAULT '',
@@ -291,7 +293,8 @@ CREATE TABLE shop_settings (
   opcode_categories TEXT NOT NULL DEFAULT '',
   part_categories TEXT NOT NULL DEFAULT '',
   part_uoms TEXT NOT NULL DEFAULT '',
-  allow_updates INTEGER NOT NULL DEFAULT 0
+  allow_updates INTEGER NOT NULL DEFAULT 0,
+  offer_wash INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE expenses (
   id TEXT PRIMARY KEY,
