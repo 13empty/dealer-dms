@@ -116,6 +116,7 @@ export function UpdatePanel() {
         <div className="min-w-0">
           <h2 className="text-lg font-medium">{t("updates.title")}</h2>
           <p className="mt-1 text-sm text-slate-400">{t("updates.hint")}</p>
+          <p className="mt-1 text-xs text-slate-500">{t("updates.notifyHint")}</p>
         </div>
         <p className="shrink-0 text-sm text-slate-300">
           {t("updates.current", { version: current })}
@@ -161,36 +162,76 @@ export function UpdatePanel() {
   );
 }
 
-export function UpdateBanner() {
+const DISMISS_KEY = "dms.update.dismissed";
+
+function dismissedOf(version: string) {
+  try {
+    return localStorage.getItem(DISMISS_KEY) === version;
+  } catch {
+    return false;
+  }
+}
+
+function rememberDismiss(version: string) {
+  try {
+    localStorage.setItem(DISMISS_KEY, version);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function UpdateBanner({ className = "" }: { className?: string }) {
   const { t } = useI18n();
   const [version, setVersion] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
+    function apply(next: string | null) {
+      if (!alive || !next) return;
+      if (dismissedOf(next)) return;
+      setVersion(next);
+    }
     void (async () => {
       try {
         const packaged = await call(window.dms.meta.isPackaged());
         if (!packaged) return;
-        const status = await call(window.dms.updates.status());
-        if (!status.allowUpdates) return;
-        const next = await call(window.dms.updates.check());
-        if (alive && next.available && next.version) setVersion(next.version);
+        const next = await call(window.dms.updates.peek());
+        if (next.available && next.version) apply(next.version);
       } catch {
-        // silent on home
+        // silent
       }
     })();
+    const off = window.dms.updates.onEvent((event) => {
+      if (event.type === "available" && event.version) apply(String(event.version));
+      if (event.type === "current") setVersion(null);
+    });
     return () => {
       alive = false;
+      off();
     };
   }, []);
 
   if (!version) return null;
   return (
-    <div className="mb-5 rounded-xl border border-gold-400/40 bg-gold-400/10 px-4 py-3 text-sm">
-      {t("updates.banner", { version })}{" "}
-      <Link className="font-medium text-gold-400 hover:underline" to="/ajustes">
-        {t("updates.goSettings")}
-      </Link>
+    <div
+      className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold-400/40 bg-gold-400/10 px-4 py-3 text-sm print:hidden ${className}`}
+    >
+      <p>
+        {t("updates.banner", { version })}{" "}
+        <Link className="font-medium text-gold-400 hover:underline" to="/ajustes">
+          {t("updates.goSettings")}
+        </Link>
+      </p>
+      <button
+        type="button"
+        className="text-xs text-slate-400 hover:text-slate-200"
+        onClick={() => {
+          rememberDismiss(version);
+          setVersion(null);
+        }}
+      >
+        {t("updates.dismiss")}
+      </button>
     </div>
   );
 }

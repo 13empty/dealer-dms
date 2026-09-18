@@ -87,6 +87,16 @@ contextBridge.exposeInMainWorld("dms", {
     catalogs: () => invoke("settings:catalogs"),
     saveCatalogs: (data) => invoke("settings:saveCatalogs", data),
   },
+  brand: {
+    get: () => invoke("brand:get"),
+    pick: () => invoke("brand:pick"),
+    clear: () => invoke("brand:clear"),
+    onChange: (cb) => {
+      const listener = () => cb();
+      ipcRenderer.on("brand:event", listener);
+      return () => ipcRenderer.removeListener("brand:event", listener);
+    },
+  },
   search: {
     global: (q) => invoke("search:global", q),
   },
@@ -127,6 +137,7 @@ contextBridge.exposeInMainWorld("dms", {
   },
   updates: {
     status: () => invoke("updates:status"),
+    peek: () => invoke("updates:peek"),
     check: () => invoke("updates:check"),
     download: () => invoke("updates:download"),
     install: () => invoke("updates:install"),

@@ -1,4 +1,5 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, Notification } = require("electron");
+const path = require("path");
 const { autoUpdater } = require("electron-updater");
 const { backupShopData } = require("./backup.cjs");
 const repo = require("./db/repo.cjs");
@@ -8,6 +9,8 @@ let lastInfo = null;
 let lastBackup = null;
 let downloaded = false;
 let busy = false;
+let notifiedVersion = "";
+let peekTimer = null;
 
 function send(payload) {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -79,6 +82,60 @@ function initUpdater(dir) {
     busy = false;
     send({ type: "error", message: explain(error) });
   });
+}
+
+function showNotice(version) {
+  const body = `Hay una versión nueva (${version}). Ábrela en Ajustes.`;
+  if (!Notification.isSupported()) return;
+  try {
+    const n = new Notification({
+      title: "Dealer DMS",
+      body,
+      icon: path.join(__dirname, "icon.ico"),
+    });
+    n.on("click", () => {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (!win) return;
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+      send({ type: "open", version });
+    });
+    n.show();
+  } catch {
+    // ignore
+  }
+}
+
+async function peek({ notify = false } = {}) {
+  if (!app.isPackaged) {
+    return { ...snapshot(), available: false, note: "dev" };
+  }
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    lastInfo = result?.updateInfo || null;
+    const available = Boolean(result?.isUpdateAvailable);
+    if (!available) downloaded = false;
+    const version = lastInfo?.version || app.getVersion();
+    send({ type: available ? "available" : "current", version });
+    if (notify && available && version && version !== notifiedVersion) {
+      notifiedVersion = version;
+      showNotice(version);
+    }
+    return { ...snapshot(), available };
+  } catch (error) {
+    if (notify) return { ...snapshot(), available: false, note: "peek-failed" };
+    throw new Error(explain(error));
+  }
+}
+
+function scheduleNotify() {
+  if (peekTimer) return;
+  const run = () => {
+    void peek({ notify: true }).catch(() => {});
+  };
+  setTimeout(run, 8000);
+  peekTimer = setInterval(run, 6 * 60 * 60 * 1000);
 }
 
 async function status() {
@@ -166,4 +223,4 @@ async function install() {
   return { ok: true, backupDir: lastBackup.dir };
 }
 
-module.exports = { initUpdater, status, check, download, install, backupOnly, setAllow };
+module.exports = { initUpdater, status, check, peek, download, install, backupOnly, setAllow, scheduleNotify };

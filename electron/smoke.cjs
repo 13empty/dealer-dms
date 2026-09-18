@@ -300,8 +300,28 @@ app.whenReady().then(async () => {
   if (!repo.setUpdatesAllowed(true) || !repo.updatesAllowed()) throw new Error("No se activaron las actualizaciones");
   const opened = await updater.check();
   if (!opened.allowUpdates || opened.note !== "dev") throw new Error("Al activar, check debe correr (dev)");
+  const peeked = await updater.peek();
+  if (peeked.note !== "dev") throw new Error("peek en desarrollo debe marcar dev");
   if (repo.setUpdatesAllowed(false) || repo.updatesAllowed()) throw new Error("No se desactivaron las actualizaciones");
   if (gerente.job !== "asesor" || !gerente.canTech) throw new Error("Gerente debe ser asesor de taller");
+
+  const logo = require("./logo.cjs");
+  logo.initLogo(dir);
+  if (logo.getLogo().custom) throw new Error("El logo debe nacer vacío");
+  const tinyPng = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64"
+  );
+  const logoSrc = path.join(dir, "tiny.png");
+  fs.writeFileSync(logoSrc, tinyPng);
+  const setLogo = logo.setLogoFromFile(logoSrc);
+  if (!setLogo.custom || !String(setLogo.dataUrl || "").startsWith("data:image/png")) {
+    throw new Error("No guardó el logo del taller");
+  }
+  if (!logo.getLogo().custom) throw new Error("No leyó el logo guardado");
+  logo.clearLogo();
+  if (logo.getLogo().custom) throw new Error("No restauró el logo original");
+  logo.setLogoFromFile(logoSrc);
 
   if (repo.getSettings().offerWash) throw new Error("Lavado debe nacer apagado");
   const typesOff = repo.listWashTypes();
@@ -672,6 +692,9 @@ app.whenReady().then(async () => {
   const snap = await backupShopData({ userDataDir: dir, reason: "smoke", version: "test" });
   if (!fs.existsSync(snap.file) || fs.statSync(snap.file).size < 1000) {
     throw new Error("El respaldo SQLite no se escribió");
+  }
+  if (!fs.existsSync(path.join(snap.dir, "brand", "logo.png"))) {
+    throw new Error("El respaldo no copió el logo");
   }
   process.stdout.write(
     JSON.stringify(

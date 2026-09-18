@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { BrandMark } from "./BrandMark";
 import { Button, PageHeader } from "./ui";
 import { useI18n } from "../lib/i18n";
 
@@ -56,13 +57,16 @@ export function PrintShopHead({
   const { t } = useI18n();
   return (
     <div className="flex items-start justify-between gap-6 border-b border-neutral-300 pb-5">
-      <div>
-        <div className="text-xl font-semibold tracking-tight">{shop.name}</div>
-        {shop.address ? <div className="mt-1 text-sm text-neutral-600">{shop.address}</div> : null}
-        <div className="mt-1 text-sm text-neutral-600">{[shop.phone, shop.email].filter(Boolean).join(" · ")}</div>
-        {shop.gstNumber ? (
-          <div className="mt-1 text-sm text-neutral-600">{t("invoice.gstNumber", { number: shop.gstNumber })}</div>
-        ) : null}
+      <div className="flex items-start gap-4">
+        <BrandMark className="h-14 w-14 shrink-0 rounded-md" />
+        <div>
+          <div className="text-xl font-semibold tracking-tight">{shop.name}</div>
+          {shop.address ? <div className="mt-1 text-sm text-neutral-600">{shop.address}</div> : null}
+          <div className="mt-1 text-sm text-neutral-600">{[shop.phone, shop.email].filter(Boolean).join(" · ")}</div>
+          {shop.gstNumber ? (
+            <div className="mt-1 text-sm text-neutral-600">{t("invoice.gstNumber", { number: shop.gstNumber })}</div>
+          ) : null}
+        </div>
       </div>
       <div className="text-right">
         <div className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">{docLabel}</div>

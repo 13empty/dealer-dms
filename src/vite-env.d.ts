@@ -762,6 +762,12 @@ interface DmsApi {
       partUoms?: string[] | CatalogItem[];
     }) => Result<ShopCatalogs>;
   };
+  brand: {
+    get: () => Result<{ dataUrl: string | null; custom: boolean }>;
+    pick: () => Result<{ dataUrl: string | null; custom: boolean }>;
+    clear: () => Result<{ dataUrl: string | null; custom: boolean }>;
+    onChange: (cb: () => void) => () => void;
+  };
   search: {
     global: (q: string) => Result<GlobalSearchResult>;
   };
@@ -808,6 +814,7 @@ interface DmsApi {
   };
   updates: {
     status: () => Result<UpdateStatus>;
+    peek: () => Result<UpdateStatus>;
     check: () => Result<UpdateStatus>;
     download: () => Result<UpdateStatus>;
     install: () => Result<{ ok: true; backupDir?: string | null }>;

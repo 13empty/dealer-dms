@@ -1,12 +1,13 @@
 const fs = require("fs");
 const path = require("path");
-const { ipcMain } = require("electron");
+const { BrowserWindow, ipcMain } = require("electron");
 const repo = require("./db/repo.cjs");
 const auth = require("./db/auth.cjs");
 const { seedDemo } = require("./db/seed.cjs");
 const { getDbPath } = require("./db/index.cjs");
 const { decodeVin } = require("./vin.cjs");
 const updater = require("./updater.cjs");
+const logo = require("./logo.cjs");
 
 let sessionUserId = null;
 let sessionFile = null;
@@ -218,7 +219,21 @@ function registerIpc(app) {
   handle("meta:dbPath", wrap(() => getDbPath(), { minRank: 50 }));
   handle("meta:isPackaged", wrap(() => app.isPackaged, { public: true }));
   handle("meta:version", wrap(() => app.getVersion(), { public: true }));
+  handle("brand:get", wrap(() => logo.getLogo(), { public: true }));
+  handle("brand:pick", async (event) => {
+    try {
+      const user = currentUser();
+      if (!user) throw new Error("Inicia sesión");
+      if (auth.rank(user.role) < 50) throw new Error("No tienes permiso para esta acción");
+      const win = BrowserWindow.fromWebContents(event.sender);
+      return { ok: true, data: await logo.pickLogo(win || undefined) };
+    } catch (error) {
+      return { ok: false, error: error.message || String(error) };
+    }
+  });
+  handle("brand:clear", wrap(() => logo.clearLogo(), { minRank: 50 }));
   handle("updates:status", wrap(() => updater.status(), { minRank: 80 }));
+  handle("updates:peek", wrap(() => updater.peek(), { minRank: 80 }));
   handle("updates:check", wrap(() => updater.check(), { minRank: 80 }));
   handle("updates:download", wrap(() => updater.download(), { minRank: 80 }));
   handle("updates:install", wrap(() => updater.install(), { minRank: 80 }));

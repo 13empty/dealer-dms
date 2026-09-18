@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppearancePanel } from "../components/Appearance";
-import { UpdateBanner } from "../components/UpdatePanel";
 import { Badge, Button, Card, ErrorText, Field, Page, PageHeader } from "../components/ui";
 import { useAuth } from "../lib/auth";
 import { DASH_WIDGETS, DEFAULT_DASH_WIDGETS, readDashWidgets, toggleDashWidget, writeDashWidgets, type DashWidgetId } from "../lib/dash";
@@ -194,7 +193,6 @@ export default function Dashboard() {
         }
       />
       <ErrorText error={error} />
-      {can.updates ? <UpdateBanner /> : null}
       <div className="mb-5 flex flex-wrap gap-2">
         <Link className="rounded-md bg-gold-400 px-3 py-2 text-sm font-medium text-onacc hover:bg-gold-500" to="/taller?nueva=1">
           {t("workshop.new")}

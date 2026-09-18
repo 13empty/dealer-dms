@@ -7,6 +7,7 @@ import { Icon, initials, type IconName } from "./components/icons";
 import { AppearanceStrip } from "./components/Appearance";
 import { Badge, Button } from "./components/ui";
 import { BrandMark } from "./components/BrandMark";
+import { UpdateBanner } from "./components/UpdatePanel";
 import { LanguageSelect, k, useI18n } from "./lib/i18n";
 import { call } from "./lib/format";
 import { usePrefs } from "./lib/prefs-context";
@@ -248,6 +249,7 @@ function Shell() {
         />
       ) : null}
       <main className="min-w-0 flex-1 overflow-auto bg-ink-950">
+        {can.updates ? <UpdateBanner className="mx-6 mt-5 mb-0" /> : null}
         <ErrorBoundary>
           <Routes>
             <Route path="/" element={<Dashboard />} />

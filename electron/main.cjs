@@ -4,7 +4,8 @@ const path = require("path");
 const { openDatabase } = require("./db/index.cjs");
 const { seedStarter } = require("./db/seed.cjs");
 const { registerIpc, setSessionPath } = require("./ipc.cjs");
-const { initUpdater } = require("./updater.cjs");
+const { initUpdater, scheduleNotify } = require("./updater.cjs");
+const { initLogo } = require("./logo.cjs");
 
 const isDev = !app.isPackaged;
 
@@ -63,8 +64,10 @@ app.whenReady().then(() => {
     // Si el arranque limpio falla, la app igual abre.
   }
   registerIpc(app);
+  initLogo(userData);
   initUpdater(userData);
   createWindow();
+  scheduleNotify();
 });
 
 app.on("window-all-closed", () => {

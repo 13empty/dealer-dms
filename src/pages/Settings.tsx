@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppearancePanel } from "../components/Appearance";
+import { LogoPicker } from "../components/BrandMark";
 import { UpdatePanel } from "../components/UpdatePanel";
 import { SearchPicker } from "../components/SearchPicker";
 import { CatalogEditor } from "../components/CatalogEditor";
@@ -170,6 +171,7 @@ export default function Settings() {
         <Card className="p-5">
           <h2 className="text-lg font-medium">{t("settings.shopTitle")}</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <LogoPicker />
             <div className="sm:col-span-2 lg:col-span-3">
               <Field label={t("settings.name")}>
                 <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />

@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { getSqlite, getDbPath } = require("./db/index.cjs");
+const { copyLogoTo } = require("./logo.cjs");
 
 const KEEP = 10;
 
@@ -52,6 +53,7 @@ async function backupShopData({ userDataDir, reason = "manual", version = "" }) 
     source: getDbPath(),
   };
   fs.writeFileSync(path.join(dir, "backup.json"), JSON.stringify(info, null, 2), "utf8");
+  copyLogoTo(dir);
   pruneBackups(userDataDir);
   return { dir, file, ...info };
 }
