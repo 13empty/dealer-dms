@@ -33,16 +33,27 @@ import Invoice from "./pages/Invoice";
 import SalePrint from "./pages/SalePrint";
 import VehiclePrint from "./pages/VehiclePrint";
 import SqlStudio from "./pages/SqlStudio";
+import { ChangelogModal, VersionButton } from "./components/ChangelogModal";
+import { markChangelogSeen, shouldShowChangelog } from "./lib/changelog";
 
 function Shell() {
   const { user, can, logout } = useAuth();
   const { t } = useI18n();
   const { prefs } = usePrefs();
   const [appVersion, setAppVersion] = useState("");
+  const [changelogOpen, setChangelogOpen] = useState(false);
+  const [changelogAuto, setChangelogAuto] = useState(false);
 
   useEffect(() => {
     void call(window.dms.meta.version())
-      .then((v) => setAppVersion(String(v || "")))
+      .then((v) => {
+        const version = String(v || "");
+        setAppVersion(version);
+        if (shouldShowChangelog(version)) {
+          setChangelogAuto(true);
+          setChangelogOpen(true);
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -126,12 +137,28 @@ function Shell() {
             {t("nav.logout")}
           </Button>
           {appVersion ? (
-            <div className="mt-3 text-center text-[11px] tabular-nums text-slate-500">
-              {t("nav.version", { version: appVersion })}
-            </div>
+            <VersionButton
+              className="mt-3 w-full text-center"
+              version={appVersion}
+              onClick={() => {
+                setChangelogAuto(false);
+                setChangelogOpen(true);
+              }}
+            />
           ) : null}
         </div>
       </aside>
+      {changelogOpen && appVersion ? (
+        <ChangelogModal
+          version={appVersion}
+          auto={changelogAuto}
+          onClose={(hide) => {
+            if (hide) markChangelogSeen(appVersion);
+            setChangelogOpen(false);
+            setChangelogAuto(false);
+          }}
+        />
+      ) : null}
       <main className="min-w-0 flex-1 overflow-auto bg-ink-950">
         <ErrorBoundary>
           <Routes>

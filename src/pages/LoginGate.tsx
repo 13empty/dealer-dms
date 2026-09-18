@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AppearanceStrip } from "../components/Appearance";
 import { BrandMark } from "../components/BrandMark";
+import { ChangelogModal, VersionButton } from "../components/ChangelogModal";
 import { Button, Card, ErrorText, Field } from "../components/ui";
 import { useAuth } from "../lib/auth";
 import { call } from "../lib/format";
@@ -15,6 +16,7 @@ export default function LoginGate() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [appVersion, setAppVersion] = useState("");
+  const [changelogOpen, setChangelogOpen] = useState(false);
 
   useEffect(() => {
     void call(window.dms.meta.version())
@@ -75,7 +77,14 @@ export default function LoginGate() {
         </form>
       </Card>
       {appVersion ? (
-        <div className="absolute bottom-4 left-6 text-[11px] tabular-nums text-slate-500">{t("nav.version", { version: appVersion })}</div>
+        <VersionButton
+          className="absolute bottom-4 left-6"
+          version={appVersion}
+          onClick={() => setChangelogOpen(true)}
+        />
+      ) : null}
+      {changelogOpen && appVersion ? (
+        <ChangelogModal version={appVersion} onClose={() => setChangelogOpen(false)} />
       ) : null}
     </div>
   );
