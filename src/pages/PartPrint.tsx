@@ -70,16 +70,16 @@ export default function PartPrint() {
           />
         </div>
         <div className="mx-auto max-w-3xl rounded-lg border border-ink-600 p-8 print:border-black">
-          <div className="mb-6 flex justify-between">
-            <div>
-              <div className="text-xs uppercase tracking-widest text-gold-400 print:text-black">{shopName || shop.name}</div>
+          <div className="mb-6 flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="break-words text-xs uppercase tracking-widest text-gold-400 print:text-black">{shopName || shop.name}</div>
               <h1 className="mt-1 text-2xl font-semibold">{row.sku}</h1>
               <p className="text-sm text-slate-400 print:text-neutral-600">{row.name}</p>
               <div className="mt-2">
                 <GuidCopy value={row.id} />
               </div>
             </div>
-            <div className="text-right text-sm">
+            <div className="shrink-0 text-right text-sm">
               <div>{t(k(`partStatus.${row.status || "activo"}`))}</div>
               <div>{t(k(`partCat.${row.category || "otros"}`))}</div>
             </div>
@@ -143,7 +143,7 @@ export default function PartPrint() {
       </div>
       <div className="mx-auto max-w-5xl">
         <div className="mb-4">
-          <div className="text-xs uppercase tracking-widest text-gold-400 print:text-black">{shopName || shop.name}</div>
+          <div className="break-words text-xs uppercase tracking-widest text-gold-400 print:text-black">{shopName || shop.name}</div>
           <h1 className="text-2xl font-semibold">{title}</h1>
           <p className="text-sm text-slate-400 print:text-neutral-600">{dateEs(new Date().toISOString())}</p>
         </div>

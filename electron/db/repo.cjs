@@ -3701,6 +3701,7 @@ module.exports = {
   setWorkOrderNumber,
   getSettings,
   shopDisplayName,
+  offerWashOn,
   updatesAllowed,
   setUpdatesAllowed,
   saveSettings,

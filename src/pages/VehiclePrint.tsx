@@ -55,9 +55,9 @@ export default function VehiclePrint() {
         />
       </div>
       <div className="mx-auto max-w-3xl rounded-lg border border-ink-600 p-8 print:border-black">
-        <div className="mb-6 flex justify-between">
-          <div>
-            <div className="text-xs uppercase tracking-widest text-gold-400 print:text-black">{shopName || shop.name}</div>
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="break-words text-xs uppercase tracking-widest text-gold-400 print:text-black">{shopName || shop.name}</div>
             <h1 className="mt-1 text-2xl font-semibold">{vehicleLabel(row)}</h1>
             <p className="text-sm text-slate-400 print:text-neutral-600">
               {[row.stockNumber, row.plate, row.vin].filter(Boolean).join(" · ")}
@@ -66,7 +66,7 @@ export default function VehiclePrint() {
               <GuidCopy value={row.id} />
             </div>
           </div>
-          <div className="text-right text-sm">
+            <div className="shrink-0 text-right text-sm">
             <div>{t(k(`vehicle.${row.status}`))}</div>
             <div>{t(k(`vehicleCond.${row.condition || "usado"}`))}</div>
           </div>

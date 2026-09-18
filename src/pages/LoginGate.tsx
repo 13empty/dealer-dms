@@ -44,10 +44,10 @@ export default function LoginGate() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_420px_at_20%_10%,rgba(232,184,109,0.16),transparent_55%)]" />
       <Card className="relative w-full max-w-md p-7">
         <div className="mb-5 flex items-center gap-3">
-          <BrandMark className="h-10 w-10" />
-          <div>
+          <BrandMark className="h-10 w-10 shrink-0" />
+          <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-[0.22em] text-gold-400">{t("nav.brand")}</div>
-            <div className="text-sm font-semibold text-slate-100">{shopName}</div>
+            <div className="text-sm font-semibold leading-tight break-words text-slate-100">{shopName}</div>
           </div>
         </div>
         <h1 className="text-2xl font-semibold">{needsSetup ? t("login.setupTitle") : t("login.loginTitle")}</h1>

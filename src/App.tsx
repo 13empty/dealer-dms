@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -11,6 +11,7 @@ import { UpdateBanner } from "./components/UpdatePanel";
 import { LanguageSelect, k, useI18n } from "./lib/i18n";
 import { call } from "./lib/format";
 import { usePrefs } from "./lib/prefs-context";
+import { clampNavWidth, NAV_WIDTH_DEFAULT } from "./lib/prefs";
 import { useShop } from "./lib/shop-context";
 import { DEFAULT_NAV_OFFICE, DEFAULT_NAV_OPS, NAV_OFFICE, NAV_OPS, reorderNav, sortByNavOrder, type NavId } from "./lib/nav";
 import LoginGate from "./pages/LoginGate";
@@ -167,10 +168,11 @@ function Shell() {
   const { user, can, logout } = useAuth();
   const { t } = useI18n();
   const { prefs, setPref } = usePrefs();
-  const { name: shopName } = useShop();
+  const { name: shopName, offerWash } = useShop();
   const [appVersion, setAppVersion] = useState("");
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [changelogAuto, setChangelogAuto] = useState(false);
+  const [navWidth, setNavWidth] = useState(() => clampNavWidth(prefs.navWidth));
 
   useEffect(() => {
     void call(window.dms.meta.version())
@@ -188,7 +190,7 @@ function Shell() {
   const opsItems: MenuLink[] = [
     { id: "home", to: "/", label: t("nav.home"), icon: "home", show: true, end: true },
     { id: "workshop", to: "/taller", label: t("nav.workshop"), icon: "wrench", show: true, end: true },
-    { id: "wash", to: "/lavado", label: t("nav.wash"), icon: "droplet", show: true, end: true },
+    { id: "wash", to: "/lavado", label: t("nav.wash"), icon: "droplet", show: offerWash, end: true },
     { id: "customers", to: "/clientes", label: t("nav.customers"), icon: "users", show: true },
     { id: "parts", to: "/partes", label: t("nav.parts"), icon: "box", show: true },
     { id: "opcodes", to: "/taller/opcodes", label: t("nav.opcodes"), icon: "list", show: true },
@@ -220,15 +222,36 @@ function Shell() {
     prefs.navOpsOrder.join(" ") !== DEFAULT_NAV_OPS.join(" ") ||
     prefs.navOfficeOrder.join(" ") !== DEFAULT_NAV_OFFICE.join(" ");
 
+  function startResize(e: ReactPointerEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = navWidth;
+    let latest = startW;
+    const move = (ev: PointerEvent) => {
+      latest = clampNavWidth(startW + ev.clientX - startX);
+      setNavWidth(latest);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setPref("navWidth", latest);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
   return (
     <div className="flex h-full">
-      <aside className="flex w-60 shrink-0 flex-col border-r border-ink-600 bg-ink-900/95 print:hidden">
+      <aside
+        style={{ width: navWidth }}
+        className="relative flex shrink-0 flex-col border-r border-ink-600 bg-ink-900/95 print:hidden"
+      >
         <div className="border-b border-ink-600 px-4 py-4">
-          <div className="flex items-center gap-3">
-            <BrandMark className="h-9 w-9" />
+          <div className="flex items-start gap-3">
+            <BrandMark className="mt-0.5 h-9 w-9 shrink-0" />
             <div className="min-w-0">
               <div className="text-[10px] uppercase tracking-[0.22em] text-gold-400">{t("nav.brand")}</div>
-              <div className="truncate text-base font-semibold leading-tight">{shopName}</div>
+              <div className="break-words text-base font-semibold leading-tight">{shopName}</div>
             </div>
           </div>
         </div>
@@ -298,6 +321,17 @@ function Shell() {
             />
           ) : null}
         </div>
+        <button
+          type="button"
+          aria-label={t("nav.resize")}
+          title={t("nav.resize")}
+          className="absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize border-0 bg-transparent p-0 hover:bg-gold-400/40"
+          onPointerDown={startResize}
+          onDoubleClick={() => {
+            setNavWidth(NAV_WIDTH_DEFAULT);
+            setPref("navWidth", NAV_WIDTH_DEFAULT);
+          }}
+        />
       </aside>
       {changelogOpen && appVersion ? (
         <ChangelogModal

@@ -174,7 +174,7 @@ export default function Dashboard() {
   const queues = kpis
     ? [
         { to: "/taller?status=lista", label: t("dash.actionReady"), n: kpis.readyWorkOrders },
-        { to: "/lavado", label: t("dash.actionWash"), n: kpis.offerWash ? kpis.washOpen || 0 : 0 },
+        ...(kpis.offerWash ? [{ to: "/lavado", label: t("dash.actionWash"), n: kpis.washOpen || 0 }] : []),
         { to: "/taller?unpaid=1", label: t("dash.actionUnpaid"), n: kpis.unpaidOpenOrders },
         { to: "/taller?status=espera_partes", label: t("dash.waitingParts"), n: kpis.waitingPartsCount || 0 },
         { to: "/partes?low=1", label: t("dash.actionLow"), n: kpis.lowStockCount },
@@ -200,9 +200,11 @@ export default function Dashboard() {
         <Link className="rounded-md border border-ink-600 bg-ink-800 px-3 py-2 text-sm hover:bg-ink-700" to="/taller?nueva=presupuesto">
           {t("workshop.newEstimate")}
         </Link>
-        <Link className="rounded-md border border-ink-600 bg-ink-800 px-3 py-2 text-sm hover:bg-ink-700" to="/lavado?nueva=1">
-          {t("workshop.newWash")}
-        </Link>
+        {kpis?.offerWash ? (
+          <Link className="rounded-md border border-ink-600 bg-ink-800 px-3 py-2 text-sm hover:bg-ink-700" to="/lavado?nueva=1">
+            {t("workshop.newWash")}
+          </Link>
+        ) : null}
         <Link className="rounded-md border border-ink-600 bg-ink-800 px-3 py-2 text-sm hover:bg-ink-700" to="/clientes?nuevo=1">
           {t("customers.new")}
         </Link>

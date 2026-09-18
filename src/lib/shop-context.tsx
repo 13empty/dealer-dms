@@ -5,6 +5,7 @@ const FALLBACK = "Dealer DMS";
 
 type ShopValue = {
   name: string;
+  offerWash: boolean;
   refresh: () => Promise<void>;
 };
 
@@ -12,15 +13,18 @@ const ShopContext = createContext<ShopValue | null>(null);
 
 export function ShopProvider({ children }: { children: ReactNode }) {
   const [name, setName] = useState(FALLBACK);
+  const [offerWash, setOfferWash] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
       const next = await call(window.dms.settings.identity());
       const shopName = String(next?.name || "").trim() || FALLBACK;
       setName(shopName);
+      setOfferWash(Boolean(next?.offerWash));
       document.title = shopName;
     } catch {
       setName(FALLBACK);
+      setOfferWash(false);
       document.title = FALLBACK;
     }
   }, []);
@@ -34,7 +38,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("dms-shop", onShop);
   }, [refresh]);
 
-  const value = useMemo<ShopValue>(() => ({ name, refresh }), [name, refresh]);
+  const value = useMemo<ShopValue>(() => ({ name, offerWash, refresh }), [name, offerWash, refresh]);
   return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>;
 }
 

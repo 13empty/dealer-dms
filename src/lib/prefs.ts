@@ -5,6 +5,16 @@ export type ThemeId = (typeof THEMES)[number];
 export type DensityId = "comodo" | "compacto";
 export type TypeSizeId = "md" | "lg";
 
+export const NAV_WIDTH_MIN = 220;
+export const NAV_WIDTH_MAX = 480;
+export const NAV_WIDTH_DEFAULT = 260;
+
+export function clampNavWidth(raw: unknown) {
+  const n = Math.round(Number(raw));
+  if (!Number.isFinite(n)) return NAV_WIDTH_DEFAULT;
+  return Math.min(NAV_WIDTH_MAX, Math.max(NAV_WIDTH_MIN, n));
+}
+
 export type AppPrefs = {
   theme: ThemeId;
   density: DensityId;
@@ -13,6 +23,7 @@ export type AppPrefs = {
   promisedDays: number;
   navOpsOrder: NavId[];
   navOfficeOrder: NavId[];
+  navWidth: number;
 };
 
 export const DEFAULT_PREFS: AppPrefs = {
@@ -23,6 +34,7 @@ export const DEFAULT_PREFS: AppPrefs = {
   promisedDays: 1,
   navOpsOrder: [...DEFAULT_NAV_OPS],
   navOfficeOrder: [...DEFAULT_NAV_OFFICE],
+  navWidth: NAV_WIDTH_DEFAULT,
 };
 
 const KEY = "dms.prefs";
@@ -45,6 +57,7 @@ export function readPrefs(): AppPrefs {
       promisedDays,
       navOpsOrder: normalizeNavOrder(parsed.navOpsOrder ?? parsed.navOrder, NAV_OPS),
       navOfficeOrder: normalizeNavOrder(parsed.navOfficeOrder ?? parsed.navOrder, NAV_OFFICE),
+      navWidth: clampNavWidth(parsed.navWidth),
     };
   } catch {
     return { ...DEFAULT_PREFS };

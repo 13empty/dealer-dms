@@ -59,10 +59,10 @@ export function PrintShopHead({
   const { name: shopName } = useShop();
   return (
     <div className="flex items-start justify-between gap-6 border-b border-neutral-300 pb-5">
-      <div className="flex items-start gap-4">
+      <div className="flex min-w-0 flex-1 items-start gap-4">
         <BrandMark className="h-14 w-14 shrink-0 rounded-md" />
-        <div>
-          <div className="text-xl font-semibold tracking-tight">{shopName || shop.name}</div>
+        <div className="min-w-0">
+          <div className="text-xl font-semibold tracking-tight break-words">{shopName || shop.name}</div>
           {shop.address ? <div className="mt-1 text-sm text-neutral-600">{shop.address}</div> : null}
           <div className="mt-1 text-sm text-neutral-600">{[shop.phone, shop.email].filter(Boolean).join(" · ")}</div>
           {shop.gstNumber ? (
@@ -70,7 +70,7 @@ export function PrintShopHead({
           ) : null}
         </div>
       </div>
-      <div className="text-right">
+      <div className="shrink-0 text-right">
         <div className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">{docLabel}</div>
         {number ? <div className="mt-1 text-2xl font-semibold">{number}</div> : null}
         <div className="mt-1 text-sm text-neutral-600">{date}</div>

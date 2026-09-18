@@ -190,7 +190,7 @@ function registerIpc(app) {
   handle("workOrders:setNumber", wrap((_u, { id, number }) => repo.setWorkOrderNumber(id, number), { minRank: 80 }));
 
   handle("settings:get", wrap(() => repo.getSettings()));
-  handle("settings:identity", wrap(() => ({ name: repo.shopDisplayName() }), { public: true }));
+  handle("settings:identity", wrap(() => ({ name: repo.shopDisplayName(), offerWash: repo.offerWashOn() }), { public: true }));
   handle("settings:save", wrap((_u, data) => {
     const next = repo.saveSettings(data);
     for (const win of BrowserWindow.getAllWindows()) {

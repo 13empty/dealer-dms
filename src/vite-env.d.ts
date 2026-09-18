@@ -753,7 +753,7 @@ interface DmsApi {
   };
   settings: {
     get: () => Result<ShopSettings>;
-    identity: () => Result<{ name: string }>;
+    identity: () => Result<{ name: string; offerWash: boolean }>;
     save: (data: Partial<ShopSettings>) => Result<ShopSettings>;
     saveNumbering: (data: { woPrefix?: string; woNextNumber?: number; woPad?: number }) => Result<ShopSettings>;
     catalogs: () => Result<ShopCatalogs>;
