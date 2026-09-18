@@ -202,6 +202,11 @@ function registerIpc(app) {
   handle("opCodes:update", wrap((_u, { id, data }) => repo.updateOpCode(id, data)));
   handle("opCodes:remove", wrap((_u, id) => repo.removeOpCode(id), { minRank: 50 }));
 
+  handle("washTypes:list", wrap((_u, opts) => repo.listWashTypes(opts || {})));
+  handle("washTypes:create", wrap((_u, data) => repo.createWashType(data), { minRank: 50 }));
+  handle("washTypes:update", wrap((_u, { id, data }) => repo.updateWashType(id, data), { minRank: 50 }));
+  handle("washTypes:remove", wrap((_u, id) => repo.removeWashType(id), { minRank: 50 }));
+
   handle("dashboard:kpis", wrap(() => repo.dashboardKpis()));
   handle("finance:summary", wrap((_u, period) => repo.financeSummary(period), { minRank: 50 }));
   handle("finance:addExpense", wrap((_u, data) => repo.createExpense(data), { minRank: 50 }));

@@ -304,24 +304,45 @@ app.whenReady().then(async () => {
   if (gerente.job !== "asesor" || !gerente.canTech) throw new Error("Gerente debe ser asesor de taller");
 
   if (repo.getSettings().offerWash) throw new Error("Lavado debe nacer apagado");
+  const typesOff = repo.listWashTypes();
+  if (!typesOff.some((item) => item.code === "WASH-F") || !typesOff.some((item) => item.code === "DET-X")) {
+    throw new Error("Los tipos de lavado deben existir aunque la cola esté apagada");
+  }
+  if (repo.getSettings().offerWash) throw new Error("Listar tipos no debe encender la cola");
+  const shopWash = repo.createWorkOrder({
+    customerId: plated.customerId,
+    vehicleId: plated.id,
+    complaint: "Frenos",
+  });
+  const fullWash = typesOff.find((item) => item.code === "WASH-F");
+  repo.addWorkOrderLine(shopWash.id, { type: "labor", opCodeId: fullWash.id, payType: "cliente" });
+  const shopGot = repo.getWorkOrder(shopWash.id);
+  if (!shopGot.lines.some((line) => line.opCodeId === fullWash.id)) throw new Error("El taller no agregó el lavado a la OT");
+  if (repo.listWorkOrders("", { serviceLine: "lavado" }).some((o) => o.id === shopWash.id)) {
+    throw new Error("Un lavado en OT de taller no debe ir a la cola de lavado");
+  }
+  if (repo.listOpCodes("", { serviceLine: "taller" }).some((o) => o.code === "WASH-F")) {
+    throw new Error("Los tipos de lavado no deben mezclarse con Op Codes de taller");
+  }
   repo.saveSettings({ ...repo.getSettings(), offerWash: true });
   if (!repo.getSettings().offerWash) throw new Error("No activó lavado / detailing");
   const washCats = repo.getCatalogs();
   if (!washCats.opcodeCategories.some((c) => c.id === "lavado") || !washCats.opcodeCategories.some((c) => c.id === "detailing")) {
     throw new Error("No agregó categorías de lavado");
   }
-  const washOps = repo.listOpCodes();
-  if (!washOps.some((o) => o.code === "WASH-F") || !washOps.some((o) => o.code === "DET-X")) {
-    throw new Error("No sembraron operaciones de lavado");
-  }
+  const ceramic = repo.createWashType({ name: "Ceramic coat", category: "detailing", price: 499, minutes: 120 });
+  if (ceramic.name !== "Ceramic coat" || ceramic.price !== 499) throw new Error("No creó el tipo de lavado");
+  const priced = repo.updateWashType(ceramic.id, { price: 450 });
+  if (priced.price !== 450) throw new Error("No actualizó el precio del tipo");
   const washWo = repo.createWorkOrder({
     customerId: plated.customerId,
     vehicleId: plated.id,
-    complaint: "Lavado / detailing",
     serviceLine: "lavado",
+    washTypeIds: [fullWash.id],
   });
   if (washWo.serviceLine !== "lavado") throw new Error("No guardó la línea de lavado");
   if (washWo.status !== "en_taller") throw new Error("Lavado debe abrir en bahía, sin recepción de taller");
+  if (!washWo.lines.some((line) => line.opCodeId === fullWash.id)) throw new Error("El ticket de lavado no cargó el tipo");
   if (repo.listWorkOrders("", { serviceLine: "taller" }).some((o) => o.id === washWo.id)) {
     throw new Error("El taller no debe listar OT de lavado");
   }
@@ -345,7 +366,9 @@ app.whenReady().then(async () => {
   if (!repo.listStaff({ line: "lavado" }).some((s) => s.id === washer.id)) {
     throw new Error("Lavador debe salir al asignar lavado");
   }
+  repo.removeWashType(ceramic.id);
   repo.removeWorkOrder(washWo.id);
+  repo.removeWorkOrder(shopWash.id);
   repo.saveSettings({ ...repo.getSettings(), offerWash: false });
   if (repo.getSettings().offerWash) throw new Error("No se apagó lavado");
   auth.removeUser(master, washer.id);

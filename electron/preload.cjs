@@ -100,6 +100,12 @@ contextBridge.exposeInMainWorld("dms", {
     update: (id, data) => invoke("opCodes:update", { id, data }),
     remove: (id) => invoke("opCodes:remove", id),
   },
+  washTypes: {
+    list: (opts) => invoke("washTypes:list", opts || {}),
+    create: (data) => invoke("washTypes:create", data),
+    update: (id, data) => invoke("washTypes:update", { id, data }),
+    remove: (id) => invoke("washTypes:remove", id),
+  },
   dashboard: {
     kpis: () => invoke("dashboard:kpis"),
   },

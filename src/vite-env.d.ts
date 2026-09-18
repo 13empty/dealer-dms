@@ -300,6 +300,16 @@ export type OpCode = {
   parts?: OpCodePart[];
 };
 
+export type WashType = {
+  id: string;
+  code: string;
+  name: string;
+  category: "lavado" | "detailing";
+  price: number;
+  minutes: number;
+  active: boolean;
+};
+
 export type WorkOrderLine = {
   id: string;
   workOrderId: string;
@@ -725,7 +735,7 @@ interface DmsApi {
       opts?: { status?: string; kind?: string; serviceLine?: string; techUserId?: string; unpaid?: boolean; overdue?: boolean; open?: boolean; limit?: number }
     ) => Result<WorkOrder[]>;
     get: (id: string) => Result<WorkOrder | null>;
-    create: (data: Partial<WorkOrder>) => Result<WorkOrder>;
+    create: (data: Partial<WorkOrder> & { washTypeIds?: string[] }) => Result<WorkOrder>;
     update: (id: string, data: Partial<WorkOrder>) => Result<WorkOrder>;
     setStatus: (id: string, status: WorkOrder["status"]) => Result<WorkOrder>;
     addLine: (
@@ -763,6 +773,12 @@ interface DmsApi {
     get: (id: string) => Result<OpCode | null>;
     create: (data: Partial<OpCode> & { parts?: Array<{ partId: string; qty?: number }> }) => Result<OpCode>;
     update: (id: string, data: Partial<OpCode> & { parts?: Array<{ partId: string; qty?: number }> }) => Result<OpCode>;
+    remove: (id: string) => Result<{ id: string; deactivated?: boolean }>;
+  };
+  washTypes: {
+    list: (opts?: { activeOnly?: boolean }) => Result<WashType[]>;
+    create: (data: Partial<WashType> & { name?: string; description?: string }) => Result<WashType>;
+    update: (id: string, data: Partial<WashType> & { name?: string }) => Result<WashType>;
     remove: (id: string) => Result<{ id: string; deactivated?: boolean }>;
   };
   dashboard: { kpis: () => Result<DashboardKpis> };

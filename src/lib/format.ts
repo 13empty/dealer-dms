@@ -131,6 +131,15 @@ export function vehicleSearchHint(v?: { plate?: string; vin?: string; stockNumbe
   return [v.stockNumber, v.plate, v.vin, owner].filter(Boolean).join(" · ");
 }
 
+export function isWashCategory(category?: string | null) {
+  const key = String(category || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return key === "lavado" || key === "detailing";
+}
+
 export function workOrderPath(order: { id: string; serviceLine?: string | null }) {
   return `${order.serviceLine === "lavado" ? "/lavado" : "/taller"}/${order.id}`;
 }

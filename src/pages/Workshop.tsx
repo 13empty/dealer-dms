@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { SearchPicker, type SearchOption } from "../components/SearchPicker";
 import {
   customerDraftFromQuery,
@@ -64,22 +64,18 @@ const emptyForm = {
   waiter: false,
   priority: "normal" as "normal" | "urgente",
   poNumber: "",
-  serviceLine: "taller" as "taller" | "lavado",
 };
 
 export default function Workshop() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [params, setParams] = useSearchParams();
   const { t } = useI18n();
-  const { user, can } = useAuth();
+  const { user } = useAuth();
   const { prefs } = usePrefs();
-  const washLane = location.pathname.startsWith("/lavado");
   const [rows, setRows] = useState<WorkOrder[]>([]);
   const [q, setQ] = useState(() => params.get("q") || "");
   const [view, setView] = useState<"board" | "list">(readWorkshopView);
   const [simple, setSimple] = useState(false);
-  const [offerWash, setOfferWash] = useState<boolean | null>(null);
   const [status, setStatus] = useState(() => params.get("status") || "");
   const [kind, setKind] = useState(() => params.get("kind") || "");
   const [unpaid, setUnpaid] = useState(() => params.get("unpaid") === "1");
@@ -112,20 +108,18 @@ export default function Workshop() {
           window.dms.workOrders.list(q, {
             status: status || undefined,
             kind: kind || undefined,
-            serviceLine: washLane ? "lavado" : "taller",
+            serviceLine: "taller",
             unpaid: unpaid || undefined,
             overdue: overdue || undefined,
             open: showDelivered ? undefined : true,
           })
         ),
-        call(window.dms.staff.list({ line: washLane ? "lavado" : "taller" })),
+        call(window.dms.staff.list({ line: "taller" })),
         call(window.dms.settings.get()),
       ]);
       setRows(Array.isArray(orders) ? orders : []);
       setStaff(Array.isArray(staffRows) ? staffRows : []);
-      const nextSimple = settings?.serviceMode === "sencillo" || washLane;
-      setSimple(nextSimple);
-      setOfferWash(Boolean(settings?.offerWash));
+      setSimple(settings?.serviceMode === "sencillo");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -133,7 +127,7 @@ export default function Workshop() {
 
   useEffect(() => {
     void load();
-  }, [q, status, kind, unpaid, overdue, showDelivered, washLane]);
+  }, [q, status, kind, unpaid, overdue, showDelivered]);
 
   useEffect(() => {
     const cliente = params.get("cliente") || "";
@@ -150,8 +144,6 @@ export default function Workshop() {
         const owner = customer || vehicle?.customer || null;
         setForm({
           ...emptyForm,
-          serviceLine: washLane ? "lavado" : "taller",
-          complaint: washLane ? t("workshop.washComplaint") : "",
           customerId: owner ? String(owner.id) : "",
           vehicleId: chosen ? String(chosen.id) : "",
           kmIn: chosen ? String(chosen.km || 0) : "",
@@ -187,19 +179,17 @@ export default function Workshop() {
   }, [params.get("cliente"), params.get("vehiculo")]);
 
   useEffect(() => {
-    if (washLane) return;
     if (params.get("linea") !== "lavado" && params.get("nueva") !== "lavado") return;
     const next = new URLSearchParams(params);
     next.delete("linea");
     if (next.get("nueva") === "lavado") next.set("nueva", "1");
     navigate({ pathname: "/lavado", search: next.toString() ? `?${next}` : "" }, { replace: true });
-  }, [washLane, params, navigate]);
+  }, [params, navigate]);
 
   useEffect(() => {
     const nueva = params.get("nueva");
     if (!nueva) return;
-    if (washLane && offerWash !== true) return;
-    startCreate(nueva === "presupuesto" ? "presupuesto" : "orden", washLane ? "lavado" : "taller");
+    startCreate(nueva === "presupuesto" ? "presupuesto" : "orden");
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -208,7 +198,7 @@ export default function Workshop() {
       },
       { replace: true }
     );
-  }, [params.get("nueva"), washLane, offerWash]);
+  }, [params.get("nueva")]);
 
   async function save() {
     try {
@@ -258,7 +248,6 @@ export default function Workshop() {
           waiter: form.waiter ? 1 : 0,
           priority: form.priority,
           poNumber: form.poNumber,
-          serviceLine: form.serviceLine,
         })
       );
       setOpen(false);
@@ -288,12 +277,10 @@ export default function Workshop() {
     setError(null);
   }
 
-  function startCreate(kind: "orden" | "presupuesto", line: "taller" | "lavado" = "taller") {
+  function startCreate(kind: "orden" | "presupuesto" = "orden") {
     setForm({
       ...emptyForm,
       kind,
-      serviceLine: line,
-      complaint: line === "lavado" ? t("workshop.washComplaint") : "",
       promisedAt: defaultPromisedAt(prefs.promisedDays),
       techUserId: user?.id && staff.some((u) => u.id === user.id) ? String(user.id) : "",
     });
@@ -423,60 +410,20 @@ export default function Workshop() {
     );
   }
 
-  async function enableWash() {
-    try {
-      setError(null);
-      const settings = await call(window.dms.settings.get());
-      await call(window.dms.settings.save({ ...settings, offerWash: true }));
-      window.dispatchEvent(new Event("dms-shop"));
-      setOfferWash(true);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }
-
-  if (washLane && offerWash === false) {
-    return (
-      <Page>
-        <PageHeader title={t("wash.title")} subtitle={t("wash.subtitle")} />
-        <ErrorText error={error} />
-        <Card className="max-w-xl p-5">
-          <h2 className="text-lg font-medium">{t("wash.turnOn")}</h2>
-          <p className="mt-2 text-sm text-slate-400">{t("wash.turnOnHint")}</p>
-          {can.finance ? (
-            <Button className="mt-4" onClick={() => void enableWash()}>
-              {t("wash.turnOnAction")}
-            </Button>
-          ) : (
-            <p className="mt-4 text-sm text-slate-400">{t("wash.askManager")}</p>
-          )}
-        </Card>
-      </Page>
-    );
-  }
-
   return (
     <Page>
       <PageHeader
-        title={washLane ? t("wash.title") : t("workshop.title")}
-        subtitle={washLane ? t("wash.subtitle") : t("workshop.subtitle")}
+        title={t("workshop.title")}
+        subtitle={t("workshop.subtitle")}
         actions={
           <>
-            {washLane ? null : (
-              <Button variant="ghost" onClick={() => navigate("/taller/opcodes")}>
-                {t("opcodes.title")}
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              onClick={() => startCreate("presupuesto", washLane ? "lavado" : "taller")}
-            >
+            <Button variant="ghost" onClick={() => navigate("/taller/opcodes")}>
+              {t("opcodes.title")}
+            </Button>
+            <Button variant="ghost" onClick={() => startCreate("presupuesto")}>
               {t("workshop.newEstimate")}
             </Button>
-            <Button onClick={() => startCreate("orden", washLane ? "lavado" : "taller")}>
-              {washLane ? t("workshop.newWash") : t("workshop.new")}
-            </Button>
+            <Button onClick={() => startCreate("orden")}>{t("workshop.new")}</Button>
           </>
         }
       />
@@ -616,13 +563,7 @@ export default function Workshop() {
       {open ? (
         <Modal
           xl
-          title={
-            form.kind === "presupuesto"
-              ? t("workshop.newEstimate")
-              : form.serviceLine === "lavado"
-                ? t("workshop.newWash")
-                : t("workshop.newTitle")
-          }
+          title={form.kind === "presupuesto" ? t("workshop.newEstimate") : t("workshop.newTitle")}
           onClose={() => setOpen(false)}
           footer={
             <>
@@ -656,7 +597,7 @@ export default function Workshop() {
                     </select>
                   </Field>
                 ) : null}
-                <Field label={washLane ? t("workshop.washTech") : t("workshop.tech")}>
+                <Field label={t("workshop.tech")}>
                   <select value={form.techUserId} onChange={(e) => setForm({ ...form, techUserId: e.target.value })}>
                     <option value="">{t("workshop.noTech")}</option>
                     {staff.map((u) => (

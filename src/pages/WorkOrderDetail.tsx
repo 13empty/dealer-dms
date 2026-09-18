@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { SearchPicker } from "../components/SearchPicker";
+import { WashTypePicker } from "../components/WashTypesPanel";
 import { Badge, Button, Card, ErrorText, Field, Page, PageHeader, GuidCopy } from "../components/ui";
 import { SHOP_DEFAULTS } from "../lib/canada";
-import { call, customerName, dateEs, fromDateTimeLocal, money, toDateTimeLocal, vehicleLabel, workOrderListPath, workOrderPath } from "../lib/format";
+import { call, customerName, dateEs, fromDateTimeLocal, isWashCategory, money, toDateTimeLocal, vehicleLabel, workOrderListPath, workOrderPath } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
-import type { StaffUser, WorkOrder, WorkOrderLine, WorkOrderStatus } from "../vite-env";
+import type { StaffUser, WashType, WorkOrder, WorkOrderLine, WorkOrderStatus } from "../vite-env";
 
 const FULL_FLOW: WorkOrderStatus[] = ["recepcion", "autorizacion", "espera_partes", "en_taller", "en_espera", "lista"];
 const SIMPLE_FLOW: WorkOrderStatus[] = ["en_taller", "lista"];
@@ -51,18 +52,20 @@ export default function WorkOrderDetail() {
   const [pay, setPay] = useState({ amount: "", method: "efectivo" });
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [lineJob, setLineJob] = useState({ complaint: "", cause: "", correction: "" });
+  const [washTypes, setWashTypes] = useState<WashType[]>([]);
 
   async function load() {
     try {
       setError(null);
-      const [wo, settings] = await Promise.all([
+      const [wo, settings, types] = await Promise.all([
         call(window.dms.workOrders.get(String(id || ""))),
         call(window.dms.settings.get()),
+        call(window.dms.washTypes.list({ activeOnly: true })),
       ]);
       setOrder(wo);
+      setWashTypes(Array.isArray(types) ? types : []);
       if (!wo) throw new Error(t("workshop.missing"));
-      const wash = wo.serviceLine === "lavado";
-      const staffRows = await call(window.dms.staff.list({ line: wash ? "lavado" : "taller" }));
+      const staffRows = await call(window.dms.staff.list({ line: "taller" }));
       setStaff(() => {
         const list = Array.isArray(staffRows) ? [...staffRows] : [];
         if (wo?.tech && !list.some((u) => u.id === wo.tech?.id)) {
@@ -80,7 +83,7 @@ export default function WorkOrderDetail() {
       });
       setTaxLabel(settings?.taxLabel || SHOP_DEFAULTS.taxLabel);
       setLaborRate(Number(settings?.laborRate) || SHOP_DEFAULTS.laborRate);
-      setSimple(settings?.serviceMode === "sencillo" || wash);
+      setSimple(settings?.serviceMode === "sencillo");
       if (wo) {
         setJob({
           kmIn: String(wo.kmIn || 0),
@@ -159,6 +162,10 @@ export default function WorkOrderDetail() {
         <ErrorText error={error} />
       </Page>
     );
+  }
+
+  if (order.serviceLine === "lavado") {
+    return <Navigate to={`/lavado/${order.id}`} replace />;
   }
 
   const locked = order.status === "entregada";
@@ -334,7 +341,6 @@ export default function WorkOrderDetail() {
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         <Badge status={estimate ? "presupuesto" : order.status} label={t(k(estimate ? "wo.presupuesto" : `wo.${order.status}`))} />
-        {order.serviceLine === "lavado" ? <Badge status="lavado" label={t("workshop.lineWash")} /> : null}
         {!estimate && paidOff && !locked ? <Badge status="pagada" label={t("workshop.paidOff")} /> : null}
         {order.priority === "urgente" ? <Badge status="urgente" label={t("workshop.priority.urgente")} /> : null}
         {!simple && order.waiter ? <Badge status="lista" label={t("workshop.waiter")} /> : null}
@@ -370,7 +376,7 @@ export default function WorkOrderDetail() {
           <Field label={t("workshop.kmOut")}>
             <input type="text" disabled={locked} value={job.kmOut} onChange={(e) => setJob({ ...job, kmOut: e.target.value })} />
           </Field>
-          <Field label={order.serviceLine === "lavado" ? t("workshop.washTech") : t("workshop.tech")}>
+          <Field label={t("workshop.tech")}>
             <select disabled={locked} value={job.techUserId} onChange={(e) => setJob({ ...job, techUserId: e.target.value })}>
               <option value="">{t("workshop.noTech")}</option>
               {staff.map((u) => (
@@ -447,7 +453,7 @@ export default function WorkOrderDetail() {
                 }}
                 search={async (query) => {
                   const [ops, foundParts] = await Promise.all([
-                    call(window.dms.opCodes.list(query, { activeOnly: true, serviceLine: order.serviceLine === "lavado" ? "lavado" : "taller" })),
+                    call(window.dms.opCodes.list(query, { activeOnly: true, serviceLine: "taller" })),
                     call(window.dms.parts.list(query, { limit: 8, activeOnly: true })),
                   ]);
                   return [
@@ -493,6 +499,38 @@ export default function WorkOrderDetail() {
             <Button onClick={saveJob}>{selectedLine ? t("workshop.saveLine") : t("workshop.saveJob")}</Button>
           ) : null}
         </div>
+      </Card>
+
+      <Card className="p-4">
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{t("wash.addToRo")}</div>
+          <Link className="text-xs text-gold-400 hover:underline" to="/lavado?tipos=1">
+            {t("wash.manageTypes")}
+          </Link>
+        </div>
+        <p className="mb-3 text-xs text-slate-500">{t("wash.addToRoHint")}</p>
+        <WashTypePicker
+          types={washTypes}
+          selectedIds={(order.lines || []).map((line) => line.opCodeId || "").filter(Boolean)}
+          disabled={locked}
+          onToggle={(typeId) => {
+            const existing = (order.lines || []).find((line) => line.opCodeId === typeId);
+            if (existing) {
+              if (!confirm(t("workshop.removeLine"))) return;
+              void act(() => call(window.dms.workOrders.removeLine(existing.id)));
+              return;
+            }
+            void addAndSelect(() =>
+              call(
+                window.dms.workOrders.addLine(order.id, {
+                  type: "labor",
+                  opCodeId: typeId,
+                  payType: "cliente",
+                })
+              )
+            );
+          }}
+        />
       </Card>
 
       {simple && !selectedLine ? null : (
@@ -560,7 +598,7 @@ export default function WorkOrderDetail() {
                 }}
                 search={async (query) => {
                   const [ops, foundParts] = await Promise.all([
-                    call(window.dms.opCodes.list(query, { activeOnly: true, serviceLine: order.serviceLine === "lavado" ? "lavado" : "taller" })),
+                    call(window.dms.opCodes.list(query, { activeOnly: true, serviceLine: "taller" })),
                     call(window.dms.parts.list(query, { limit: 8, activeOnly: true })),
                   ]);
                   return [
@@ -612,7 +650,13 @@ export default function WorkOrderDetail() {
                     onClick={() => selectLine(line)}
                   >
                     <td className="px-4 py-2">
-                      {line.type === "part" ? t("workshop.part") : line.opcode ? t("workshop.op", { code: line.opcode.code }) : t("workshop.labor")}
+                      {isWashCategory(line.opcode?.category)
+                        ? t("wash.addToRo")
+                        : line.type === "part"
+                          ? t("workshop.part")
+                          : line.opcode
+                            ? t("workshop.op", { code: line.opcode.code })
+                            : t("workshop.labor")}
                       {Number(line.authorized) === 0 ? <div className="text-xs text-red-300">{t("workshop.declined")}</div> : null}
                     </td>
                     <td className="px-4 py-2">
@@ -695,7 +739,7 @@ export default function WorkOrderDetail() {
                   setOpPicked({ id: nextId, label: option?.label || "", payType: String((option?.raw as { payType?: string } | undefined)?.payType || "cliente") })
                 }
                 search={async (query) => {
-                  const found = await call(window.dms.opCodes.list(query, { activeOnly: true, serviceLine: order.serviceLine === "lavado" ? "lavado" : "taller" }));
+                  const found = await call(window.dms.opCodes.list(query, { activeOnly: true, serviceLine: "taller" }));
                   return found.slice(0, 25).map((op) => ({
                     id: op.id,
                     label: `${op.popular ? "★ " : ""}${op.code} · ${op.description}`,

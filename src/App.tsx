@@ -23,6 +23,8 @@ import PartDetail from "./pages/PartDetail";
 import PartPrint from "./pages/PartPrint";
 import Workshop from "./pages/Workshop";
 import OpCodes from "./pages/OpCodes";
+import Wash from "./pages/Wash";
+import WashTicket from "./pages/WashTicket";
 import WorkOrderDetail from "./pages/WorkOrderDetail";
 import Finance from "./pages/Finance";
 import Users from "./pages/Users";
@@ -151,9 +153,9 @@ function Shell() {
             <Route path="/taller/opcodes" element={<OpCodes />} />
             <Route path="/taller/:id/imprimir" element={<Invoice />} />
             <Route path="/taller/:id" element={<WorkOrderDetail />} />
-            <Route path="/lavado" element={<Workshop />} />
+            <Route path="/lavado" element={<Wash />} />
             <Route path="/lavado/:id/imprimir" element={<Invoice />} />
-            <Route path="/lavado/:id" element={<WorkOrderDetail />} />
+            <Route path="/lavado/:id" element={<WashTicket />} />
             <Route path="/finanzas" element={can.finance ? <Finance /> : <Navigate to="/" replace />} />
             <Route path="/ajustes" element={can.finance ? <Settings /> : <Navigate to="/" replace />} />
             <Route path="/sql" element={can.options ? <SqlStudio /> : <Navigate to="/" replace />} />

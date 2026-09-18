@@ -40,12 +40,14 @@ export default function OpCodes() {
   const [editing, setEditing] = useState<OpCode | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [defaultRate, setDefaultRate] = useState(String(SHOP_DEFAULTS.laborRate));
-  const categories = catalogs?.opcodeCategories.map((item) => item.id) || [];
+  const categories = (catalogs?.opcodeCategories || [])
+    .map((item) => item.id)
+    .filter((id) => id !== "lavado" && id !== "detailing");
 
   async function load() {
     try {
       setError(null);
-      const found = await call(window.dms.opCodes.list(q));
+      const found = await call(window.dms.opCodes.list(q, { serviceLine: "taller" }));
       setRows(Array.isArray(found) ? found : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -211,11 +213,16 @@ export default function OpCodes() {
         <div className="space-y-4">
           <CatalogEditor
             title={t("catalog.opcodeCats")}
-            items={catalogs?.opcodeCategories || []}
+            items={(catalogs?.opcodeCategories || []).filter((item) => item.id !== "lavado" && item.id !== "detailing")}
             placeholder={t("catalog.new")}
             canEdit={can.finance}
             labelFor={(id) => catalogLabel(t, "op", id)}
-            onChange={(ids) => saveCatalogs({ opcodeCategories: ids })}
+            onChange={(ids) => {
+              const wash = (catalogs?.opcodeCategories || [])
+                .filter((item) => item.id === "lavado" || item.id === "detailing")
+                .map((item) => item.id);
+              return saveCatalogs({ opcodeCategories: [...ids, ...wash] });
+            }}
           />
           <CatalogEditor
             title={t("catalog.payTypes")}

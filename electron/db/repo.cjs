@@ -1537,6 +1537,122 @@ function ensureWashSetup() {
   }
 }
 
+function isWashCategory(category) {
+  return WASH_CATEGORIES.includes(catalogKey(category));
+}
+
+function asWashType(row) {
+  if (!row) return null;
+  const category = isWashCategory(row.category) ? catalogKey(row.category) : "lavado";
+  return {
+    id: row.id,
+    code: row.code,
+    name: row.description,
+    category,
+    price: Number(row.price) || 0,
+    minutes: Math.max(0, Math.round((Number(row.laborHours) || 0) * 60)),
+    active: Number(row.active) !== 0,
+  };
+}
+
+function nextWashCode(category) {
+  const prefix = catalogKey(category) === "detailing" ? "DET" : "WASH";
+  const used = new Set(
+    db()
+      .select()
+      .from(opCodes)
+      .all()
+      .map((row) => String(row.code || "").toUpperCase())
+  );
+  let n = 1;
+  while (used.has(`${prefix}-${n}`)) n += 1;
+  return `${prefix}-${n}`;
+}
+
+function listWashTypes(opts = {}) {
+  ensureWashSetup();
+  let rows = db()
+    .select()
+    .from(opCodes)
+    .all()
+    .filter((row) => isWashCategory(row.category));
+  if (opts.activeOnly) rows = rows.filter((row) => Number(row.active) !== 0);
+  rows.sort((a, b) => {
+    const ca = catalogKey(a.category);
+    const cb = catalogKey(b.category);
+    if (ca !== cb) return ca === "lavado" ? -1 : 1;
+    return (Number(a.price) || 0) - (Number(b.price) || 0);
+  });
+  return rows.map(asWashType);
+}
+
+function getWashType(id) {
+  const row = db().select().from(opCodes).where(eq(opCodes.id, asId(id))).get();
+  if (!row || !isWashCategory(row.category)) return null;
+  return asWashType(row);
+}
+
+function createWashType(data) {
+  ensureWashSetup();
+  const name = String(data.name || data.description || "").trim();
+  if (!name) throw new Error("Ponle nombre al tipo de lavado");
+  const category = catalogKey(data.category) === "detailing" ? "detailing" : "lavado";
+  const minutes = data.minutes != null && String(data.minutes).trim() !== "" ? Number(data.minutes) : category === "detailing" ? 90 : 25;
+  const laborHours = Number.isFinite(minutes) && minutes > 0 ? Math.round((minutes / 60) * 100) / 100 : category === "detailing" ? 1.5 : 0.4;
+  const created = createOpCode({
+    code: String(data.code || "").trim() || nextWashCode(category),
+    description: name,
+    category,
+    payType: "cliente",
+    laborHours,
+    laborRate: 0,
+    price: Number(data.price) || 0,
+    cost: Number(data.cost) || 0,
+    concern: name,
+    correction: name,
+    popular: data.popular ? 1 : 0,
+    active: data.active === 0 || data.active === false ? 0 : 1,
+  });
+  return asWashType(created);
+}
+
+function updateWashType(id, data) {
+  const current = getWashType(id);
+  if (!current) throw new Error("Tipo de lavado no encontrado");
+  const category = data.category != null ? (catalogKey(data.category) === "detailing" ? "detailing" : "lavado") : current.category;
+  const minutes = data.minutes != null ? Number(data.minutes) : current.minutes;
+  const laborHours = Number.isFinite(minutes) && minutes >= 0 ? Math.round((minutes / 60) * 100) / 100 : current.minutes / 60;
+  const updated = updateOpCode(id, {
+    description: data.name != null || data.description != null ? String(data.name || data.description || "").trim() : current.name,
+    category,
+    price: data.price != null ? Number(data.price) || 0 : current.price,
+    laborHours,
+    laborRate: 0,
+    active: data.active != null ? data.active : current.active,
+  });
+  return asWashType(updated);
+}
+
+function removeWashType(id) {
+  const current = getWashType(id);
+  if (!current) throw new Error("Tipo de lavado no encontrado");
+  return removeOpCode(id);
+}
+
+function applyWashTypesToOrder(orderId, typeIds, complaint) {
+  const ids = [...new Set((Array.isArray(typeIds) ? typeIds : []).map((item) => asId(item)).filter(Boolean))];
+  const names = [];
+  for (const typeId of ids) {
+    const type = getWashType(typeId);
+    if (!type || !type.active) throw new Error("Tipo de lavado no encontrado");
+    addWorkOrderLine(orderId, { type: "labor", opCodeId: type.id, payType: "cliente" });
+    names.push(type.name);
+  }
+  if (names.length && !String(complaint || "").trim()) {
+    db().update(workOrders).set({ complaint: names.join(", "), updatedAt: nowIso() }).where(eq(workOrders.id, orderId)).run();
+  }
+}
+
 function ensureCatalogValue(column, defaults, value, fallback) {
   const name = cleanCatalogName(value);
   if (!name) return fallback;
@@ -2199,7 +2315,11 @@ function createWorkOrder(data) {
     }
     return id;
   });
-  return getWorkOrder(run());
+  run();
+  if (Array.isArray(data.washTypeIds) && data.washTypeIds.length) {
+    applyWashTypesToOrder(id, data.washTypeIds, data.complaint);
+  }
+  return getWorkOrder(id);
 }
 
 function updateWorkOrder(id, data) {
@@ -3253,9 +3373,9 @@ function listOpCodes(q, opts = {}) {
   const query = String(q || "").trim();
   let rows = db().select().from(opCodes).orderBy(opCodes.code).all();
   if (opts.activeOnly) rows = rows.filter((r) => r.active);
-  if (offerWashOn() && (opts.serviceLine === "lavado" || opts.serviceLine === "taller")) {
+  if (opts.serviceLine === "lavado" || opts.serviceLine === "taller") {
     rows = rows.filter((r) => {
-      const washCat = WASH_CATEGORIES.includes(catalogKey(r.category));
+      const washCat = isWashCategory(r.category);
       return opts.serviceLine === "lavado" ? washCat : !washCat;
     });
   }
@@ -3569,6 +3689,11 @@ module.exports = {
   createOpCode,
   updateOpCode,
   removeOpCode,
+  listWashTypes,
+  getWashType,
+  createWashType,
+  updateWashType,
+  removeWashType,
   linkKnownOpcodeParts,
   listSqlTables,
   sqlQuery,

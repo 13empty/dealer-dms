@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { AppearancePanel } from "../components/Appearance";
 import { UpdatePanel } from "../components/UpdatePanel";
 import { SearchPicker } from "../components/SearchPicker";
@@ -265,6 +266,9 @@ export default function Settings() {
                 <span className="mt-1 block text-xs text-slate-400">{t("settings.washMenuHint")}</span>
               </span>
             </label>
+            <Link className="mt-3 inline-block text-sm text-gold-400 hover:underline" to="/lavado?tipos=1">
+              {t("wash.manageTypes")}
+            </Link>
           </Card>
           {dbPath ? (
             <Card className="p-5">
@@ -357,11 +361,16 @@ export default function Settings() {
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <CatalogEditor
                 title={t("catalog.opcodeCats")}
-                items={catalogs?.opcodeCategories || []}
+                items={(catalogs?.opcodeCategories || []).filter((item) => item.id !== "lavado" && item.id !== "detailing")}
                 placeholder={t("catalog.new")}
                 canEdit={can.finance}
                 labelFor={(id) => catalogLabel(t, "op", id)}
-                onChange={(ids) => saveCatalogs({ opcodeCategories: ids })}
+                onChange={(ids) => {
+                  const wash = (catalogs?.opcodeCategories || [])
+                    .filter((item) => item.id === "lavado" || item.id === "detailing")
+                    .map((item) => item.id);
+                  return saveCatalogs({ opcodeCategories: [...ids, ...wash] });
+                }}
               />
               <CatalogEditor
                 title={t("catalog.partCats")}
