@@ -1,25 +1,20 @@
-export const NAV_IDS = [
-  "home",
-  "workshop",
-  "wash",
-  "customers",
-  "parts",
-  "opcodes",
-  "vehicles",
-  "sales",
-  "finance",
-  "settings",
-  "sql",
-  "users",
-] as const;
+export const NAV_OPS = ["home", "workshop", "wash", "customers", "parts", "opcodes", "vehicles", "sales"] as const;
+export const NAV_OFFICE = ["finance", "settings", "sql", "users"] as const;
+export const NAV_IDS = [...NAV_OPS, ...NAV_OFFICE] as const;
 
+export type NavOpsId = (typeof NAV_OPS)[number];
+export type NavOfficeId = (typeof NAV_OFFICE)[number];
 export type NavId = (typeof NAV_IDS)[number];
 
-export const DEFAULT_NAV_ORDER: NavId[] = [...NAV_IDS];
+export const DEFAULT_NAV_OPS: NavId[] = [...NAV_OPS];
+export const DEFAULT_NAV_OFFICE: NavId[] = [...NAV_OFFICE];
 
-const allowed = new Set<string>(NAV_IDS);
+function allowedSet(catalog: readonly NavId[]) {
+  return new Set<string>(catalog);
+}
 
-export function normalizeNavOrder(raw: unknown): NavId[] {
+export function normalizeNavOrder(raw: unknown, catalog: readonly NavId[]): NavId[] {
+  const allowed = allowedSet(catalog);
   const seen = new Set<NavId>();
   const next: NavId[] = [];
   if (Array.isArray(raw)) {
@@ -30,7 +25,7 @@ export function normalizeNavOrder(raw: unknown): NavId[] {
       next.push(id as NavId);
     }
   }
-  for (const id of NAV_IDS) {
+  for (const id of catalog) {
     if (seen.has(id)) continue;
     next.push(id);
   }
@@ -42,30 +37,30 @@ export function sortByNavOrder<T extends { id: NavId }>(items: T[], order: NavId
   return [...items].sort((a, b) => (rank.get(a.id) ?? 99) - (rank.get(b.id) ?? 99));
 }
 
-export function moveNavId(order: NavId[], visible: NavId[], id: NavId, dir: -1 | 1): NavId[] {
+export function reorderNav(order: NavId[], visible: NavId[], fromId: NavId, toId: NavId, catalog: readonly NavId[]): NavId[] {
+  if (fromId === toId) return order;
   const vis = order.filter((item) => visible.includes(item));
   for (const item of visible) {
     if (!vis.includes(item)) vis.push(item);
   }
-  const from = vis.indexOf(id);
-  const to = from + dir;
-  if (from < 0 || to < 0 || to >= vis.length) return order;
-  const swapped = [...vis];
-  const other = swapped[to];
-  swapped[to] = swapped[from];
-  swapped[from] = other;
+  const from = vis.indexOf(fromId);
+  const to = vis.indexOf(toId);
+  if (from < 0 || to < 0) return order;
+  const nextVis = [...vis];
+  nextVis.splice(from, 1);
+  nextVis.splice(to, 0, fromId);
   let i = 0;
   const used = new Set<NavId>();
   const next = order.map((item) => {
     if (!visible.includes(item)) return item;
-    const value = swapped[i];
+    const value = nextVis[i];
     i += 1;
     used.add(value);
     return value;
   });
-  for (const item of swapped) {
+  for (const item of nextVis) {
     if (used.has(item)) continue;
     next.push(item);
   }
-  return normalizeNavOrder(next);
+  return normalizeNavOrder(next, catalog);
 }

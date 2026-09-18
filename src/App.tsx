@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -10,7 +10,7 @@ import { BrandMark } from "./components/BrandMark";
 import { LanguageSelect, k, useI18n } from "./lib/i18n";
 import { call } from "./lib/format";
 import { usePrefs } from "./lib/prefs-context";
-import { DEFAULT_NAV_ORDER, moveNavId, sortByNavOrder, type NavId } from "./lib/nav";
+import { DEFAULT_NAV_OFFICE, DEFAULT_NAV_OPS, NAV_OFFICE, NAV_OPS, reorderNav, sortByNavOrder, type NavId } from "./lib/nav";
 import LoginGate from "./pages/LoginGate";
 import Dashboard from "./pages/Dashboard";
 import Vehicles from "./pages/Vehicles";
@@ -37,6 +37,84 @@ import SqlStudio from "./pages/SqlStudio";
 import { ChangelogModal, VersionButton } from "./components/ChangelogModal";
 import { markChangelogSeen, shouldShowChangelog } from "./lib/changelog";
 
+type MenuLink = { id: NavId; to: string; label: string; icon: IconName; show: boolean; end?: boolean };
+
+function NavList({
+  items,
+  order,
+  catalog,
+  onReorder,
+}: {
+  items: MenuLink[];
+  order: NavId[];
+  catalog: readonly NavId[];
+  onReorder: (next: NavId[]) => void;
+}) {
+  const links = sortByNavOrder(items.filter((item) => item.show), order);
+  const visibleIds = links.map((item) => item.id);
+  const [overId, setOverId] = useState<NavId | null>(null);
+  const [dragId, setDragId] = useState<NavId | null>(null);
+  const skipClick = useRef(false);
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      {links.map((link) => (
+        <div
+          key={link.to}
+          draggable
+          onDragStart={(e) => {
+            skipClick.current = false;
+            setDragId(link.id);
+            e.dataTransfer.setData("text/plain", link.id);
+            e.dataTransfer.effectAllowed = "move";
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            if (overId !== link.id) setOverId(link.id);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            const from = e.dataTransfer.getData("text/plain") as NavId;
+            setOverId(null);
+            setDragId(null);
+            if (!from || from === link.id || !visibleIds.includes(from)) return;
+            skipClick.current = true;
+            onReorder(reorderNav(order, visibleIds, from, link.id, catalog));
+          }}
+          onDragEnd={() => {
+            setOverId(null);
+            setDragId(null);
+          }}
+          className={`rounded-lg ${dragId === link.id ? "opacity-40" : ""} ${
+            overId === link.id && dragId && dragId !== link.id ? "ring-1 ring-gold-400/60" : ""
+          }`}
+        >
+          <NavLink
+            to={link.to}
+            end={link.end || link.to === "/"}
+            draggable={false}
+            onClick={(e) => {
+              if (skipClick.current) {
+                e.preventDefault();
+                skipClick.current = false;
+              }
+            }}
+            className={({ isActive }) =>
+              `flex cursor-grab items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition active:cursor-grabbing ${
+                isActive ? "bg-gold-400/15 font-medium text-gold-400" : "text-slate-300 hover:bg-ink-700 hover:text-white"
+              }`
+            }
+          >
+            <Icon name={link.icon} className="h-4 w-4 shrink-0 opacity-80" />
+            <span className="truncate">{link.label}</span>
+          </NavLink>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Shell() {
   const { user, can, logout } = useAuth();
   const { t } = useI18n();
@@ -58,70 +136,26 @@ function Shell() {
       .catch(() => {});
   }, []);
 
-  const links = sortByNavOrder(
-    [
-      { id: "home" as const, to: "/", label: t("nav.home"), icon: "home" as const, show: true, end: true },
-      { id: "workshop" as const, to: "/taller", label: t("nav.workshop"), icon: "wrench" as const, show: true, end: true },
-      { id: "wash" as const, to: "/lavado", label: t("nav.wash"), icon: "droplet" as const, show: true, end: true },
-      { id: "customers" as const, to: "/clientes", label: t("nav.customers"), icon: "users" as const, show: true },
-      { id: "parts" as const, to: "/partes", label: t("nav.parts"), icon: "box" as const, show: true },
-      { id: "opcodes" as const, to: "/taller/opcodes", label: t("nav.opcodes"), icon: "list" as const, show: true },
-      { id: "vehicles" as const, to: "/vehiculos", label: t("nav.vehicles"), icon: "car" as const, show: true },
-      { id: "sales" as const, to: "/ventas", label: t("nav.sales"), icon: "tag" as const, show: prefs.showUnitSales },
-      { id: "finance" as const, to: "/finanzas", label: t("nav.finance"), icon: "ledger" as const, show: can.finance },
-      { id: "settings" as const, to: "/ajustes", label: t("nav.settings"), icon: "settings" as const, show: can.finance },
-      { id: "sql" as const, to: "/sql", label: t("nav.sql"), icon: "terminal" as const, show: can.options },
-      { id: "users" as const, to: "/usuarios", label: t("nav.users"), icon: "shield" as const, show: can.users },
-    ].filter((l) => l.show),
-    prefs.navOrder
-  );
-  const visibleIds = links.map((l) => l.id);
-  const navCustomized = prefs.navOrder.join(" ") !== DEFAULT_NAV_ORDER.join(" ");
-
-  function moveLink(id: NavId, dir: -1 | 1) {
-    setPref("navOrder", moveNavId(prefs.navOrder, visibleIds, id, dir));
-  }
-
-  function navItem(link: { id: NavId; to: string; label: string; icon: IconName; end?: boolean }, index: number) {
-    return (
-      <div key={link.to} className="flex items-center gap-0.5">
-        <NavLink
-          to={link.to}
-          end={link.end || link.to === "/"}
-          className={({ isActive }) =>
-            `flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${
-              isActive ? "bg-gold-400/15 font-medium text-gold-400" : "text-slate-300 hover:bg-ink-700 hover:text-white"
-            }`
-          }
-        >
-          <Icon name={link.icon} className="h-4 w-4 shrink-0 opacity-80" />
-          <span className="truncate">{link.label}</span>
-        </NavLink>
-        <div className="flex shrink-0 flex-col">
-          <button
-            type="button"
-            className="grid h-4 w-5 place-items-center rounded text-slate-500 hover:text-gold-400 disabled:opacity-20"
-            disabled={index === 0}
-            title={t("nav.moveUp")}
-            aria-label={t("nav.moveUp")}
-            onClick={() => moveLink(link.id, -1)}
-          >
-            <Icon name="up" className="h-3 w-3" />
-          </button>
-          <button
-            type="button"
-            className="grid h-4 w-5 place-items-center rounded text-slate-500 hover:text-gold-400 disabled:opacity-20"
-            disabled={index === links.length - 1}
-            title={t("nav.moveDown")}
-            aria-label={t("nav.moveDown")}
-            onClick={() => moveLink(link.id, 1)}
-          >
-            <Icon name="down" className="h-3 w-3" />
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const opsItems: MenuLink[] = [
+    { id: "home", to: "/", label: t("nav.home"), icon: "home", show: true, end: true },
+    { id: "workshop", to: "/taller", label: t("nav.workshop"), icon: "wrench", show: true, end: true },
+    { id: "wash", to: "/lavado", label: t("nav.wash"), icon: "droplet", show: true, end: true },
+    { id: "customers", to: "/clientes", label: t("nav.customers"), icon: "users", show: true },
+    { id: "parts", to: "/partes", label: t("nav.parts"), icon: "box", show: true },
+    { id: "opcodes", to: "/taller/opcodes", label: t("nav.opcodes"), icon: "list", show: true },
+    { id: "vehicles", to: "/vehiculos", label: t("nav.vehicles"), icon: "car", show: true },
+    { id: "sales", to: "/ventas", label: t("nav.sales"), icon: "tag", show: prefs.showUnitSales },
+  ];
+  const officeItems: MenuLink[] = [
+    { id: "finance", to: "/finanzas", label: t("nav.finance"), icon: "ledger", show: can.finance },
+    { id: "settings", to: "/ajustes", label: t("nav.settings"), icon: "settings", show: can.finance },
+    { id: "sql", to: "/sql", label: t("nav.sql"), icon: "terminal", show: can.options },
+    { id: "users", to: "/usuarios", label: t("nav.users"), icon: "shield", show: can.users },
+  ];
+  const office = officeItems.filter((item) => item.show);
+  const navCustomized =
+    prefs.navOpsOrder.join(" ") !== DEFAULT_NAV_OPS.join(" ") ||
+    prefs.navOfficeOrder.join(" ") !== DEFAULT_NAV_OFFICE.join(" ");
 
   return (
     <div className="flex h-full">
@@ -138,13 +172,32 @@ function Shell() {
         <div className="border-b border-ink-600 p-3">
           <GlobalSearch />
         </div>
-        <nav className="flex flex-1 flex-col gap-2 overflow-auto p-3">
-          <div className="flex flex-col gap-0.5">{links.map((link, index) => navItem(link, index))}</div>
+        <nav className="flex flex-1 flex-col gap-4 overflow-auto p-3">
+          <NavList
+            items={opsItems}
+            order={prefs.navOpsOrder}
+            catalog={NAV_OPS}
+            onReorder={(next) => setPref("navOpsOrder", next)}
+          />
+          {office.length ? (
+            <div>
+              <div className="mb-1 px-3 text-[10px] uppercase tracking-[0.16em] text-slate-500">{t("nav.office")}</div>
+              <NavList
+                items={office}
+                order={prefs.navOfficeOrder}
+                catalog={NAV_OFFICE}
+                onReorder={(next) => setPref("navOfficeOrder", next)}
+              />
+            </div>
+          ) : null}
           {navCustomized ? (
             <button
               type="button"
               className="px-3 text-left text-[11px] text-slate-500 hover:text-gold-400"
-              onClick={() => setPref("navOrder", [...DEFAULT_NAV_ORDER])}
+              onClick={() => {
+                setPref("navOpsOrder", [...DEFAULT_NAV_OPS]);
+                setPref("navOfficeOrder", [...DEFAULT_NAV_OFFICE]);
+              }}
             >
               {t("nav.resetOrder")}
             </button>

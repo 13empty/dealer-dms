@@ -1,4 +1,4 @@
-import { DEFAULT_NAV_ORDER, normalizeNavOrder, type NavId } from "./nav";
+import { DEFAULT_NAV_OFFICE, DEFAULT_NAV_OPS, NAV_OFFICE, NAV_OPS, normalizeNavOrder, type NavId } from "./nav";
 
 export const THEMES = ["oro", "bahia", "acero", "bosque", "noche", "cobre", "vino", "pizarra", "marina", "dia", "niebla"] as const;
 export type ThemeId = (typeof THEMES)[number];
@@ -11,7 +11,8 @@ export type AppPrefs = {
   typeSize: TypeSizeId;
   showUnitSales: boolean;
   promisedDays: number;
-  navOrder: NavId[];
+  navOpsOrder: NavId[];
+  navOfficeOrder: NavId[];
 };
 
 export const DEFAULT_PREFS: AppPrefs = {
@@ -20,7 +21,8 @@ export const DEFAULT_PREFS: AppPrefs = {
   typeSize: "md",
   showUnitSales: true,
   promisedDays: 1,
-  navOrder: [...DEFAULT_NAV_ORDER],
+  navOpsOrder: [...DEFAULT_NAV_OPS],
+  navOfficeOrder: [...DEFAULT_NAV_OFFICE],
 };
 
 const KEY = "dms.prefs";
@@ -30,7 +32,7 @@ export function readPrefs(): AppPrefs {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return { ...DEFAULT_PREFS };
-    const parsed = JSON.parse(raw) as Partial<AppPrefs>;
+    const parsed = JSON.parse(raw) as Partial<AppPrefs> & { navOrder?: unknown };
     const theme = themeSet.has(String(parsed.theme)) ? (parsed.theme as ThemeId) : DEFAULT_PREFS.theme;
     const density = parsed.density === "compacto" ? "compacto" : "comodo";
     const typeSize = parsed.typeSize === "lg" ? "lg" : "md";
@@ -41,7 +43,8 @@ export function readPrefs(): AppPrefs {
       typeSize,
       showUnitSales: parsed.showUnitSales !== false,
       promisedDays,
-      navOrder: normalizeNavOrder(parsed.navOrder),
+      navOpsOrder: normalizeNavOrder(parsed.navOpsOrder ?? parsed.navOrder, NAV_OPS),
+      navOfficeOrder: normalizeNavOrder(parsed.navOfficeOrder ?? parsed.navOrder, NAV_OFFICE),
     };
   } catch {
     return { ...DEFAULT_PREFS };

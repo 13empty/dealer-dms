@@ -1,7 +1,7 @@
 {
   "name": "dealer-dms",
   "productName": "Dealer DMS",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Sistema local para talleres: órdenes de servicio, clientes, partes y caja",
   "author": "Dealer DMS",
   "private": true,

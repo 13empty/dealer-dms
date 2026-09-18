@@ -19,10 +19,12 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
     () => ({
       prefs,
       setPref(key, value) {
-        const next = { ...prefs, [key]: value };
-        writePrefs(next);
-        applyPrefs(next);
-        setPrefs(next);
+        setPrefs((current) => {
+          const next = { ...current, [key]: value };
+          writePrefs(next);
+          applyPrefs(next);
+          return next;
+        });
       },
     }),
     [prefs]
