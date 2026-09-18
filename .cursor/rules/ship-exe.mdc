@@ -1,0 +1,27 @@
+---
+description: After app changes, ship an installer so the user can see them
+alwaysApply: true
+---
+
+# Ship the EXE after every app change
+
+The installed copy is what the user looks at. After a feature, fix, or UI change they can see, ship it. Do not stop at source.
+
+## Do this before finishing
+
+1. Bump `package.json` version (patch: 1.0.7 → 1.0.8).
+2. Add a changelog entry (`src/lib/changelog.ts` + ES/EN/FR in `src/lib/i18n.tsx`).
+3. Kill running `Dealer DMS` / `Dealer DMS.exe` (electron-builder fails with Access denied if it is open).
+4. `npm run dist`.
+5. Commit with env author only (never `git config`):
+   `GIT_AUTHOR_NAME=13empty`
+   `GIT_AUTHOR_EMAIL=289273061+13empty@users.noreply.github.com`
+   (same for `GIT_COMMITTER_*`).
+6. `git push origin HEAD`.
+7. `gh release create vX.Y.Z` with `release/DealerDMS-Setup.exe`, `.blockmap`, and `latest.yml`.
+
+## Do not
+
+- Native `type="date"` / `datetime-local` (renderer crash).
+- Mix this repo with trading-journal.
+- Skip the installer because “they can run npm run dev”.

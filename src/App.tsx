@@ -10,6 +10,7 @@ import { BrandMark } from "./components/BrandMark";
 import { LanguageSelect, k, useI18n } from "./lib/i18n";
 import { call } from "./lib/format";
 import { usePrefs } from "./lib/prefs-context";
+import { DEFAULT_NAV_ORDER, moveNavId, sortByNavOrder, type NavId } from "./lib/nav";
 import LoginGate from "./pages/LoginGate";
 import Dashboard from "./pages/Dashboard";
 import Vehicles from "./pages/Vehicles";
@@ -39,7 +40,7 @@ import { markChangelogSeen, shouldShowChangelog } from "./lib/changelog";
 function Shell() {
   const { user, can, logout } = useAuth();
   const { t } = useI18n();
-  const { prefs } = usePrefs();
+  const { prefs, setPref } = usePrefs();
   const [appVersion, setAppVersion] = useState("");
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [changelogAuto, setChangelogAuto] = useState(false);
@@ -57,39 +58,68 @@ function Shell() {
       .catch(() => {});
   }, []);
 
-  const ops = [
-    { to: "/", label: t("nav.home"), icon: "home" as const, show: true },
-    { to: "/taller", label: t("nav.workshop"), icon: "wrench" as const, show: true, end: true },
-    { to: "/lavado", label: t("nav.wash"), icon: "droplet" as const, show: true, end: true },
-    { to: "/clientes", label: t("nav.customers"), icon: "users" as const, show: true },
-    { to: "/partes", label: t("nav.parts"), icon: "box" as const, show: true },
-    { to: "/taller/opcodes", label: t("nav.opcodes"), icon: "list" as const, show: true },
-    { to: "/vehiculos", label: t("nav.vehicles"), icon: "car" as const, show: true },
-    { to: "/ventas", label: t("nav.sales"), icon: "tag" as const, show: prefs.showUnitSales },
-  ].filter((l) => l.show);
+  const links = sortByNavOrder(
+    [
+      { id: "home" as const, to: "/", label: t("nav.home"), icon: "home" as const, show: true, end: true },
+      { id: "workshop" as const, to: "/taller", label: t("nav.workshop"), icon: "wrench" as const, show: true, end: true },
+      { id: "wash" as const, to: "/lavado", label: t("nav.wash"), icon: "droplet" as const, show: true, end: true },
+      { id: "customers" as const, to: "/clientes", label: t("nav.customers"), icon: "users" as const, show: true },
+      { id: "parts" as const, to: "/partes", label: t("nav.parts"), icon: "box" as const, show: true },
+      { id: "opcodes" as const, to: "/taller/opcodes", label: t("nav.opcodes"), icon: "list" as const, show: true },
+      { id: "vehicles" as const, to: "/vehiculos", label: t("nav.vehicles"), icon: "car" as const, show: true },
+      { id: "sales" as const, to: "/ventas", label: t("nav.sales"), icon: "tag" as const, show: prefs.showUnitSales },
+      { id: "finance" as const, to: "/finanzas", label: t("nav.finance"), icon: "ledger" as const, show: can.finance },
+      { id: "settings" as const, to: "/ajustes", label: t("nav.settings"), icon: "settings" as const, show: can.finance },
+      { id: "sql" as const, to: "/sql", label: t("nav.sql"), icon: "terminal" as const, show: can.options },
+      { id: "users" as const, to: "/usuarios", label: t("nav.users"), icon: "shield" as const, show: can.users },
+    ].filter((l) => l.show),
+    prefs.navOrder
+  );
+  const visibleIds = links.map((l) => l.id);
+  const navCustomized = prefs.navOrder.join(" ") !== DEFAULT_NAV_ORDER.join(" ");
 
-  const office = [
-    { to: "/finanzas", label: t("nav.finance"), icon: "ledger" as const, show: can.finance },
-    { to: "/ajustes", label: t("nav.settings"), icon: "settings" as const, show: can.finance },
-    { to: "/sql", label: t("nav.sql"), icon: "terminal" as const, show: can.options },
-    { to: "/usuarios", label: t("nav.users"), icon: "shield" as const, show: can.users },
-  ].filter((l) => l.show);
+  function moveLink(id: NavId, dir: -1 | 1) {
+    setPref("navOrder", moveNavId(prefs.navOrder, visibleIds, id, dir));
+  }
 
-  function navItem(link: { to: string; label: string; icon: IconName; end?: boolean }) {
+  function navItem(link: { id: NavId; to: string; label: string; icon: IconName; end?: boolean }, index: number) {
     return (
-      <NavLink
-        key={link.to}
-        to={link.to}
-        end={link.end || link.to === "/"}
-        className={({ isActive }) =>
-          `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${
-            isActive ? "bg-gold-400/15 font-medium text-gold-400" : "text-slate-300 hover:bg-ink-700 hover:text-white"
-          }`
-        }
-      >
-        <Icon name={link.icon} className="h-4 w-4 opacity-80" />
-        {link.label}
-      </NavLink>
+      <div key={link.to} className="flex items-center gap-0.5">
+        <NavLink
+          to={link.to}
+          end={link.end || link.to === "/"}
+          className={({ isActive }) =>
+            `flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${
+              isActive ? "bg-gold-400/15 font-medium text-gold-400" : "text-slate-300 hover:bg-ink-700 hover:text-white"
+            }`
+          }
+        >
+          <Icon name={link.icon} className="h-4 w-4 shrink-0 opacity-80" />
+          <span className="truncate">{link.label}</span>
+        </NavLink>
+        <div className="flex shrink-0 flex-col">
+          <button
+            type="button"
+            className="grid h-4 w-5 place-items-center rounded text-slate-500 hover:text-gold-400 disabled:opacity-20"
+            disabled={index === 0}
+            title={t("nav.moveUp")}
+            aria-label={t("nav.moveUp")}
+            onClick={() => moveLink(link.id, -1)}
+          >
+            <Icon name="up" className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
+            className="grid h-4 w-5 place-items-center rounded text-slate-500 hover:text-gold-400 disabled:opacity-20"
+            disabled={index === links.length - 1}
+            title={t("nav.moveDown")}
+            aria-label={t("nav.moveDown")}
+            onClick={() => moveLink(link.id, 1)}
+          >
+            <Icon name="down" className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -108,14 +138,19 @@ function Shell() {
         <div className="border-b border-ink-600 p-3">
           <GlobalSearch />
         </div>
-        <nav className="flex flex-1 flex-col gap-4 overflow-auto p-3">
-          <div className="flex flex-col gap-0.5">{ops.map(navItem)}</div>
-          {office.length ? (
-            <div>
-              <div className="mb-1 px-3 text-[10px] uppercase tracking-[0.16em] text-slate-500">{t("nav.office")}</div>
-              <div className="flex flex-col gap-0.5">{office.map(navItem)}</div>
-            </div>
-          ) : null}
+        <nav className="flex flex-1 flex-col gap-2 overflow-auto p-3">
+          <div className="flex flex-col gap-0.5">{links.map((link, index) => navItem(link, index))}</div>
+          {navCustomized ? (
+            <button
+              type="button"
+              className="px-3 text-left text-[11px] text-slate-500 hover:text-gold-400"
+              onClick={() => setPref("navOrder", [...DEFAULT_NAV_ORDER])}
+            >
+              {t("nav.resetOrder")}
+            </button>
+          ) : (
+            <p className="px-3 text-[11px] leading-snug text-slate-600">{t("nav.reorderHint")}</p>
+          )}
         </nav>
         <div className="border-t border-ink-600 p-3">
           <div className="mb-3 flex items-center gap-3">

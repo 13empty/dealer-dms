@@ -1,3 +1,5 @@
+import { DEFAULT_NAV_ORDER, normalizeNavOrder, type NavId } from "./nav";
+
 export const THEMES = ["oro", "bahia", "acero", "bosque", "noche", "cobre", "vino", "pizarra", "marina", "dia", "niebla"] as const;
 export type ThemeId = (typeof THEMES)[number];
 export type DensityId = "comodo" | "compacto";
@@ -9,6 +11,7 @@ export type AppPrefs = {
   typeSize: TypeSizeId;
   showUnitSales: boolean;
   promisedDays: number;
+  navOrder: NavId[];
 };
 
 export const DEFAULT_PREFS: AppPrefs = {
@@ -17,6 +20,7 @@ export const DEFAULT_PREFS: AppPrefs = {
   typeSize: "md",
   showUnitSales: true,
   promisedDays: 1,
+  navOrder: [...DEFAULT_NAV_ORDER],
 };
 
 const KEY = "dms.prefs";
@@ -37,6 +41,7 @@ export function readPrefs(): AppPrefs {
       typeSize,
       showUnitSales: parsed.showUnitSales !== false,
       promisedDays,
+      navOrder: normalizeNavOrder(parsed.navOrder),
     };
   } catch {
     return { ...DEFAULT_PREFS };
