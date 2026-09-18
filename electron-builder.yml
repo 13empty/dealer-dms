@@ -34,11 +34,9 @@ nsis:
   installerHeaderIcon: build/icon.ico
   installerLanguages:
     - es_ES
+    - en_US
+    - fr_FR
   language: "3082"
-electronLanguages:
-  - es
-  - es-ES
-  - es-MX
 afterPack: electron/afterPack.cjs
 publish:
   provider: github
