@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -11,9 +11,9 @@ import { UpdateBanner } from "./components/UpdatePanel";
 import { LanguageSelect, k, useI18n } from "./lib/i18n";
 import { call } from "./lib/format";
 import { usePrefs } from "./lib/prefs-context";
-import { clampNavWidth, NAV_WIDTH_DEFAULT } from "./lib/prefs";
-import { useShop } from "./lib/shop-context";
+import { useShop, ShopName } from "./lib/shop-context";
 import { DEFAULT_NAV_OFFICE, DEFAULT_NAV_OPS, NAV_OFFICE, NAV_OPS, reorderNav, sortByNavOrder, type NavId } from "./lib/nav";
+import { clampNavWidth, NAV_WIDTH_DEFAULT } from "./lib/prefs";
 import LoginGate from "./pages/LoginGate";
 import Dashboard from "./pages/Dashboard";
 import Vehicles from "./pages/Vehicles";
@@ -168,11 +168,20 @@ function Shell() {
   const { user, can, logout } = useAuth();
   const { t } = useI18n();
   const { prefs, setPref } = usePrefs();
-  const { name: shopName, offerWash } = useShop();
+  const { offerWash } = useShop();
   const [appVersion, setAppVersion] = useState("");
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [changelogAuto, setChangelogAuto] = useState(false);
   const [navWidth, setNavWidth] = useState(() => clampNavWidth(prefs.navWidth));
+  const navWidthRef = useRef(navWidth);
+
+  useEffect(() => {
+    navWidthRef.current = navWidth;
+  }, [navWidth]);
+
+  useEffect(() => {
+    setNavWidth(clampNavWidth(prefs.navWidth));
+  }, [prefs.navWidth]);
 
   useEffect(() => {
     void call(window.dms.meta.version())
@@ -186,6 +195,28 @@ function Shell() {
       })
       .catch(() => {});
   }, []);
+
+  function startNavResize(event: ReactMouseEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const origin = event.clientX;
+    const start = navWidthRef.current;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    const onMove = (ev: MouseEvent) => {
+      const next = clampNavWidth(start + ev.clientX - origin);
+      navWidthRef.current = next;
+      setNavWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      setPref("navWidth", navWidthRef.current);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
 
   const opsItems: MenuLink[] = [
     { id: "home", to: "/", label: t("nav.home"), icon: "home", show: true, end: true },
@@ -222,24 +253,6 @@ function Shell() {
     prefs.navOpsOrder.join(" ") !== DEFAULT_NAV_OPS.join(" ") ||
     prefs.navOfficeOrder.join(" ") !== DEFAULT_NAV_OFFICE.join(" ");
 
-  function startResize(e: ReactPointerEvent<HTMLButtonElement>) {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startW = navWidth;
-    let latest = startW;
-    const move = (ev: PointerEvent) => {
-      latest = clampNavWidth(startW + ev.clientX - startX);
-      setNavWidth(latest);
-    };
-    const up = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      setPref("navWidth", latest);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-  }
-
   return (
     <div className="flex h-full">
       <aside
@@ -248,10 +261,12 @@ function Shell() {
       >
         <div className="border-b border-ink-600 px-4 py-4">
           <div className="flex items-start gap-3">
-            <BrandMark className="mt-0.5 h-9 w-9 shrink-0" />
-            <div className="min-w-0">
+            <BrandMark className="h-9 w-9 shrink-0" />
+            <div className="min-w-0 flex-1">
               <div className="text-[10px] uppercase tracking-[0.22em] text-gold-400">{t("nav.brand")}</div>
-              <div className="break-words text-base font-semibold leading-tight">{shopName}</div>
+              <div className="text-base font-semibold leading-tight">
+                <ShopName />
+              </div>
             </div>
           </div>
         </div>
@@ -297,7 +312,7 @@ function Shell() {
               {initials(user?.name)}
             </div>
             <div className="min-w-0">
-              <div className="truncate text-sm font-medium">{user?.name}</div>
+              <div className="break-words text-sm font-medium leading-tight [overflow-wrap:anywhere]">{user?.name}</div>
               <div className="flex flex-wrap items-center gap-1">
                 <Badge status={user?.role || "empleado"} label={t(k(`role.${user?.role || "empleado"}`))} />
                 {user?.job ? <Badge status={user.job} label={t(k(`job.${user.job}`))} /> : null}
@@ -321,16 +336,16 @@ function Shell() {
             />
           ) : null}
         </div>
-        <button
-          type="button"
-          aria-label={t("nav.resize")}
+        <div
+          role="separator"
+          aria-orientation="vertical"
           title={t("nav.resize")}
-          className="absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize border-0 bg-transparent p-0 hover:bg-gold-400/40"
-          onPointerDown={startResize}
+          onMouseDown={startNavResize}
           onDoubleClick={() => {
             setNavWidth(NAV_WIDTH_DEFAULT);
             setPref("navWidth", NAV_WIDTH_DEFAULT);
           }}
+          className="absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize hover:bg-gold-400/50"
         />
       </aside>
       {changelogOpen && appVersion ? (

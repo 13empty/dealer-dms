@@ -6,11 +6,13 @@ import { useAuth } from "../lib/auth";
 import { DASH_WIDGETS, DEFAULT_DASH_WIDGETS, readDashWidgets, toggleDashWidget, writeDashWidgets, type DashWidgetId } from "../lib/dash";
 import { call, money } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
+import { useShop } from "../lib/shop-context";
 import type { DashboardKpis } from "../vite-env";
 
 export default function Dashboard() {
   const { can, user } = useAuth();
   const { t } = useI18n();
+  const { offerWash } = useShop();
   const [kpis, setKpis] = useState<DashboardKpis | null>(null);
   const [dbPath, setDbPath] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -174,7 +176,7 @@ export default function Dashboard() {
   const queues = kpis
     ? [
         { to: "/taller?status=lista", label: t("dash.actionReady"), n: kpis.readyWorkOrders },
-        ...(kpis.offerWash ? [{ to: "/lavado", label: t("dash.actionWash"), n: kpis.washOpen || 0 }] : []),
+        { to: "/lavado", label: t("dash.actionWash"), n: offerWash ? kpis.washOpen || 0 : 0 },
         { to: "/taller?unpaid=1", label: t("dash.actionUnpaid"), n: kpis.unpaidOpenOrders },
         { to: "/taller?status=espera_partes", label: t("dash.waitingParts"), n: kpis.waitingPartsCount || 0 },
         { to: "/partes?low=1", label: t("dash.actionLow"), n: kpis.lowStockCount },
@@ -200,7 +202,7 @@ export default function Dashboard() {
         <Link className="rounded-md border border-ink-600 bg-ink-800 px-3 py-2 text-sm hover:bg-ink-700" to="/taller?nueva=presupuesto">
           {t("workshop.newEstimate")}
         </Link>
-        {kpis?.offerWash ? (
+        {offerWash ? (
           <Link className="rounded-md border border-ink-600 bg-ink-800 px-3 py-2 text-sm hover:bg-ink-700" to="/lavado?nueva=1">
             {t("workshop.newWash")}
           </Link>

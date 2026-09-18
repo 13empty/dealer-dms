@@ -47,3 +47,8 @@ export function useShop() {
   if (!ctx) throw new Error("useShop outside ShopProvider");
   return ctx;
 }
+
+export function ShopName({ className = "" }: { className?: string }) {
+  const { name } = useShop();
+  return <span className={`break-words [overflow-wrap:anywhere] ${className}`.trim()}>{name}</span>;
+}

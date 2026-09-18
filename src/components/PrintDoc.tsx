@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { BrandMark } from "./BrandMark";
 import { Button, PageHeader } from "./ui";
 import { useI18n } from "../lib/i18n";
-import { useShop } from "../lib/shop-context";
 
 export function PrintDoc({
   title,
@@ -56,13 +55,14 @@ export function PrintShopHead({
   extra?: ReactNode;
 }) {
   const { t } = useI18n();
-  const { name: shopName } = useShop();
   return (
     <div className="flex items-start justify-between gap-6 border-b border-neutral-300 pb-5">
       <div className="flex min-w-0 flex-1 items-start gap-4">
         <BrandMark className="h-14 w-14 shrink-0 rounded-md" />
         <div className="min-w-0">
-          <div className="text-xl font-semibold tracking-tight break-words">{shopName || shop.name}</div>
+          <div className="break-words text-xl font-semibold leading-snug tracking-tight [overflow-wrap:anywhere]">
+            {shop.name}
+          </div>
           {shop.address ? <div className="mt-1 text-sm text-neutral-600">{shop.address}</div> : null}
           <div className="mt-1 text-sm text-neutral-600">{[shop.phone, shop.email].filter(Boolean).join(" · ")}</div>
           {shop.gstNumber ? (
