@@ -12,7 +12,11 @@ export type IconName =
   | "shield"
   | "search"
   | "logout"
-  | "droplet";
+  | "droplet"
+  | "building"
+  | "palette"
+  | "download"
+  | "archive";
 
 const paths: Record<IconName, string> = {
   home: "M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z",
@@ -30,6 +34,10 @@ const paths: Record<IconName, string> = {
   search: "M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Zm9 2-4-4",
   logout: "M10 6H6v12h4M10 12h9m-3-4 4 4-4 4",
   droplet: "M12 3.2S6 9.2 6 13.5a6 6 0 0 0 12 0C18 9.2 12 3.2 12 3.2Z",
+  building: "M5 21V4h8v4h6v13H5Zm2-2h2v-4H7v4Zm4 0h2v-4h-2v4Zm4 0h2v-4h-2v4ZM7 11h2V7H7v4Zm4 0h2V7h-2v4Z",
+  palette: "M12 4a8 8 0 1 0 .3 16H14a2 2 0 0 0 0-4h-1.2a1.6 1.6 0 1 1 0-3.2A8 8 0 0 0 20 8.2 8 8 0 0 0 12 4Zm-4 6.2a1.1 1.1 0 1 1 0-2.2 1.1 1.1 0 0 1 0 2.2Zm3-2.4a1.1 1.1 0 1 1 0-2.2 1.1 1.1 0 0 1 0 2.2Zm3.4 1a1.1 1.1 0 1 1 0-2.2 1.1 1.1 0 0 1 0 2.2ZM8.4 14.2a1.1 1.1 0 1 1 0-2.2 1.1 1.1 0 0 1 0 2.2Z",
+  download: "M12 4v11m-4-4 4 4 4-4M5 19h14",
+  archive: "M4 6h16v3H4V6Zm2 3v11h12V9M9 14h6",
 };
 
 export function Icon({ name, className = "h-4 w-4" }: { name: IconName; className?: string }) {

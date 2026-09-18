@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { GlobalSearch } from "./components/GlobalSearch";
@@ -40,7 +40,23 @@ import { ChangelogModal, VersionButton } from "./components/ChangelogModal";
 import { ShopProvider } from "./lib/shop-context";
 import { markChangelogSeen, shouldShowChangelog } from "./lib/changelog";
 
-type MenuLink = { id: NavId; to: string; label: string; icon: IconName; show: boolean; end?: boolean };
+type NestedLink = { to: string; label: string; icon: IconName; show: boolean };
+type MenuLink = {
+  id: NavId;
+  to: string;
+  label: string;
+  icon: IconName;
+  show: boolean;
+  end?: boolean;
+  match?: string;
+  nested?: NestedLink[];
+};
+
+function linkActive(pathname: string, to: string, end?: boolean, match?: string) {
+  if (match) return pathname === match || pathname.startsWith(`${match}/`);
+  if (end || to === "/") return pathname === to;
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
 
 function NavList({
   items,
@@ -53,6 +69,7 @@ function NavList({
   catalog: readonly NavId[];
   onReorder: (next: NavId[]) => void;
 }) {
+  const { pathname } = useLocation();
   const links = sortByNavOrder(items.filter((item) => item.show), order);
   const visibleIds = links.map((item) => item.id);
   const [overId, setOverId] = useState<NavId | null>(null);
@@ -61,9 +78,13 @@ function NavList({
 
   return (
     <div className="flex flex-col gap-0.5">
-      {links.map((link) => (
+      {links.map((link) => {
+        const nested = (link.nested || []).filter((item) => item.show);
+        const open = Boolean(nested.length && linkActive(pathname, link.to, link.end, link.match));
+        const parentActive = linkActive(pathname, link.to, link.end, link.match);
+        return (
         <div
-          key={link.to}
+          key={link.id}
           draggable
           onDragStart={(e) => {
             skipClick.current = false;
@@ -103,17 +124,41 @@ function NavList({
                 skipClick.current = false;
               }
             }}
-            className={({ isActive }) =>
+            className={() =>
               `flex cursor-grab items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition active:cursor-grabbing ${
-                isActive ? "bg-gold-400/15 font-medium text-gold-400" : "text-slate-300 hover:bg-ink-700 hover:text-white"
+                parentActive && !open
+                  ? "bg-gold-400/15 font-medium text-gold-400"
+                  : parentActive
+                    ? "font-medium text-gold-400"
+                    : "text-slate-300 hover:bg-ink-700 hover:text-white"
               }`
             }
           >
             <Icon name={link.icon} className="h-4 w-4 shrink-0 opacity-80" />
             <span className="truncate">{link.label}</span>
           </NavLink>
+          {open ? (
+            <div className="mb-1 ml-3 mt-0.5 flex flex-col gap-0.5 border-l border-ink-600 pl-2">
+              {nested.map((child) => (
+                <NavLink
+                  key={child.to}
+                  to={child.to}
+                  draggable={false}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] transition ${
+                      isActive ? "bg-gold-400/15 font-medium text-gold-400" : "text-slate-400 hover:bg-ink-700 hover:text-white"
+                    }`
+                  }
+                >
+                  <Icon name={child.icon} className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                  <span className="truncate">{child.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          ) : null}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -152,7 +197,21 @@ function Shell() {
   ];
   const officeItems: MenuLink[] = [
     { id: "finance", to: "/finanzas", label: t("nav.finance"), icon: "ledger", show: can.finance },
-    { id: "settings", to: "/ajustes", label: t("nav.settings"), icon: "settings", show: can.finance },
+    {
+      id: "settings",
+      to: "/ajustes/taller",
+      match: "/ajustes",
+      label: t("nav.settings"),
+      icon: "settings",
+      show: can.finance,
+      nested: [
+        { to: "/ajustes/taller", label: t("nav.settingsShop"), icon: "building", show: true },
+        { to: "/ajustes/operaciones", label: t("nav.settingsOps"), icon: "wrench", show: true },
+        { to: "/ajustes/apariencia", label: t("nav.settingsLook"), icon: "palette", show: true },
+        { to: "/ajustes/actualizaciones", label: t("nav.settingsUpdates"), icon: "download", show: can.updates },
+        { to: "/ajustes/respaldo", label: t("nav.settingsBackup"), icon: "archive", show: true },
+      ],
+    },
     { id: "sql", to: "/sql", label: t("nav.sql"), icon: "terminal", show: can.options },
     { id: "users", to: "/usuarios", label: t("nav.users"), icon: "shield", show: can.users },
   ];
@@ -277,7 +336,8 @@ function Shell() {
             <Route path="/lavado/:id/imprimir" element={<Invoice />} />
             <Route path="/lavado/:id" element={<WashTicket />} />
             <Route path="/finanzas" element={can.finance ? <Finance /> : <Navigate to="/" replace />} />
-            <Route path="/ajustes" element={can.finance ? <Settings /> : <Navigate to="/" replace />} />
+            <Route path="/ajustes" element={can.finance ? <Navigate to="/ajustes/taller" replace /> : <Navigate to="/" replace />} />
+            <Route path="/ajustes/:section" element={can.finance ? <Settings /> : <Navigate to="/" replace />} />
             <Route path="/sql" element={can.options ? <SqlStudio /> : <Navigate to="/" replace />} />
             <Route path="/usuarios" element={can.users ? <Users /> : <Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />

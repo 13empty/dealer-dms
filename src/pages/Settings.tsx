@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { AppearancePanel } from "../components/Appearance";
 import { LogoPicker } from "../components/BrandMark";
 import { UpdatePanel } from "../components/UpdatePanel";
@@ -11,11 +11,13 @@ import { catalogLabel, useCatalogs } from "../lib/catalogs";
 import { call, customerName, vehicleLabel } from "../lib/format";
 import { SHOP_DEFAULTS } from "../lib/canada";
 import { useI18n } from "../lib/i18n";
+import { isSettingsSection } from "../lib/settings-nav";
 import type { ShopSettings } from "../vite-env";
 
 export default function Settings() {
   const { t } = useI18n();
   const { can } = useAuth();
+  const { section } = useParams();
   const { catalogs, save: saveCatalogs } = useCatalogs();
   const [form, setForm] = useState<ShopSettings | null>(null);
   const [numbering, setNumbering] = useState({ woPrefix: "OT", woNextNumber: "1", woPad: "4", woPreview: "OT-0001" });
@@ -147,6 +149,13 @@ export default function Settings() {
     }
   }
 
+  if (!isSettingsSection(section)) {
+    return <Navigate to="/ajustes/taller" replace />;
+  }
+  if (section === "actualizaciones" && !can.updates) {
+    return <Navigate to="/ajustes/taller" replace />;
+  }
+
   if (!form) {
     return (
       <div className="page">
@@ -156,21 +165,44 @@ export default function Settings() {
     );
   }
 
+  const title =
+    section === "taller"
+      ? t("settings.shopTitle")
+      : section === "operaciones"
+        ? t("settings.opsTitle")
+        : section === "apariencia"
+          ? t("appearance.title")
+          : section === "actualizaciones"
+            ? t("updates.title")
+            : t("settings.backupTitle");
+  const subtitle =
+    section === "taller"
+      ? t("settings.subtitle")
+      : section === "operaciones"
+        ? t("settings.opsSubtitle")
+        : section === "apariencia"
+          ? t("appearance.hint")
+          : section === "actualizaciones"
+            ? t("updates.hint")
+            : t("settings.backupHint");
+
   return (
     <div className="page">
       <PageHeader
-        title={t("settings.title")}
-        subtitle={t("settings.subtitle")}
-        actions={<Button onClick={() => void save()}>{t("common.save")}</Button>}
+        title={title}
+        subtitle={subtitle}
+        actions={
+          section === "taller" ? <Button onClick={() => void save()}>{t("common.save")}</Button> : undefined
+        }
       />
       <ErrorText error={error} />
-      {saved ? <p className="mb-4 text-sm text-emerald-300">{t("settings.saved")}</p> : null}
+      {saved && (section === "taller" || section === "operaciones") ? (
+        <p className="mb-4 text-sm text-emerald-300">{t("settings.saved")}</p>
+      ) : null}
 
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        <div className="grid gap-4">
+      {section === "taller" ? (
         <Card className="p-5">
-          <h2 className="text-lg font-medium">{t("settings.shopTitle")}</h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <LogoPicker />
             <div className="sm:col-span-2 lg:col-span-3">
               <Field label={t("settings.name")}>
@@ -215,18 +247,10 @@ export default function Settings() {
           </div>
           <p className="mt-3 text-xs text-slate-400">{t("settings.hint")}</p>
         </Card>
+      ) : null}
 
-        {can.updates ? (
-          <Card className="p-5">
-            <UpdatePanel />
-          </Card>
-        ) : null}
-        </div>
-
-        <div className="grid gap-4">
-          <Card className="p-5">
-            <AppearancePanel />
-          </Card>
+      {section === "operaciones" ? (
+        <div className="grid items-start gap-4">
           <Card className="p-5">
             <h2 className="text-lg font-medium">{t("settings.serviceMode")}</h2>
             <p className="mt-1 text-sm text-slate-400">{t("settings.serviceModeHint")}</p>
@@ -272,138 +296,149 @@ export default function Settings() {
               {t("wash.manageTypes")}
             </Link>
           </Card>
-          {dbPath ? (
+          {can.finance ? (
             <Card className="p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-lg font-medium">{t("settings.backupTitle")}</h2>
-                  <p className="mt-1 text-sm text-slate-400">{t("settings.backupHint")}</p>
-                  <p className="mt-2 break-all font-mono text-xs text-slate-500">{dbPath}</p>
+              <h2 className="text-lg font-medium">{t("settings.catalogsTitle")}</h2>
+              <p className="mt-1 text-sm text-slate-400">{t("settings.catalogsSubtitle")}</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <CatalogEditor
+                  title={t("catalog.opcodeCats")}
+                  items={(catalogs?.opcodeCategories || []).filter((item) => item.id !== "lavado" && item.id !== "detailing")}
+                  placeholder={t("catalog.new")}
+                  canEdit={can.finance}
+                  labelFor={(id) => catalogLabel(t, "op", id)}
+                  onChange={(ids) => {
+                    const wash = (catalogs?.opcodeCategories || [])
+                      .filter((item) => item.id === "lavado" || item.id === "detailing")
+                      .map((item) => item.id);
+                    return saveCatalogs({ opcodeCategories: [...ids, ...wash] });
+                  }}
+                />
+                <CatalogEditor
+                  title={t("catalog.partCats")}
+                  items={catalogs?.partCategories || []}
+                  placeholder={t("catalog.new")}
+                  canEdit={can.finance}
+                  labelFor={(id) => catalogLabel(t, "partCat", id)}
+                  onChange={(ids) => saveCatalogs({ partCategories: ids })}
+                />
+                <CatalogEditor
+                  title={t("catalog.uoms")}
+                  items={catalogs?.partUoms || []}
+                  placeholder={t("catalog.new")}
+                  canEdit={can.finance}
+                  labelFor={(id) => catalogLabel(t, "partUom", id)}
+                  onChange={(ids) => saveCatalogs({ partUoms: ids })}
+                />
+                <CatalogEditor
+                  title={t("catalog.payTypes")}
+                  hint={t("catalog.payHint")}
+                  items={catalogs?.payTypes || []}
+                  placeholder=""
+                  canEdit={false}
+                  locked
+                  labelFor={(id) => catalogLabel(t, "opPay", id)}
+                  onChange={() => undefined}
+                />
+              </div>
+            </Card>
+          ) : null}
+          {can.options ? (
+            <Card className="p-5">
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div>
+                  <h2 className="text-lg font-medium">{t("settings.numberingTitle")}</h2>
+                  <p className="mt-1 text-sm text-slate-400">{t("settings.numberingSubtitle")}</p>
+                  {numberSaved ? <p className="mt-2 text-sm text-emerald-300">{t("settings.numberingSaved")}</p> : null}
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <Field label={t("settings.woPrefix")}>
+                      <input value={numbering.woPrefix} onChange={(e) => setNumbering({ ...numbering, woPrefix: e.target.value })} />
+                    </Field>
+                    <Field label={t("settings.woNext")}>
+                      <input value={numbering.woNextNumber} onChange={(e) => setNumbering({ ...numbering, woNextNumber: e.target.value })} />
+                    </Field>
+                    <Field label={t("settings.woPad")}>
+                      <input value={numbering.woPad} onChange={(e) => setNumbering({ ...numbering, woPad: e.target.value })} />
+                    </Field>
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <Button onClick={() => void saveNumbering()}>{t("common.save")}</Button>
+                    <p className="text-sm text-gold-400">{t("settings.woPreview", { number: numbering.woPreview })}</p>
+                  </div>
                 </div>
-                <Button variant="ghost" onClick={() => void navigator.clipboard.writeText(dbPath)}>
-                  {t("settings.copyPath")}
-                </Button>
+                <div className="border-t border-ink-600 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                  <h3 className="text-lg font-medium">{t("settings.changeNumberTitle")}</h3>
+                  <p className="mt-1 text-sm text-slate-400">{t("settings.changeNumberHint")}</p>
+                  {changedNumber ? <p className="mt-2 text-sm text-emerald-300">{t("settings.numberChanged")}</p> : null}
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <Field label={t("settings.currentNumber")}>
+                      <SearchPicker
+                        value={pickedWo.id}
+                        selectedLabel={pickedWo.label}
+                        selectedHint={pickedWo.hint}
+                        placeholder={t("search.placeholder")}
+                        allowEmpty
+                        onChange={(id, option) => {
+                          setPickedWo({
+                            id,
+                            label: option?.label || "",
+                            hint: option?.hint || "",
+                          });
+                          setNewNumber(option?.label || "");
+                        }}
+                        search={async (query) => {
+                          const rows = await call(window.dms.workOrders.list(query, { limit: 8 }));
+                          return rows.map((row) => ({
+                            id: row.id,
+                            label: row.number,
+                            hint: [customerName(row.customer), vehicleLabel(row.vehicle)].filter(Boolean).join(" · "),
+                            raw: row,
+                          }));
+                        }}
+                      />
+                    </Field>
+                    <Field label={t("settings.newNumber")}>
+                      <input value={newNumber} onChange={(e) => setNewNumber(e.target.value)} placeholder="OT-0100" />
+                    </Field>
+                  </div>
+                  <div className="mt-4">
+                    <Button disabled={!pickedWo.id || !newNumber.trim()} onClick={() => void changeExistingNumber()}>
+                      {t("settings.changeNumber")}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </Card>
           ) : null}
         </div>
+      ) : null}
 
-        {can.options ? (
-          <Card className="p-5 lg:col-span-2">
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div>
-                <h2 className="text-lg font-medium">{t("settings.numberingTitle")}</h2>
-                <p className="mt-1 text-sm text-slate-400">{t("settings.numberingSubtitle")}</p>
-                {numberSaved ? <p className="mt-2 text-sm text-emerald-300">{t("settings.numberingSaved")}</p> : null}
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <Field label={t("settings.woPrefix")}>
-                    <input value={numbering.woPrefix} onChange={(e) => setNumbering({ ...numbering, woPrefix: e.target.value })} />
-                  </Field>
-                  <Field label={t("settings.woNext")}>
-                    <input value={numbering.woNextNumber} onChange={(e) => setNumbering({ ...numbering, woNextNumber: e.target.value })} />
-                  </Field>
-                  <Field label={t("settings.woPad")}>
-                    <input value={numbering.woPad} onChange={(e) => setNumbering({ ...numbering, woPad: e.target.value })} />
-                  </Field>
-                </div>
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <Button onClick={() => void saveNumbering()}>{t("common.save")}</Button>
-                  <p className="text-sm text-gold-400">{t("settings.woPreview", { number: numbering.woPreview })}</p>
-                </div>
-              </div>
-              <div className="border-t border-ink-600 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-                <h3 className="text-lg font-medium">{t("settings.changeNumberTitle")}</h3>
-                <p className="mt-1 text-sm text-slate-400">{t("settings.changeNumberHint")}</p>
-                {changedNumber ? <p className="mt-2 text-sm text-emerald-300">{t("settings.numberChanged")}</p> : null}
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <Field label={t("settings.currentNumber")}>
-                    <SearchPicker
-                      value={pickedWo.id}
-                      selectedLabel={pickedWo.label}
-                      selectedHint={pickedWo.hint}
-                      placeholder={t("search.placeholder")}
-                      allowEmpty
-                      onChange={(id, option) => {
-                        setPickedWo({
-                          id,
-                          label: option?.label || "",
-                          hint: option?.hint || "",
-                        });
-                        setNewNumber(option?.label || "");
-                      }}
-                      search={async (query) => {
-                        const rows = await call(window.dms.workOrders.list(query, { limit: 8 }));
-                        return rows.map((row) => ({
-                          id: row.id,
-                          label: row.number,
-                          hint: [customerName(row.customer), vehicleLabel(row.vehicle)].filter(Boolean).join(" · "),
-                          raw: row,
-                        }));
-                      }}
-                    />
-                  </Field>
-                  <Field label={t("settings.newNumber")}>
-                    <input value={newNumber} onChange={(e) => setNewNumber(e.target.value)} placeholder="OT-0100" />
-                  </Field>
-                </div>
-                <div className="mt-4">
-                  <Button disabled={!pickedWo.id || !newNumber.trim()} onClick={() => void changeExistingNumber()}>
-                    {t("settings.changeNumber")}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </Card>
-        ) : null}
+      {section === "apariencia" ? (
+        <Card className="p-5">
+          <AppearancePanel />
+        </Card>
+      ) : null}
 
-        {can.finance ? (
-          <Card className="p-5 lg:col-span-2">
-            <h2 className="text-lg font-medium">{t("settings.catalogsTitle")}</h2>
-            <p className="mt-1 text-sm text-slate-400">{t("settings.catalogsSubtitle")}</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <CatalogEditor
-                title={t("catalog.opcodeCats")}
-                items={(catalogs?.opcodeCategories || []).filter((item) => item.id !== "lavado" && item.id !== "detailing")}
-                placeholder={t("catalog.new")}
-                canEdit={can.finance}
-                labelFor={(id) => catalogLabel(t, "op", id)}
-                onChange={(ids) => {
-                  const wash = (catalogs?.opcodeCategories || [])
-                    .filter((item) => item.id === "lavado" || item.id === "detailing")
-                    .map((item) => item.id);
-                  return saveCatalogs({ opcodeCategories: [...ids, ...wash] });
-                }}
-              />
-              <CatalogEditor
-                title={t("catalog.partCats")}
-                items={catalogs?.partCategories || []}
-                placeholder={t("catalog.new")}
-                canEdit={can.finance}
-                labelFor={(id) => catalogLabel(t, "partCat", id)}
-                onChange={(ids) => saveCatalogs({ partCategories: ids })}
-              />
-              <CatalogEditor
-                title={t("catalog.uoms")}
-                items={catalogs?.partUoms || []}
-                placeholder={t("catalog.new")}
-                canEdit={can.finance}
-                labelFor={(id) => catalogLabel(t, "partUom", id)}
-                onChange={(ids) => saveCatalogs({ partUoms: ids })}
-              />
-              <CatalogEditor
-                title={t("catalog.payTypes")}
-                hint={t("catalog.payHint")}
-                items={catalogs?.payTypes || []}
-                placeholder=""
-                canEdit={false}
-                locked
-                labelFor={(id) => catalogLabel(t, "opPay", id)}
-                onChange={() => undefined}
-              />
+      {section === "actualizaciones" ? (
+        <Card className="p-5">
+          <UpdatePanel />
+        </Card>
+      ) : null}
+
+      {section === "respaldo" ? (
+        <Card className="p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="break-all font-mono text-xs text-slate-500">{dbPath || "…"}</p>
             </div>
-          </Card>
-        ) : null}
-      </div>
+            {dbPath ? (
+              <Button variant="ghost" onClick={() => void navigator.clipboard.writeText(dbPath)}>
+                {t("settings.copyPath")}
+              </Button>
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
     </div>
   );
 }

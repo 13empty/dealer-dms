@@ -317,7 +317,7 @@ export default function Dashboard() {
             <Link className="text-sm text-gold-400 hover:underline" to="/finanzas">
               {t("nav.finance")}
             </Link>
-            <Link className="text-sm text-gold-400 hover:underline" to="/ajustes">
+            <Link className="text-sm text-gold-400 hover:underline" to="/ajustes/taller">
               {t("dash.goSettings")}
             </Link>
           </>
