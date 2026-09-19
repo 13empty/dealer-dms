@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { AppearanceStrip } from "../components/Appearance";
 import { BrandMark } from "../components/BrandMark";
 import { ChangelogModal, VersionButton } from "../components/ChangelogModal";
+import { UpdateNotice } from "../components/UpdateNotice";
 import { Button, Card, ErrorText, Field } from "../components/ui";
 import { useAuth } from "../lib/auth";
+import { markChangelogSeen } from "../lib/changelog";
 import { call } from "../lib/format";
 import { LanguageSelect, useI18n } from "../lib/i18n";
 import { ShopName } from "../lib/shop-context";
@@ -79,6 +81,7 @@ export default function LoginGate() {
           </Button>
         </form>
       </Card>
+      {appVersion ? <UpdateNotice version={appVersion} onShowMore={() => setChangelogOpen(true)} /> : null}
       {appVersion ? (
         <VersionButton
           className="absolute bottom-4 left-6"
@@ -87,7 +90,14 @@ export default function LoginGate() {
         />
       ) : null}
       {changelogOpen && appVersion ? (
-        <ChangelogModal version={appVersion} onClose={() => setChangelogOpen(false)} />
+        <ChangelogModal
+          version={appVersion}
+          allowHide
+          onClose={(hide) => {
+            if (hide) markChangelogSeen(appVersion);
+            setChangelogOpen(false);
+          }}
+        />
       ) : null}
     </div>
   );

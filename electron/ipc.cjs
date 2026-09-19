@@ -252,7 +252,7 @@ function registerIpc(app) {
   });
   handle("brand:clear", wrap(() => logo.clearLogo(), { minRank: 50 }));
   handle("updates:status", wrap(() => updater.status(), { minRank: 80 }));
-  handle("updates:peek", wrap(() => updater.peek(), { minRank: 80 }));
+  handle("updates:peek", wrap(() => updater.peek(), { public: true }));
   handle("updates:check", wrap(() => updater.check(), { minRank: 80 }));
   handle("updates:download", wrap(() => updater.download(), { minRank: 80 }));
   handle("updates:install", wrap(() => updater.install(), { minRank: 80 }));

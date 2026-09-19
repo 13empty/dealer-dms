@@ -219,7 +219,7 @@ export function UpdateBanner({ className = "" }: { className?: string }) {
       <p>
         {t("updates.banner", { version })}{" "}
         <Link className="font-medium text-gold-400 hover:underline" to="/ajustes/actualizaciones">
-          {t("updates.goSettings")}
+          {t("updates.showMore")}
         </Link>
       </p>
       <button

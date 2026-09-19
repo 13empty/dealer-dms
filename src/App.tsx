@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { GlobalSearch } from "./components/GlobalSearch";
@@ -8,6 +8,7 @@ import { AppearanceStrip } from "./components/Appearance";
 import { Badge, Button } from "./components/ui";
 import { BrandMark } from "./components/BrandMark";
 import { UpdateBanner } from "./components/UpdatePanel";
+import { UpdateNotice } from "./components/UpdateNotice";
 import { LanguageSelect, k, useI18n } from "./lib/i18n";
 import { call } from "./lib/format";
 import { usePrefs } from "./lib/prefs-context";
@@ -40,7 +41,7 @@ import VehiclePrint from "./pages/VehiclePrint";
 import SqlStudio from "./pages/SqlStudio";
 import { ChangelogModal, VersionButton } from "./components/ChangelogModal";
 import { ShopProvider } from "./lib/shop-context";
-import { markChangelogSeen, shouldShowChangelog } from "./lib/changelog";
+import { markChangelogSeen } from "./lib/changelog";
 
 type NestedLink = { to: string; label: string; icon: IconName; show: boolean };
 type MenuLink = {
@@ -168,11 +169,11 @@ function NavList({
 function Shell() {
   const { user, can, logout } = useAuth();
   const { t } = useI18n();
+  const navigate = useNavigate();
   const { prefs, setPref } = usePrefs();
   const { offerWash } = useShop();
   const [appVersion, setAppVersion] = useState("");
   const [changelogOpen, setChangelogOpen] = useState(false);
-  const [changelogAuto, setChangelogAuto] = useState(false);
   const [navWidth, setNavWidth] = useState(() => clampNavWidth(prefs.navWidth));
   const navWidthRef = useRef(navWidth);
 
@@ -186,14 +187,7 @@ function Shell() {
 
   useEffect(() => {
     void call(window.dms.meta.version())
-      .then((v) => {
-        const version = String(v || "");
-        setAppVersion(version);
-        if (shouldShowChangelog(version)) {
-          setChangelogAuto(true);
-          setChangelogOpen(true);
-        }
-      })
+      .then((v) => setAppVersion(String(v || "")))
       .catch(() => {});
   }, []);
 
@@ -332,10 +326,7 @@ function Shell() {
             <VersionButton
               className="mt-3 w-full text-center"
               version={appVersion}
-              onClick={() => {
-                setChangelogAuto(false);
-                setChangelogOpen(true);
-              }}
+              onClick={() => setChangelogOpen(true)}
             />
           ) : null}
         </div>
@@ -351,14 +342,25 @@ function Shell() {
           className="absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize hover:bg-gold-400/50"
         />
       </aside>
+      {appVersion ? (
+        <UpdateNotice
+          version={appVersion}
+          onShowMore={(kind) => {
+            if (kind === "available" && can.updates) {
+              navigate("/ajustes/actualizaciones");
+              return;
+            }
+            setChangelogOpen(true);
+          }}
+        />
+      ) : null}
       {changelogOpen && appVersion ? (
         <ChangelogModal
           version={appVersion}
-          auto={changelogAuto}
+          allowHide
           onClose={(hide) => {
             if (hide) markChangelogSeen(appVersion);
             setChangelogOpen(false);
-            setChangelogAuto(false);
           }}
         />
       ) : null}

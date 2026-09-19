@@ -29,10 +29,12 @@ export function VersionButton({
 export function ChangelogModal({
   version,
   auto,
+  allowHide,
   onClose,
 }: {
   version: string;
   auto?: boolean;
+  allowHide?: boolean;
   onClose: (hide: boolean) => void;
 }) {
   const { t } = useI18n();
@@ -40,6 +42,7 @@ export function ChangelogModal({
   const current = releaseFor(version);
   const older = CHANGELOG.filter((item) => item.version !== version);
   const showHistory = !auto;
+  const canHide = Boolean(auto || allowHide);
 
   return (
     <Modal
@@ -47,13 +50,13 @@ export function ChangelogModal({
       onClose={() => onClose(false)}
       footer={
         <>
-          {auto ? (
+          {canHide ? (
             <label className="mr-auto mb-0 flex items-center gap-2 text-sm normal-case tracking-normal text-slate-300">
               <input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} />
               {t("changelog.hide")}
             </label>
           ) : null}
-          <Button onClick={() => onClose(auto ? hide : false)}>{t("changelog.ok")}</Button>
+          <Button onClick={() => onClose(canHide ? hide : false)}>{t("changelog.ok")}</Button>
         </>
       }
     >

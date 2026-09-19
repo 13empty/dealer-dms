@@ -140,7 +140,7 @@ function scheduleNotify() {
   const run = () => {
     void peek({ notify: true }).catch(() => {});
   };
-  setTimeout(run, 8000);
+  setTimeout(run, 2000);
   peekTimer = setInterval(run, 6 * 60 * 60 * 1000);
 }
 
