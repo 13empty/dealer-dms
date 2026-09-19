@@ -21,6 +21,7 @@ import {
   vehicleLabel,
   vehicleSearchHint,
   workOrderPath,
+  isCollected,
 } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
@@ -287,11 +288,11 @@ export default function Wash() {
           </div>
           <div className="text-right">
             <div className="text-sm">{money(row.total || 0)}</div>
-            {Number(row.balance || 0) > 0.009 ? (
-              <div className="text-xs text-amber-300">{money(row.balance)}</div>
-            ) : (
+            {isCollected(row) ? (
               <Badge status="pagada" label={t("workshop.paidOff")} />
-            )}
+            ) : Number(row.balance || 0) > 0.009 ? (
+              <div className="text-xs text-amber-300">{money(row.balance)}</div>
+            ) : null}
           </div>
         </div>
         <p className="mt-2 line-clamp-2 text-xs text-slate-400">{typeNames(row) || t("wash.noTypesYet")}</p>

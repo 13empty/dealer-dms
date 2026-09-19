@@ -147,3 +147,7 @@ export function workOrderPath(order: { id: string; serviceLine?: string | null }
 export function workOrderListPath(order?: { serviceLine?: string | null } | null) {
   return order?.serviceLine === "lavado" ? "/lavado" : "/taller";
 }
+
+export function isCollected(row: { paid?: number | null; balance?: number | null } | null | undefined) {
+  return Number(row?.paid || 0) > 0.009 && Number(row?.balance || 0) <= 0.009;
+}

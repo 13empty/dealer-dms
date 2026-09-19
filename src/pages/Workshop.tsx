@@ -12,7 +12,7 @@ import {
   type VehicleDraft,
 } from "../components/CustomerForm";
 import { Badge, Button, Card, ErrorText, Field, FormSection, Modal, Page, PageHeader, Toolbar } from "../components/ui";
-import { call, customerName, customerSearchHint, dateTimeEs, fromDateTimeLocal, money, vehicleLabel, vehicleSearchHint, workOrderPath } from "../lib/format";
+import { call, customerName, customerSearchHint, dateTimeEs, fromDateTimeLocal, isCollected, money, vehicleLabel, vehicleSearchHint, workOrderPath } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
 import { useShop } from "../lib/shop-context";
@@ -405,7 +405,7 @@ export default function Workshop() {
         <div className="mt-2 flex items-center justify-between text-xs">
           {simple ? <span /> : <span className={row.overdue ? "text-red-300" : "text-slate-500"}>{dateTimeEs(row.promisedAt)}</span>}
           <span className="flex items-center gap-2">
-            {Number(row.balance || 0) <= 0.009 && row.status !== "entregada" ? (
+            {isCollected(row) && row.status !== "entregada" ? (
               <Badge status="pagada" label={t("workshop.paidOff")} />
             ) : null}
             <span className={Number(row.balance) > 0 ? "text-amber-300" : "text-slate-300"}>{money(row.total || 0)}</span>
@@ -568,7 +568,7 @@ export default function Workshop() {
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap items-center gap-1">
                       <Badge status={row.kind === "presupuesto" ? "presupuesto" : row.status} label={t(k(row.kind === "presupuesto" ? "wo.presupuesto" : `wo.${row.status}`))} />
-                      {Number(row.balance || 0) <= 0.009 && row.status !== "entregada" && row.kind !== "presupuesto" ? (
+                      {isCollected(row) && row.status !== "entregada" && row.kind !== "presupuesto" ? (
                         <Badge status="pagada" label={t("workshop.paidOff")} />
                       ) : null}
                     </div>

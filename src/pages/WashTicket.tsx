@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { WashTypePicker } from "../components/WashTypesPanel";
 import { Badge, Button, Card, ErrorText, Field, Page, PageHeader } from "../components/ui";
 import { SHOP_DEFAULTS } from "../lib/canada";
-import { call, customerName, dateEs, isWashCategory, money, vehicleLabel } from "../lib/format";
+import { call, customerName, dateEs, isCollected, isWashCategory, money, vehicleLabel } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
 import { askConfirm } from "../lib/ask";
 import { useShop } from "../lib/shop-context";
@@ -101,6 +101,7 @@ export default function WashTicket() {
   const locked = order.status === "entregada" || archived;
   const due = Number(order.balance || 0);
   const paidOff = due <= 0.009;
+  const collected = isCollected(order);
   const accountOpen = Boolean(order.customer?.accountOpen);
   const canDeliver = paidOff || accountOpen;
   const selectedIds = (order.lines || [])
@@ -187,7 +188,7 @@ export default function WashTicket() {
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         <Badge status={order.status === "lista" ? "lista" : "lavado"} label={washStatus} />
-        {!locked && paidOff ? <Badge status="pagada" label={t("workshop.paidOff")} /> : null}
+        {!locked && collected ? <Badge status="pagada" label={t("workshop.paidOff")} /> : null}
         <Link className="text-gold-400 hover:underline" to={`/clientes/${order.customerId}`}>
           {customerName(order.customer)}
         </Link>
@@ -289,9 +290,9 @@ export default function WashTicket() {
                 </div>
               ))}
             </div>
-            {locked && paidOff ? (
+            {locked && collected ? (
               <p className="text-sm text-emerald-300">{t("workshop.closedPaid")}</p>
-            ) : paidOff ? (
+            ) : locked && paidOff ? null : paidOff ? (
               <Button className="w-full" onClick={() => void act(() => call(window.dms.workOrders.deliver(order.id)))}>
                 {t("workshop.deliver")}
               </Button>

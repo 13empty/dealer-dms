@@ -4,7 +4,7 @@ import { SearchPicker } from "../components/SearchPicker";
 import { WashTypePicker } from "../components/WashTypesPanel";
 import { Badge, Button, Card, ErrorText, Field, Page, PageHeader, GuidCopy } from "../components/ui";
 import { SHOP_DEFAULTS } from "../lib/canada";
-import { call, customerName, dateEs, fromDateTimeLocal, isWashCategory, money, toDateTimeLocal, vehicleLabel, workOrderListPath, workOrderPath } from "../lib/format";
+import { call, customerName, dateEs, fromDateTimeLocal, isCollected, isWashCategory, money, toDateTimeLocal, vehicleLabel, workOrderListPath, workOrderPath } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
 import { askConfirm } from "../lib/ask";
 import { useShop } from "../lib/shop-context";
@@ -185,6 +185,7 @@ export default function WorkOrderDetail() {
   const customer = order.customer;
   const due = Number(order.balance || 0);
   const paidOff = due <= 0.009;
+  const collected = isCollected(order);
   const accountOpen = Boolean(customer?.accountOpen);
   const canDeliver = paidOff || accountOpen;
   const flow = simple ? SIMPLE_FLOW : FULL_FLOW;
@@ -355,7 +356,7 @@ export default function WorkOrderDetail() {
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         <Badge status={estimate ? "presupuesto" : order.status} label={t(k(estimate ? "wo.presupuesto" : `wo.${order.status}`))} />
-        {!estimate && paidOff && !locked ? <Badge status="pagada" label={t("workshop.paidOff")} /> : null}
+        {!estimate && collected && !locked ? <Badge status="pagada" label={t("workshop.paidOff")} /> : null}
         {order.priority === "urgente" ? <Badge status="urgente" label={t("workshop.priority.urgente")} /> : null}
         {!simple && order.waiter ? <Badge status="lista" label={t("workshop.waiter")} /> : null}
         {order.overdue ? <Badge status="bloqueado" label={t("workshop.overdue")} /> : null}
@@ -983,7 +984,7 @@ export default function WorkOrderDetail() {
                   </div>
                 ))}
               </div>
-              {locked && paidOff ? (
+              {locked && collected ? (
                 <p className="text-sm text-emerald-300">{t("workshop.closedPaid")}</p>
               ) : locked && !paidOff ? (
                 <>
@@ -1018,9 +1019,9 @@ export default function WorkOrderDetail() {
                     {t("workshop.deposit")}
                   </Button>
                 </>
-              ) : paidOff ? (
+              ) : locked ? null : paidOff ? (
                 <div className="space-y-2">
-                  <p className="text-sm text-emerald-300">{t("workshop.paidReady")}</p>
+                  {collected ? <p className="text-sm text-emerald-300">{t("workshop.paidReady")}</p> : null}
                   <Button
                     className="w-full"
                     onClick={() => void act(() => call(window.dms.workOrders.deliver(order.id, { kmOut: Number(job.kmOut) || 0 })))}
