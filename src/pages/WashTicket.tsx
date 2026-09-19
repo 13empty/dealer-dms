@@ -5,12 +5,15 @@ import { Badge, Button, Card, ErrorText, Field, Page, PageHeader } from "../comp
 import { SHOP_DEFAULTS } from "../lib/canada";
 import { call, customerName, dateEs, isWashCategory, money, vehicleLabel } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
+import { askConfirm } from "../lib/ask";
+import { useShop } from "../lib/shop-context";
 import type { StaffUser, WashType, WorkOrder } from "../vite-env";
 
 export default function WashTicket() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useI18n();
+  const { offerTax } = useShop();
   const [order, setOrder] = useState<WorkOrder | null>(null);
   const [types, setTypes] = useState<WashType[]>([]);
   const [staff, setStaff] = useState<StaffUser[]>([]);
@@ -94,7 +97,8 @@ export default function WashTicket() {
     return <Navigate to={`/taller/${order.id}`} replace />;
   }
 
-  const locked = order.status === "entregada";
+  const archived = Number(order.deleted) === 1;
+  const locked = order.status === "entregada" || archived;
   const due = Number(order.balance || 0);
   const paidOff = due <= 0.009;
   const accountOpen = Boolean(order.customer?.accountOpen);
@@ -107,7 +111,7 @@ export default function WashTicket() {
     if (!order || locked) return;
     const existing = (order.lines || []).find((line) => line.opCodeId === typeId);
     if (existing) {
-      if (!confirm(t("workshop.removeLine"))) return;
+      if (!askConfirm(t("workshop.removeLine"))) return;
       await act(() => call(window.dms.workOrders.removeLine(existing.id)));
       return;
     }
@@ -154,8 +158,9 @@ export default function WashTicket() {
                 variant="danger"
                 onClick={() =>
                   void act(async () => {
-                    if (!confirm(t("workshop.deleteConfirm"))) return order;
-                    await call(window.dms.workOrders.remove(order.id));
+                    if (!askConfirm(t("workshop.deleteConfirm"))) return order;
+                    const pruneCategories = askConfirm(t("workshop.deleteCats"));
+                    await call(window.dms.workOrders.remove(order.id, { pruneCategories }));
                     navigate("/lavado");
                     return order;
                   })
@@ -178,6 +183,7 @@ export default function WashTicket() {
         }
       />
       <ErrorText error={error} />
+      {archived ? <Card className="border-red-400/40 bg-red-400/10 p-3 text-sm text-red-200">{t("workshop.deletedHint")}</Card> : null}
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         <Badge status={order.status === "lista" ? "lista" : "lavado"} label={washStatus} />
@@ -242,19 +248,21 @@ export default function WashTicket() {
               <span>{t("workshop.subtotal")}</span>
               <span>{money(order.subtotal || 0)}</span>
             </div>
-            {Number(order.taxRate) > 0 ? (
-              <div className="mt-1 flex justify-between text-slate-400">
-                <span>
-                  {taxLabel} {order.taxRate}%
-                </span>
-                <span>{money(order.tax || 0)}</span>
-              </div>
-            ) : (
-              <div className="mt-1 flex justify-between text-slate-400">
-                <span>{taxLabel}</span>
-                <span>{order.customer?.taxExempt ? t("customers.taxExempt") : money(0)}</span>
-              </div>
-            )}
+            {offerTax ? (
+              Number(order.taxRate) > 0 ? (
+                <div className="mt-1 flex justify-between text-slate-400">
+                  <span>
+                    {taxLabel} {order.taxRate}%
+                  </span>
+                  <span>{money(order.tax || 0)}</span>
+                </div>
+              ) : (
+                <div className="mt-1 flex justify-between text-slate-400">
+                  <span>{taxLabel}</span>
+                  <span>{order.customer?.taxExempt ? t("customers.taxExempt") : money(0)}</span>
+                </div>
+              )
+            ) : null}
             <div className="mt-1 flex justify-between font-medium">
               <span>{t("workshop.total")}</span>
               <span>{money(order.total || 0)}</span>

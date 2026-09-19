@@ -8,12 +8,13 @@ import { catalogLabel, PAY_TYPES, useCatalogs } from "../lib/catalogs";
 import { SHOP_DEFAULTS } from "../lib/canada";
 import { call, money } from "../lib/format";
 import { useI18n } from "../lib/i18n";
+import { askConfirm } from "../lib/ask";
 import type { OpCode } from "../vite-env";
 
 const emptyForm = {
   code: "",
   description: "",
-  category: "mantenimiento",
+  category: "",
   payType: "cliente",
   laborHours: "1",
   laborRate: String(SHOP_DEFAULTS.laborRate),
@@ -66,7 +67,7 @@ export default function OpCodes() {
 
   function startCreate() {
     setEditing(null);
-    setForm({ ...emptyForm, laborRate: defaultRate, category: categories[0] || "mantenimiento", parts: [] });
+    setForm({ ...emptyForm, laborRate: defaultRate, category: "", parts: [] });
     setOpen(true);
   }
 
@@ -125,7 +126,7 @@ export default function OpCodes() {
   }
 
   async function remove(id: string) {
-    if (!confirm(t("opcodes.deleteConfirm"))) return;
+    if (!askConfirm(t("opcodes.deleteConfirm"))) return;
     try {
       await call(window.dms.opCodes.remove(id));
       await Promise.all([load(), reloadCatalogs()]);
@@ -245,6 +246,7 @@ export default function OpCodes() {
             </Field>
             <Field label={t("opcodes.category")}>
               <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                <option value="">{t("catalog.optional")}</option>
                 {(categories.includes(form.category) ? categories : [...categories, form.category]).filter(Boolean).map((id) => (
                   <option key={id} value={id}>
                     {catalogLabel(t, "op", id)}

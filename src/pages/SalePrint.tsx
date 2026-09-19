@@ -4,11 +4,13 @@ import { PrintDoc, PrintShopHead } from "../components/PrintDoc";
 import { ErrorText } from "../components/ui";
 import { call, customerBillingName, dateEs, formatAddress, formatPhones, money, vehicleLabel } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
+import { useShop } from "../lib/shop-context";
 import type { Sale, ShopSettings } from "../vite-env";
 
 export default function SalePrint() {
   const { id } = useParams();
   const { t } = useI18n();
+  const { offerTax } = useShop();
   const [sale, setSale] = useState<Sale | null>(null);
   const [shop, setShop] = useState<ShopSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export default function SalePrint() {
     <PrintDoc title={t("sales.printTitle")} subtitle={t("invoice.subtitle")} backTo={`/ventas/${sale.id}`} backLabel={t("common.open")}>
       <ErrorText error={error} />
       <PrintShopHead
-        shop={shop}
+        shop={offerTax ? shop : { ...shop, gstNumber: "" }}
         docLabel={t("sales.printTitle")}
         number={sale.vehicle?.stockNumber || ""}
         date={dateEs(sale.deliveredAt || sale.closedAt || sale.createdAt)}
@@ -90,6 +92,7 @@ export default function SalePrint() {
           <span>{t("sales.price")}</span>
           <span>{money(sale.price)}</span>
         </div>
+        {offerTax ? (
         <div className="flex justify-between">
           <span>
             {shop.taxLabel || "GST"}
@@ -97,6 +100,7 @@ export default function SalePrint() {
           </span>
           <span>{Number(sale.taxRate) > 0 ? money(sale.tax || 0) : sale.customer?.taxExempt ? t("invoice.gstExempt") : money(0)}</span>
         </div>
+        ) : null}
         <div className="flex justify-between border-t border-neutral-300 pt-2 text-base font-semibold">
           <span>{t("workshop.total")}</span>
           <span>{money(total)}</span>

@@ -3,12 +3,15 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Badge, Button, Card, ErrorText, Field, PageHeader, GuidCopy } from "../components/ui";
 import { call, dateEs, money } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
+import { askConfirm } from "../lib/ask";
+import { useShop } from "../lib/shop-context";
 import type { Sale } from "../vite-env";
 
 export default function SaleDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useI18n();
+  const { offerTax } = useShop();
   const [sale, setSale] = useState<Sale | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
@@ -75,7 +78,7 @@ export default function SaleDetail() {
                   variant="danger"
                   onClick={() =>
                     void act(async () => {
-                      if (!confirm(t("sales.deleteConfirm"))) return sale;
+                      if (!askConfirm(t("sales.deleteConfirm"))) return sale;
                       await call(window.dms.sales.remove(sale.id));
                       navigate("/ventas");
                       return sale;
@@ -108,6 +111,7 @@ export default function SaleDetail() {
               <dt className="text-slate-400">{t("sales.price")}</dt>
               <dd className="text-lg">{money(sale.price)}</dd>
             </div>
+            {offerTax ? (
             <div>
               <dt className="text-slate-400">{t("sales.tax", { label: "GST" })}</dt>
               <dd>
@@ -118,6 +122,7 @@ export default function SaleDetail() {
                     : money(0)}
               </dd>
             </div>
+            ) : null}
             <div>
               <dt className="text-slate-400">{t("workshop.total")}</dt>
               <dd className="text-lg">{money(sale.total || Number(sale.price) + Number(sale.tax || 0))}</dd>

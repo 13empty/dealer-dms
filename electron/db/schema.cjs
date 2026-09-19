@@ -176,7 +176,7 @@ const workOrders = sqliteTable("work_orders", {
   id: id(),
   number: text("number").notNull(),
   customerId: text("customer_id").notNull(),
-  vehicleId: text("vehicle_id").notNull(),
+  vehicleId: text("vehicle_id"),
   status: text("status").notNull().default("recepcion"),
   kind: text("kind").notNull().default("orden"),
   serviceLine: text("service_line").notNull().default("taller"),
@@ -276,6 +276,14 @@ const shopSettings = sqliteTable("shop_settings", {
   partUoms: text("part_uoms").notNull().default(""),
   allowUpdates: integer("allow_updates").notNull().default(0),
   offerWash: integer("offer_wash").notNull().default(0),
+  estPrefix: text("est_prefix").notNull().default("PRE"),
+  estNextNumber: integer("est_next_number").notNull().default(1),
+  washPrefix: text("wash_prefix").notNull().default("DET"),
+  washNextNumber: integer("wash_next_number").notNull().default(1),
+  piPrefix: text("pi_prefix").notNull().default("PI"),
+  piNextNumber: integer("pi_next_number").notNull().default(1),
+  offerPartInvoices: integer("offer_part_invoices").notNull().default(0),
+  offerTax: integer("offer_tax").notNull().default(1),
 });
 
 const expenses = sqliteTable("expenses", {

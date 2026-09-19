@@ -1,6 +1,7 @@
 import { Field } from "./ui";
 import { catalogLabel } from "../lib/catalogs";
 import { k, type Translate } from "../lib/i18n";
+import { useShop } from "../lib/shop-context";
 import type { Part } from "../vite-env";
 
 export const PART_CATEGORIES = [
@@ -136,6 +137,7 @@ export function PartFormFields({
   categories?: string[];
   uoms?: string[];
 }) {
+  const { offerTax } = useShop();
   const categoryOptions = [...(categories?.length ? categories : PART_CATEGORIES)];
   const uomOptions = [...(uoms?.length ? uoms : PART_UOMS)];
   if (form.category && !categoryOptions.includes(form.category)) categoryOptions.push(form.category);
@@ -210,8 +212,8 @@ export function PartFormFields({
               ))}
             </select>
           </Field>
-          {includeStock ? (
-            <Field label={t("parts.initial")}>
+          {includeStock !== false ? (
+            <Field label={t("parts.oh")}>
               <input value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
             </Field>
           ) : null}
@@ -232,15 +234,17 @@ export function PartFormFields({
           </Field>
         </div>
         <div className="mt-3 flex flex-wrap gap-4 text-sm">
-          <label className="flex items-center gap-2 normal-case tracking-normal text-slate-200">
-            <input
-              type="checkbox"
-              className="w-auto"
-              checked={form.taxable}
-              onChange={(e) => setForm({ ...form, taxable: e.target.checked })}
-            />
-            {t("parts.taxable")}
-          </label>
+          {offerTax ? (
+            <label className="flex items-center gap-2 normal-case tracking-normal text-slate-200">
+              <input
+                type="checkbox"
+                className="w-auto"
+                checked={form.taxable}
+                onChange={(e) => setForm({ ...form, taxable: e.target.checked })}
+              />
+              {t("parts.taxable")}
+            </label>
+          ) : null}
           <label className="flex items-center gap-2 normal-case tracking-normal text-slate-200">
             <input
               type="checkbox"

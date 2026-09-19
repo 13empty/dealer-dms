@@ -3,6 +3,7 @@ import type { WashType } from "../vite-env";
 import { useAuth } from "../lib/auth";
 import { call, money } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
+import { askConfirm } from "../lib/ask";
 import { Button, Field } from "./ui";
 
 const emptyForm = {
@@ -69,7 +70,7 @@ export function WashTypesPanel({
   }
 
   async function remove(row: WashType) {
-    if (!confirm(t("wash.deleteConfirm", { name: row.name }))) return;
+    if (!askConfirm(t("wash.deleteConfirm", { name: row.name }))) return;
     try {
       setError(null);
       await call(window.dms.washTypes.remove(row.id));

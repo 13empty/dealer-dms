@@ -3,6 +3,7 @@ import { Badge, Button, Card, ErrorText, Field, FormSection, Modal, PageHeader }
 import { useAuth } from "../lib/auth";
 import { call } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
+import { askConfirm } from "../lib/ask";
 import { CA_PROVINCES, SHOP_DEFAULTS } from "../lib/canada";
 import type { AppUser, UserJob, UserRole } from "../vite-env";
 
@@ -179,7 +180,7 @@ export default function Users() {
   async function toggleActive(row: AppUser) {
     if (row.active) {
       const msg = row.assigned ? t("users.deactivateAssigned") : t("users.deactivateConfirm");
-      if (!confirm(msg)) return;
+      if (!askConfirm(msg)) return;
     }
     try {
       await call(window.dms.users.update(row.id, { active: row.active ? 0 : 1 }));
@@ -190,7 +191,7 @@ export default function Users() {
   }
 
   async function remove(row: AppUser) {
-    if (!confirm(t("users.deleteConfirm"))) return;
+    if (!askConfirm(t("users.deleteConfirm"))) return;
     try {
       await call(window.dms.users.remove(row.id));
       await load();

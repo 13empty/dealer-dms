@@ -6,6 +6,7 @@ import { Badge, Button, Card, ErrorText, Field, Page, PageHeader, GuidCopy } fro
 import { SHOP_DEFAULTS } from "../lib/canada";
 import { call, customerName, dateEs, fromDateTimeLocal, isWashCategory, money, toDateTimeLocal, vehicleLabel, workOrderListPath, workOrderPath } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
+import { askConfirm } from "../lib/ask";
 import { useShop } from "../lib/shop-context";
 import type { StaffUser, WashType, WorkOrder, WorkOrderLine, WorkOrderStatus } from "../vite-env";
 
@@ -25,7 +26,7 @@ export default function WorkOrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useI18n();
-  const { offerWash } = useShop();
+  const { offerWash, offerTax } = useShop();
   const [order, setOrder] = useState<WorkOrder | null>(null);
   const [staff, setStaff] = useState<StaffUser[]>([]);
   const [taxLabel, setTaxLabel] = useState(SHOP_DEFAULTS.taxLabel);
@@ -178,7 +179,8 @@ export default function WorkOrderDetail() {
     return <Navigate to={`/lavado/${order.id}`} replace />;
   }
 
-  const locked = order.status === "entregada";
+  const archived = Number(order.deleted) === 1;
+  const locked = order.status === "entregada" || archived;
   const estimate = order.kind === "presupuesto";
   const customer = order.customer;
   const due = Number(order.balance || 0);
@@ -294,13 +296,14 @@ export default function WorkOrderDetail() {
             {estimate && !locked ? (
               <Button onClick={() => void act(() => call(window.dms.workOrders.convert(order.id)))}>{t("workshop.convert")}</Button>
             ) : null}
-            {!locked && (estimate || order.status === "recepcion" || (simple && order.status === "en_taller")) && Number(order.paid || 0) <= 0.009 ? (
+            {!locked && (estimate || order.status === "recepcion" || (simple && order.status === "en_taller") || order.kind === "factura_partes") && Number(order.paid || 0) <= 0.009 ? (
               <Button
                 variant="danger"
                 onClick={() =>
                   void act(async () => {
-                    if (!confirm(t("workshop.deleteConfirm"))) return order;
-                    await call(window.dms.workOrders.remove(order.id));
+                    if (!askConfirm(t("workshop.deleteConfirm"))) return order;
+                    const pruneCategories = askConfirm(t("workshop.deleteCats"));
+                    await call(window.dms.workOrders.remove(order.id, { pruneCategories }));
                     navigate(workOrderListPath(order));
                     return order;
                   })
@@ -347,6 +350,7 @@ export default function WorkOrderDetail() {
           </>
         }
       />
+      {archived ? <Card className="border-red-400/40 bg-red-400/10 p-3 text-sm text-red-200">{t("workshop.deletedHint")}</Card> : null}
       <ErrorText error={error} />
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
@@ -678,7 +682,7 @@ export default function WorkOrderDetail() {
                           <button
                             className="text-xs text-gold-400"
                             onClick={() => {
-                              if (Number(line.authorized) !== 0 && !confirm(t("workshop.declineConfirm"))) return;
+                              if (Number(line.authorized) !== 0 && !askConfirm(t("workshop.declineConfirm"))) return;
                               void act(() =>
                                 call(window.dms.workOrders.updateLine(line.id, { authorized: Number(line.authorized) === 0 ? 1 : 0 }))
                               );
@@ -690,7 +694,7 @@ export default function WorkOrderDetail() {
                           <button
                             className="text-red-300"
                             onClick={() => {
-                              if (!confirm(t("workshop.removeLine"))) return;
+                              if (!askConfirm(t("workshop.removeLine"))) return;
                               void act(() => call(window.dms.workOrders.removeLine(line.id)));
                             }}
                           >
@@ -843,7 +847,7 @@ export default function WorkOrderDetail() {
                   onToggle={(typeId) => {
                     const existing = (order.lines || []).find((line) => line.opCodeId === typeId);
                     if (existing) {
-                      if (!confirm(t("workshop.removeLine"))) return;
+                      if (!askConfirm(t("workshop.removeLine"))) return;
                       void act(() => call(window.dms.workOrders.removeLine(existing.id)));
                       return;
                     }
@@ -889,19 +893,41 @@ export default function WorkOrderDetail() {
               </label>
               <span>{Number(order.discount) > 0 ? `-${money(order.discount)}` : money(0)}</span>
             </div>
-            {Number(order.taxRate) > 0 ? (
-              <div className="mt-1 flex justify-between text-slate-400">
-                <span>
-                  {taxLabel} {order.taxRate}%
-                </span>
-                <span>{money(order.tax || 0)}</span>
-              </div>
-            ) : (
-              <div className="mt-1 flex justify-between text-slate-400">
-                <span>{taxLabel}</span>
-                <span>{order.customer?.taxExempt ? t("customers.taxExempt") : money(0)}</span>
-              </div>
-            )}
+            {offerTax ? (
+              <>
+                {Number(order.taxRate) > 0 ? (
+                  <div className="mt-1 flex justify-between text-slate-400">
+                    <span>
+                      {taxLabel} {order.taxRate}%
+                    </span>
+                    <span>{money(order.tax || 0)}</span>
+                  </div>
+                ) : (
+                  <div className="mt-1 flex justify-between text-slate-400">
+                    <span>{taxLabel}</span>
+                    <span>{order.customer?.taxExempt ? t("customers.taxExempt") : money(0)}</span>
+                  </div>
+                )}
+                <label className="mt-2 mb-0 flex items-center gap-2 text-xs normal-case tracking-normal text-slate-400">
+                  <input
+                    type="checkbox"
+                    disabled={locked}
+                    checked={!(Number(order.taxRate) > 0)}
+                    onChange={(e) =>
+                      void act(() =>
+                        call(
+                          window.dms.workOrders.update(order.id, {
+                            taxExempt: e.target.checked,
+                            taxRate: e.target.checked ? 0 : undefined,
+                          })
+                        )
+                      )
+                    }
+                  />
+                  {t("invoice.taxExemptJob")}
+                </label>
+              </>
+            ) : null}
             <div className="mt-1 flex justify-between font-medium">
               <span>{t("workshop.total")}</span>
               <span>{money(order.total || 0)}</span>

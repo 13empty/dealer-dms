@@ -45,6 +45,13 @@ function createWindow() {
 
   win.setMenuBarVisibility(false);
   win.once("ready-to-show", () => win.show());
+  win.on("focus", () => {
+    try {
+      win.webContents.focus();
+    } catch {
+      // ignore
+    }
+  });
   win.webContents.on("render-process-gone", (_event, details) => {
     try {
       fs.appendFileSync(

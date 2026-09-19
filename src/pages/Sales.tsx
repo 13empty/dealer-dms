@@ -4,6 +4,7 @@ import { SearchPicker, type SearchOption } from "../components/SearchPicker";
 import { Badge, Button, Card, ErrorText, Field, Modal, Page, PageHeader, Toolbar } from "../components/ui";
 import { call, customerName, customerSearchHint, money, vehicleLabel, vehicleSearchHint } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
+import { useShop } from "../lib/shop-context";
 import type { Customer, Sale, ShopSettings, Vehicle } from "../vite-env";
 
 const emptySaleForm = {
@@ -21,6 +22,7 @@ export default function Sales() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { t } = useI18n();
+  const { offerTax } = useShop();
   const [rows, setRows] = useState<Sale[]>([]);
   const [q, setQ] = useState("");
   const [unpaid, setUnpaid] = useState(() => params.get("unpaid") === "1");
@@ -264,7 +266,7 @@ export default function Sales() {
                 <input value={form.downPayment} onChange={(e) => setForm({ ...form, downPayment: e.target.value })} />
               </Field>
             </div>
-            {shop ? (
+            {shop && offerTax ? (
               <p className="text-xs text-slate-400">
                 {picked.taxExempt
                   ? t("invoice.gstExempt")

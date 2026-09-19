@@ -15,6 +15,7 @@ import { Badge, Button, Card, ErrorText, Field, FormSection, Modal, Page, PageHe
 import { call, customerName, customerSearchHint, dateTimeEs, fromDateTimeLocal, money, vehicleLabel, vehicleSearchHint, workOrderPath } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
+import { useShop } from "../lib/shop-context";
 import { defaultPromisedAt } from "../lib/prefs";
 import { usePrefs } from "../lib/prefs-context";
 import type { Customer, StaffUser, Vehicle, WorkOrder, WorkOrderStatus } from "../vite-env";
@@ -71,6 +72,7 @@ export default function Workshop() {
   const [params, setParams] = useSearchParams();
   const { t } = useI18n();
   const { user } = useAuth();
+  const { offerTax } = useShop();
   const { prefs } = usePrefs();
   const [rows, setRows] = useState<WorkOrder[]>([]);
   const [q, setQ] = useState(() => params.get("q") || "");
@@ -81,6 +83,7 @@ export default function Workshop() {
   const [unpaid, setUnpaid] = useState(() => params.get("unpaid") === "1");
   const [overdue, setOverdue] = useState(() => params.get("overdue") === "1");
   const [showDelivered, setShowDelivered] = useState(() => params.get("entregada") === "1" || params.get("status") === "entregada");
+  const [showDeleted, setShowDeleted] = useState(() => params.get("eliminadas") === "1");
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -111,7 +114,8 @@ export default function Workshop() {
             serviceLine: "taller",
             unpaid: unpaid || undefined,
             overdue: overdue || undefined,
-            open: showDelivered ? undefined : true,
+            open: showDelivered || showDeleted ? undefined : true,
+            deleted: showDeleted || undefined,
           })
         ),
         call(window.dms.staff.list({ line: "taller" })),
@@ -127,7 +131,7 @@ export default function Workshop() {
 
   useEffect(() => {
     void load();
-  }, [q, status, kind, unpaid, overdue, showDelivered]);
+  }, [q, status, kind, unpaid, overdue, showDelivered, showDeleted]);
 
   useEffect(() => {
     const cliente = params.get("cliente") || "";
@@ -384,6 +388,7 @@ export default function Workshop() {
       <Link
         key={row.id}
         to={workOrderPath(row)}
+        draggable={false}
         className="block rounded-lg border border-ink-600 border-t-2 bg-ink-900/90 p-3 shadow-sm shadow-black/20 transition hover:border-gold-400/40"
       >
         <div className="flex items-start justify-between gap-2">
@@ -458,6 +463,20 @@ export default function Workshop() {
           <input type="checkbox" checked={showDelivered} onChange={(e) => setShowDelivered(e.target.checked)} />
           {t("wo.entregada")}
         </label>
+        <label className="mb-0 flex items-center gap-2 text-sm normal-case tracking-normal text-slate-300">
+          <input
+            type="checkbox"
+            checked={showDeleted}
+            onChange={(e) => {
+              setShowDeleted(e.target.checked);
+              if (e.target.checked) {
+                setView("list");
+                writeWorkshopView("list");
+              }
+            }}
+          />
+          {t("workshop.showDeleted")}
+        </label>
         <div className="flex rounded-lg border border-ink-600 bg-ink-950 p-0.5">
           <Button
             variant={view === "board" ? "primary" : "ghost"}
@@ -526,12 +545,17 @@ export default function Workshop() {
                 </tr>
               ) : null}
               {rows.map((row) => (
-                <tr key={row.id} className="border-t border-ink-600">
+                <tr
+                  key={row.id}
+                  className="cursor-pointer border-t border-ink-600 hover:bg-ink-800/60"
+                  onClick={() => navigate(workOrderPath(row))}
+                >
                   <td className="px-4 py-3 font-mono text-xs">
-                    <Link className="text-gold-400 hover:underline" to={workOrderPath(row)}>
+                    <Link className="text-gold-400 hover:underline" to={workOrderPath(row)} onClick={(e) => e.stopPropagation()}>
                       {row.number}
                     </Link>
                     {row.kind === "presupuesto" ? <div className="text-sky-300">{t("workshop.estimate")}</div> : null}
+                    {row.deleted ? <div className="text-red-300">{t("workshop.deleted")}</div> : null}
                   </td>
                   <td className="px-4 py-3">{customerName(row.customer)}</td>
                   <td className="px-4 py-3">
@@ -669,14 +693,16 @@ export default function Workshop() {
                         />
                       </Field>
                     </div>
-                    <label className="flex items-center gap-2 text-sm normal-case tracking-normal text-slate-200">
-                      <input
-                        type="checkbox"
-                        checked={customerDraft.taxExempt}
-                        onChange={(e) => setCustomerDraft({ ...customerDraft, taxExempt: e.target.checked })}
-                      />
-                      {t("customers.taxExempt")}
-                    </label>
+                    {offerTax ? (
+                      <label className="flex items-center gap-2 text-sm normal-case tracking-normal text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={customerDraft.taxExempt}
+                          onChange={(e) => setCustomerDraft({ ...customerDraft, taxExempt: e.target.checked })}
+                        />
+                        {t("customers.taxExempt")}
+                      </label>
+                    ) : null}
                     {customerDupes.length ? (
                       <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
                         <div className="font-medium">{t("customers.duplicates")}</div>

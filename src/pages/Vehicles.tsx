@@ -13,6 +13,7 @@ import { Badge, Button, Card, ErrorText, Modal, Page, PageHeader, Toolbar } from
 import { useAuth } from "../lib/auth";
 import { call, customerName, customerSearchHint, formatNumber, money, vehicleLabel } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
+import { askConfirm } from "../lib/ask";
 import type { Vehicle } from "../vite-env";
 
 export default function Vehicles() {
@@ -82,7 +83,7 @@ export default function Vehicles() {
   }
 
   async function remove(id: string) {
-    if (!confirm(t("vehicles.deleteConfirm"))) return;
+    if (!askConfirm(t("vehicles.deleteConfirm"))) return;
     try {
       await call(window.dms.vehicles.remove(id));
       await load();

@@ -73,7 +73,7 @@ contextBridge.exposeInMainWorld("dms", {
     addLine: (id, data) => invoke("workOrders:addLine", { id, data }),
     updateLine: (lineId, data) => invoke("workOrders:updateLine", { lineId, data }),
     removeLine: (lineId) => invoke("workOrders:removeLine", lineId),
-    remove: (id) => invoke("workOrders:remove", id),
+    remove: (id, opts) => invoke("workOrders:remove", { id, ...(opts || {}) }),
     deliver: (id, data) => invoke("workOrders:deliver", { id, ...(data || {}) }),
     addPayment: (id, data) => invoke("workOrders:addPayment", { id, data }),
     authorize: (id, data) => invoke("workOrders:authorize", { id, data }),

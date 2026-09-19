@@ -2,6 +2,7 @@ import { Button, ErrorText, Field, FormSection, Modal } from "./ui";
 import { VinField, applyVinDecoded } from "./VinField";
 import { PHONE_KEYS, k, phoneKey, type Translate } from "../lib/i18n";
 import { CA_PROVINCES } from "../lib/canada";
+import { useShop } from "../lib/shop-context";
 import type { Customer, CustomerContact, CustomerPhone, CustomerSource, CustomerStatus, CustomerType } from "../vite-env";
 
 export const CUSTOMER_TYPES: CustomerType[] = ["particular", "empresa", "flotilla", "seguro", "mayoreo"];
@@ -198,6 +199,7 @@ export function CustomerFormModal({
   error?: string | null;
 }) {
   const needsCompany = form.type !== "particular";
+  const { offerTax } = useShop();
 
   function setPhone(index: number, patch: Partial<CustomerPhone>) {
     setForm({
@@ -368,10 +370,12 @@ export function CustomerFormModal({
                 </Field>
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {offerTax ? (
                 <label className="flex items-center gap-2 text-sm normal-case tracking-normal text-slate-200">
                   <input type="checkbox" checked={form.taxExempt} onChange={(e) => setForm({ ...form, taxExempt: e.target.checked })} />
                   {t("customers.taxExempt")}
                 </label>
+                ) : null}
                 <label className="flex items-center gap-2 text-sm normal-case tracking-normal text-slate-200">
                   <input type="checkbox" checked={form.accountOpen} onChange={(e) => setForm({ ...form, accountOpen: e.target.checked })} />
                   {t("customers.accountOpen")}

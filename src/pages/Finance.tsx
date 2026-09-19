@@ -4,6 +4,7 @@ import { SearchPicker, type SearchOption } from "../components/SearchPicker";
 import { Button, Card, ErrorText, Field, Modal, PageHeader } from "../components/ui";
 import { call, customerName, dateEs, money, vehicleLabel } from "../lib/format";
 import { k, useI18n, type Translate } from "../lib/i18n";
+import { askConfirm } from "../lib/ask";
 import type { Expense, FinancePeriod, FinanceReceivable, FinanceSummary } from "../vite-env";
 
 const categories: Expense["category"][] = ["partes", "renta", "servicios", "sueldos", "otros"];
@@ -142,7 +143,7 @@ export default function Finance() {
   }
 
   async function removeExpense(id: string) {
-    if (!confirm(t("finance.deleteExpense"))) return;
+    if (!askConfirm(t("finance.deleteExpense"))) return;
     try {
       await call(window.dms.finance.removeExpense(id));
       await load();
@@ -152,7 +153,7 @@ export default function Finance() {
   }
 
   async function removeIncome(id: string) {
-    if (!confirm(t("finance.deleteIncome"))) return;
+    if (!askConfirm(t("finance.deleteIncome"))) return;
     try {
       await call(window.dms.finance.removeIncome(id));
       await load();

@@ -25,6 +25,7 @@ import SaleDetail from "./pages/SaleDetail";
 import Parts from "./pages/Parts";
 import PartDetail from "./pages/PartDetail";
 import PartPrint from "./pages/PartPrint";
+import PartInvoice from "./pages/PartInvoice";
 import Workshop from "./pages/Workshop";
 import OpCodes from "./pages/OpCodes";
 import Wash from "./pages/Wash";
@@ -210,12 +211,14 @@ function Shell() {
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("blur", onUp);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
       setPref("navWidth", navWidthRef.current);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
+    window.addEventListener("blur", onUp);
   }
 
   const opsItems: MenuLink[] = [
@@ -373,6 +376,7 @@ function Shell() {
             <Route path="/ventas/:id/imprimir" element={<SalePrint />} />
             <Route path="/ventas/:id" element={<SaleDetail />} />
             <Route path="/partes" element={<Parts />} />
+            <Route path="/partes/factura" element={<PartInvoice />} />
             <Route path="/partes/imprimir" element={<PartPrint />} />
             <Route path="/partes/:id/imprimir" element={<PartPrint />} />
             <Route path="/partes/:id" element={<PartDetail />} />

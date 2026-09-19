@@ -352,7 +352,7 @@ export type WorkOrder = {
   customerId: string;
   vehicleId: string;
   status: WorkOrderStatus;
-  kind?: "orden" | "presupuesto";
+  kind?: "orden" | "presupuesto" | "factura_partes";
   serviceLine?: "taller" | "lavado";
   complaint: string;
   cause?: string;
@@ -363,6 +363,7 @@ export type WorkOrder = {
   promisedAt: string | null;
   techUserId: string | null;
   taxRate: number;
+  taxExempt?: boolean | number;
   discountPct?: number;
   waiter?: number;
   priority?: "normal" | "urgente";
@@ -372,6 +373,7 @@ export type WorkOrder = {
   holdReason?: string;
   createdAt: string;
   deliveredAt: string | null;
+  deleted?: number;
   customer?: Customer;
   vehicle?: Vehicle;
   tech?: { id: string; name: string; username: string; laborRate?: number } | null;
@@ -410,6 +412,17 @@ export type ShopSettings = {
   serviceMode?: "sencillo" | "completo";
   allowUpdates?: boolean;
   offerWash?: boolean;
+  offerPartInvoices?: boolean;
+  offerTax?: boolean | number;
+  estPrefix?: string;
+  estNextNumber?: number;
+  estPreview?: string;
+  washPrefix?: string;
+  washNextNumber?: number;
+  washPreview?: string;
+  piPrefix?: string;
+  piNextNumber?: number;
+  piPreview?: string;
   opcodeCategories?: string[];
   partCategories?: string[];
   partUoms?: string[];
@@ -732,7 +745,7 @@ interface DmsApi {
   workOrders: {
     list: (
       q?: string,
-      opts?: { status?: string; kind?: string; serviceLine?: string; techUserId?: string; unpaid?: boolean; overdue?: boolean; open?: boolean; limit?: number }
+      opts?: { status?: string; kind?: string; serviceLine?: string; techUserId?: string; unpaid?: boolean; overdue?: boolean; open?: boolean; limit?: number; deleted?: boolean }
     ) => Result<WorkOrder[]>;
     get: (id: string) => Result<WorkOrder | null>;
     create: (data: Partial<WorkOrder> & { washTypeIds?: string[] }) => Result<WorkOrder>;
@@ -744,7 +757,7 @@ interface DmsApi {
     ) => Result<WorkOrder>;
     updateLine: (lineId: string, data: Partial<WorkOrderLine>) => Result<WorkOrder>;
     removeLine: (lineId: string) => Result<WorkOrder>;
-    remove: (id: string) => Result<{ id: string }>;
+    remove: (id: string, opts?: { pruneCategories?: boolean }) => Result<{ id: string }>;
     deliver: (id: string, data?: { kmOut?: number; force?: boolean }) => Result<WorkOrder>;
     addPayment: (id: string, data: Partial<WorkOrderPayment> & { close?: boolean; kmOut?: number }) => Result<WorkOrder>;
     authorize: (id: string, data?: { authorizedBy?: string }) => Result<WorkOrder>;
@@ -753,9 +766,19 @@ interface DmsApi {
   };
   settings: {
     get: () => Result<ShopSettings>;
-    identity: () => Result<{ name: string; offerWash: boolean }>;
+    identity: () => Result<{ name: string; offerWash: boolean; offerPartInvoices?: boolean; offerTax?: boolean }>;
     save: (data: Partial<ShopSettings>) => Result<ShopSettings>;
-    saveNumbering: (data: { woPrefix?: string; woNextNumber?: number; woPad?: number }) => Result<ShopSettings>;
+    saveNumbering: (data: {
+      woPrefix?: string;
+      woNextNumber?: number;
+      woPad?: number;
+      estPrefix?: string;
+      estNextNumber?: number;
+      washPrefix?: string;
+      washNextNumber?: number;
+      piPrefix?: string;
+      piNextNumber?: number;
+    }) => Result<ShopSettings>;
     catalogs: () => Result<ShopCatalogs>;
     saveCatalogs: (data: {
       opcodeCategories?: string[] | CatalogItem[];

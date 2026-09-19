@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { PrintDoc, PrintShopHead } from "../components/PrintDoc";
-import { ErrorText } from "../components/ui";
+import { Button, ErrorText } from "../components/ui";
 import { call, customerBillingName, dateEs, formatAddress, formatNumber, formatPhones, money, vehicleLabel, workOrderPath } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
+import { useShop } from "../lib/shop-context";
 import type { ShopSettings, WorkOrder, WorkOrderLine } from "../vite-env";
 
 function isEstimate(order: WorkOrder) {
@@ -20,7 +21,8 @@ function payOf(line: WorkOrderLine) {
   return line.payType || "cliente";
 }
 
-function clientVisible(line: WorkOrderLine, estimate: boolean) {
+function clientVisible(line: WorkOrderLine, estimate: boolean, shopCopy: boolean) {
+  if (shopCopy) return true;
   if (payOf(line) === "interno") return false;
   if (!estimate && Number(line.authorized) === 0) return false;
   return true;
@@ -46,9 +48,11 @@ function lineCharge(line: WorkOrderLine) {
 export default function Invoice() {
   const { id } = useParams();
   const { t } = useI18n();
+  const { offerTax } = useShop();
   const [order, setOrder] = useState<WorkOrder | null>(null);
   const [shop, setShop] = useState<ShopSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [shopCopy, setShopCopy] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -69,8 +73,8 @@ export default function Invoice() {
   const estimate = Boolean(order && isEstimate(order));
   const receipt = Boolean(order && isReceipt(order));
   const lines = useMemo(
-    () => (order?.lines || []).filter((line) => clientVisible(line, estimate)),
-    [order, estimate]
+    () => (order?.lines || []).filter((line) => clientVisible(line, estimate, shopCopy)),
+    [order, estimate, shopCopy]
   );
 
   if (!order || !shop) {
@@ -82,7 +86,9 @@ export default function Invoice() {
     );
   }
 
-  const docLabel = estimate ? t("invoice.docEstimate") : receipt ? t("invoice.docReceipt") : t("invoice.docWork");
+  const docLabel = `${estimate ? t("invoice.docEstimate") : receipt ? t("invoice.docReceipt") : t("invoice.docWork")}${
+    shopCopy ? ` · ${t("invoice.shopCopy")}` : ` · ${t("invoice.customerCopy")}`
+  }`;
   const title = estimate
     ? t("invoice.estimateTitle", { number: order.number })
     : receipt
@@ -92,10 +98,37 @@ export default function Invoice() {
   const date = dateEs(receipt ? order.deliveredAt || order.createdAt : order.createdAt);
 
   return (
-    <PrintDoc title={title} subtitle={t("invoice.subtitle")} backTo={workOrderPath(order)} backLabel={t("invoice.back")}>
+    <PrintDoc
+      title={title}
+      subtitle={t("invoice.subtitle")}
+      backTo={workOrderPath(order)}
+      backLabel={t("invoice.back")}
+      extraActions={
+        <>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setShopCopy(false);
+              window.setTimeout(() => window.print(), 50);
+            }}
+          >
+            {t("invoice.printCustomer")}
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setShopCopy(true);
+              window.setTimeout(() => window.print(), 50);
+            }}
+          >
+            {t("invoice.printShop")}
+          </Button>
+        </>
+      }
+    >
       <ErrorText error={error} />
       <PrintShopHead
-        shop={shop}
+        shop={offerTax ? shop : { ...shop, gstNumber: "" }}
         docLabel={docLabel}
         number={order.number}
         date={date}
@@ -141,10 +174,21 @@ export default function Invoice() {
       </div>
 
       <p className="mt-6 text-sm">
-        <span className="font-medium text-neutral-500">{estimate ? t("invoice.workRequested") : t("invoice.workDone")}: </span>
+        <span className="font-medium text-neutral-500">{t("workshop.complaint")}: </span>
         {order.complaint || t("workshop.noComplaint")}
       </p>
-      {receipt && order.correction ? <p className="mt-1 text-sm text-neutral-700">{order.correction}</p> : null}
+      {order.cause ? (
+        <p className="mt-1 text-sm">
+          <span className="font-medium text-neutral-500">{t("workshop.cause")}: </span>
+          {order.cause}
+        </p>
+      ) : null}
+      {order.correction ? (
+        <p className="mt-1 text-sm">
+          <span className="font-medium text-neutral-500">{t("workshop.correction")}: </span>
+          {order.correction}
+        </p>
+      ) : null}
 
       <table className="mt-6 w-full text-left text-sm">
         <thead>
@@ -170,6 +214,21 @@ export default function Invoice() {
                       {warranty ? ` · ${t("invoice.warrantyLine")}` : ""}
                       {declined ? ` · ${t("invoice.notApproved")}` : ""}
                     </div>
+                    {line.complaint ? (
+                      <div className="mt-1 text-xs text-neutral-600">
+                        {t("workshop.complaint")}: {line.complaint}
+                      </div>
+                    ) : null}
+                    {line.cause ? (
+                      <div className="text-xs text-neutral-600">
+                        {t("workshop.cause")}: {line.cause}
+                      </div>
+                    ) : null}
+                    {line.correction ? (
+                      <div className="text-xs text-neutral-600">
+                        {t("workshop.correction")}: {line.correction}
+                      </div>
+                    ) : null}
                   </td>
                   <td className="py-2.5 pr-3 align-top">{line.qty}</td>
                   <td className="py-2.5 pr-3 text-right align-top">{declined || warranty ? t("invoice.noCharge") : money(line.unitPrice)}</td>
@@ -200,6 +259,7 @@ export default function Invoice() {
             <span>-{money(order.discount)}</span>
           </div>
         ) : null}
+        {offerTax ? (
         <div className="flex justify-between">
           <span>
             {shop.taxLabel || "GST"}
@@ -207,6 +267,7 @@ export default function Invoice() {
           </span>
           <span>{order.customer?.taxExempt && !(Number(order.taxRate) > 0) ? t("invoice.gstExempt") : money(order.tax || 0)}</span>
         </div>
+        ) : null}
         <div className="flex justify-between border-t border-neutral-300 pt-2 text-base font-semibold">
           <span>{t("workshop.total")}</span>
           <span>{money(order.total || 0)}</span>

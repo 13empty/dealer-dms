@@ -9,6 +9,55 @@ function newGuid() {
   return crypto.randomUUID();
 }
 
+function allowNullWorkOrderVehicle(sqlite) {
+  const cols = sqlite.prepare("PRAGMA table_info(work_orders)").all();
+  const vehicle = cols.find((c) => c.name === "vehicle_id");
+  if (!vehicle || Number(vehicle.notnull) === 0) return;
+  sqlite.exec("PRAGMA foreign_keys = OFF");
+  sqlite.exec(`
+    CREATE TABLE work_orders_new (
+      id TEXT PRIMARY KEY,
+      number TEXT NOT NULL UNIQUE,
+      customer_id TEXT NOT NULL,
+      vehicle_id TEXT,
+      status TEXT NOT NULL DEFAULT 'recepcion',
+      kind TEXT NOT NULL DEFAULT 'orden',
+      service_line TEXT NOT NULL DEFAULT 'taller',
+      complaint TEXT NOT NULL DEFAULT '',
+      cause TEXT NOT NULL DEFAULT '',
+      correction TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      km_in INTEGER NOT NULL DEFAULT 0,
+      km_out INTEGER NOT NULL DEFAULT 0,
+      promised_at TEXT,
+      tech_user_id TEXT,
+      tax_rate REAL NOT NULL DEFAULT 0,
+      discount_pct REAL NOT NULL DEFAULT 0,
+      waiter INTEGER NOT NULL DEFAULT 0,
+      priority TEXT NOT NULL DEFAULT 'normal',
+      po_number TEXT NOT NULL DEFAULT '',
+      authorized_at TEXT,
+      authorized_by TEXT NOT NULL DEFAULT '',
+      hold_reason TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      delivered_at TEXT,
+      updated_at TEXT NOT NULL DEFAULT '',
+      deleted INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (customer_id) REFERENCES customers(id),
+      FOREIGN KEY (vehicle_id) REFERENCES vehicles(id),
+      FOREIGN KEY (tech_user_id) REFERENCES users(id)
+    );
+  `);
+  const names = cols.map((c) => c.name);
+  sqlite.exec(`INSERT INTO work_orders_new (${names.join(", ")}) SELECT ${names.join(", ")} FROM work_orders`);
+  sqlite.exec("DROP TABLE work_orders");
+  sqlite.exec("ALTER TABLE work_orders_new RENAME TO work_orders");
+  sqlite.exec("CREATE INDEX IF NOT EXISTS idx_work_orders_vehicle ON work_orders(vehicle_id)");
+  sqlite.exec("CREATE INDEX IF NOT EXISTS idx_work_orders_customer ON work_orders(customer_id)");
+  sqlite.exec("CREATE INDEX IF NOT EXISTS idx_work_orders_number ON work_orders(number)");
+  sqlite.exec("PRAGMA foreign_keys = ON");
+}
+
 function addColumnIfMissing(sqlite, table, column, ddl) {
   const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all();
   if (!cols.some((c) => c.name === column)) {
@@ -423,6 +472,23 @@ function migrate(sqlite) {
   addColumnIfMissing(sqlite, "shop_settings", "gst_number", "gst_number TEXT NOT NULL DEFAULT ''");
   addColumnIfMissing(sqlite, "shop_settings", "allow_updates", "allow_updates INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing(sqlite, "shop_settings", "offer_wash", "offer_wash INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(sqlite, "shop_settings", "est_prefix", "est_prefix TEXT NOT NULL DEFAULT 'PRE'");
+  addColumnIfMissing(sqlite, "shop_settings", "est_next_number", "est_next_number INTEGER NOT NULL DEFAULT 1");
+  addColumnIfMissing(sqlite, "shop_settings", "wash_prefix", "wash_prefix TEXT NOT NULL DEFAULT 'DET'");
+  addColumnIfMissing(sqlite, "shop_settings", "wash_next_number", "wash_next_number INTEGER NOT NULL DEFAULT 1");
+  addColumnIfMissing(sqlite, "shop_settings", "pi_prefix", "pi_prefix TEXT NOT NULL DEFAULT 'PI'");
+  addColumnIfMissing(sqlite, "shop_settings", "pi_next_number", "pi_next_number INTEGER NOT NULL DEFAULT 1");
+  addColumnIfMissing(sqlite, "shop_settings", "offer_part_invoices", "offer_part_invoices INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(sqlite, "shop_settings", "offer_tax", "offer_tax INTEGER NOT NULL DEFAULT 1");
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS record_history (
+      id TEXT PRIMARY KEY,
+      table_name TEXT NOT NULL,
+      record_id TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      deleted_at TEXT NOT NULL
+    );
+  `);
   addColumnIfMissing(sqlite, "work_orders", "service_line", "service_line TEXT NOT NULL DEFAULT 'taller'");
   addColumnIfMissing(sqlite, "sales", "tax_rate", "tax_rate REAL NOT NULL DEFAULT 0");
   addColumnIfMissing(sqlite, "sales", "tax", "tax REAL NOT NULL DEFAULT 0");
@@ -432,6 +498,7 @@ function migrate(sqlite) {
   addColumnIfMissing(sqlite, "sales", "deleted", "deleted INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing(sqlite, "parts", "deleted", "deleted INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing(sqlite, "work_orders", "deleted", "deleted INTEGER NOT NULL DEFAULT 0");
+  allowNullWorkOrderVehicle(sqlite);
   addColumnIfMissing(sqlite, "op_codes", "deleted", "deleted INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing(sqlite, "expenses", "deleted", "deleted INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing(sqlite, "incomes", "deleted", "deleted INTEGER NOT NULL DEFAULT 0");

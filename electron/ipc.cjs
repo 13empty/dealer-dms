@@ -179,7 +179,10 @@ function registerIpc(app) {
   handle("workOrders:addLine", wrap((_u, { id, data }) => repo.addWorkOrderLine(id, data)));
   handle("workOrders:updateLine", wrap((_u, { lineId, data }) => repo.updateWorkOrderLine(lineId, data)));
   handle("workOrders:removeLine", wrap((_u, lineId) => repo.removeWorkOrderLine(lineId)));
-  handle("workOrders:remove", wrap((_u, id) => repo.removeWorkOrder(id)));
+  handle("workOrders:remove", wrap((_u, payload) => {
+    const id = payload && typeof payload === "object" ? payload.id : payload;
+    return repo.removeWorkOrder(id, { pruneCategories: Boolean(payload && payload.pruneCategories) });
+  }));
   handle("workOrders:deliver", wrap((_u, payload) => {
     if (payload && typeof payload === "object") return repo.deliverWorkOrder(payload.id, payload);
     return repo.deliverWorkOrder(payload);
@@ -190,7 +193,12 @@ function registerIpc(app) {
   handle("workOrders:setNumber", wrap((_u, { id, number }) => repo.setWorkOrderNumber(id, number), { minRank: 80 }));
 
   handle("settings:get", wrap(() => repo.getSettings()));
-  handle("settings:identity", wrap(() => ({ name: repo.shopDisplayName(), offerWash: repo.offerWashOn() }), { public: true }));
+  handle("settings:identity", wrap(() => ({
+    name: repo.shopDisplayName(),
+    offerWash: repo.offerWashOn(),
+    offerPartInvoices: repo.offerPartInvoicesOn(),
+    offerTax: repo.offerTaxOn(),
+  }), { public: true }));
   handle("settings:save", wrap((_u, data) => {
     const next = repo.saveSettings(data);
     for (const win of BrowserWindow.getAllWindows()) {

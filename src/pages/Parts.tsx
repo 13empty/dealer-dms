@@ -15,12 +15,15 @@ import { useAuth } from "../lib/auth";
 import { catalogLabel, useCatalogs } from "../lib/catalogs";
 import { call, money } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
+import { askConfirm } from "../lib/ask";
+import { useShop } from "../lib/shop-context";
 import type { Part } from "../vite-env";
 
 export default function Parts() {
   const { can } = useAuth();
   const { t } = useI18n();
   const { catalogs, save: saveCatalogs } = useCatalogs();
+  const { offerPartInvoices } = useShop();
   const [params] = useSearchParams();
   const [rows, setRows] = useState<Part[]>([]);
   const [q, setQ] = useState(() => params.get("q") || "");
@@ -71,7 +74,7 @@ export default function Parts() {
 
   async function save() {
     try {
-      const payload = partFormPayload(form, { includeStock: !editing });
+      const payload = partFormPayload(form, { includeStock: true });
       if (editing) await call(window.dms.parts.update(editing.id, payload));
       else await call(window.dms.parts.create(payload));
       setOpen(false);
@@ -82,7 +85,7 @@ export default function Parts() {
   }
 
   async function remove(id: string) {
-    if (!confirm(t("parts.deleteConfirm"))) return;
+    if (!askConfirm(t("parts.deleteConfirm"))) return;
     try {
       await call(window.dms.parts.remove(id));
       await load();
@@ -115,6 +118,11 @@ export default function Parts() {
             <Link className="btn-ghost" to={printHref("reorden")}>
               {t("parts.printReorder")}
             </Link>
+            {offerPartInvoices ? (
+              <Link className="rounded-md border border-ink-600 px-3 py-2 text-sm" to="/partes/factura">
+                {t("parts.invoiceNew")}
+              </Link>
+            ) : null}
             <Button variant="ghost" onClick={() => setCatalogOpen(true)}>
               {t("parts.catalogs")}
             </Button>
@@ -216,7 +224,7 @@ export default function Parts() {
             form={form}
             setForm={setForm}
             t={t}
-            includeStock={!editing}
+            includeStock
             categories={catalogs?.partCategories.map((item) => item.id)}
             uoms={catalogs?.partUoms.map((item) => item.id)}
           />

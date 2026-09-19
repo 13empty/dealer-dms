@@ -20,7 +20,21 @@ export default function Settings() {
   const { section } = useParams();
   const { catalogs, save: saveCatalogs } = useCatalogs();
   const [form, setForm] = useState<ShopSettings | null>(null);
-  const [numbering, setNumbering] = useState({ woPrefix: "OT", woNextNumber: "1", woPad: "4", woPreview: "OT-0001" });
+  const [numbering, setNumbering] = useState({
+    woPrefix: "OT",
+    woNextNumber: "1",
+    woPad: "4",
+    woPreview: "OT-0001",
+    estPrefix: "PRE",
+    estNextNumber: "1",
+    estPreview: "PRE-0001",
+    washPrefix: "DET",
+    washNextNumber: "1",
+    washPreview: "DET-0001",
+    piPrefix: "PI",
+    piNextNumber: "1",
+    piPreview: "PI-0001",
+  });
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [numberSaved, setNumberSaved] = useState(false);
@@ -42,6 +56,15 @@ export default function Settings() {
       woNextNumber: String(next.woNextNumber || 1),
       woPad: String(next.woPad || 4),
       woPreview: next.woPreview || "",
+      estPrefix: next.estPrefix || "PRE",
+      estNextNumber: String(next.estNextNumber || 1),
+      estPreview: next.estPreview || "",
+      washPrefix: next.washPrefix || "DET",
+      washNextNumber: String(next.washNextNumber || 1),
+      washPreview: next.washPreview || "",
+      piPrefix: next.piPrefix || "PI",
+      piNextNumber: String(next.piNextNumber || 1),
+      piPreview: next.piPreview || "",
     });
   }
 
@@ -95,9 +118,9 @@ export default function Settings() {
     }
   }
 
-  async function saveOfferWash(on: boolean) {
+  async function saveFlag(patch: Partial<ShopSettings>) {
     if (!form) return;
-    const next = { ...form, offerWash: on };
+    const next = { ...form, ...patch };
     setForm(next);
     try {
       setError(null);
@@ -110,6 +133,10 @@ export default function Settings() {
     }
   }
 
+  async function saveOfferWash(on: boolean) {
+    await saveFlag({ offerWash: on });
+  }
+
   async function saveNumbering() {
     try {
       setError(null);
@@ -119,6 +146,12 @@ export default function Settings() {
           woPrefix: numbering.woPrefix,
           woNextNumber: Number(numbering.woNextNumber) || 1,
           woPad: Number(numbering.woPad) || 4,
+          estPrefix: numbering.estPrefix,
+          estNextNumber: Number(numbering.estNextNumber) || 1,
+          washPrefix: numbering.washPrefix,
+          washNextNumber: Number(numbering.washNextNumber) || 1,
+          piPrefix: numbering.piPrefix,
+          piNextNumber: Number(numbering.piNextNumber) || 1,
         })
       );
       setForm(next);
@@ -127,6 +160,15 @@ export default function Settings() {
         woNextNumber: String(next.woNextNumber || 1),
         woPad: String(next.woPad || 4),
         woPreview: next.woPreview || "",
+        estPrefix: next.estPrefix || "PRE",
+        estNextNumber: String(next.estNextNumber || 1),
+        estPreview: next.estPreview || "",
+        washPrefix: next.washPrefix || "DET",
+        washNextNumber: String(next.washNextNumber || 1),
+        washPreview: next.washPreview || "",
+        piPrefix: next.piPrefix || "PI",
+        piNextNumber: String(next.piNextNumber || 1),
+        piPreview: next.piPreview || "",
       });
       setNumberSaved(true);
     } catch (e) {
@@ -223,6 +265,20 @@ export default function Settings() {
                 <textarea rows={2} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
               </Field>
             </div>
+            <label className="mt-4 flex items-start gap-3 rounded-lg border border-ink-600 bg-ink-900/60 p-3 sm:col-span-2 lg:col-span-3">
+              <input
+                className="mt-1"
+                type="checkbox"
+                checked={Boolean(form.offerTax ?? true)}
+                onChange={(e) => void saveFlag({ offerTax: e.target.checked })}
+              />
+              <span>
+                <span className="block font-medium text-slate-100">{t("settings.offerTax")}</span>
+                <span className="mt-1 block text-xs text-slate-400">{t("settings.offerTaxHint")}</span>
+              </span>
+            </label>
+            {form.offerTax === false || Number(form.offerTax) === 0 ? null : (
+              <>
             <Field label={t("settings.taxLabel")}>
               <input value={form.taxLabel} onChange={(e) => setForm({ ...form, taxLabel: e.target.value })} />
             </Field>
@@ -239,6 +295,8 @@ export default function Settings() {
             <p className="text-xs text-slate-500 sm:col-span-2 lg:col-span-3">
               {t("settings.taxHintAb")} {t("settings.gstHint")}
             </p>
+              </>
+            )}
             <div className="sm:col-span-2 lg:col-span-3">
               <Field label={t("settings.invoiceNotes")}>
                 <textarea rows={2} value={form.invoiceNotes || ""} onChange={(e) => setForm({ ...form, invoiceNotes: e.target.value })} />
@@ -295,6 +353,22 @@ export default function Settings() {
             <Link className="mt-3 inline-block text-sm text-gold-400 hover:underline" to="/lavado?tipos=1">
               {t("wash.manageTypes")}
             </Link>
+          </Card>
+          <Card className="p-5">
+            <h2 className="text-lg font-medium">{t("settings.offerPartInvoices")}</h2>
+            <p className="mt-1 text-sm text-slate-400">{t("settings.offerPartInvoicesHint")}</p>
+            <label className="mt-4 flex items-start gap-3 rounded-lg border border-ink-600 bg-ink-900/60 p-3">
+              <input
+                className="mt-1"
+                type="checkbox"
+                checked={Boolean(form.offerPartInvoices)}
+                onChange={(e) => void saveFlag({ offerPartInvoices: e.target.checked })}
+              />
+              <span>
+                <span className="block font-medium text-slate-100">{t("settings.offerPartInvoices")}</span>
+                <span className="mt-1 block text-xs text-slate-400">{t("settings.offerPartInvoicesHint")}</span>
+              </span>
+            </label>
           </Card>
           {can.finance ? (
             <Card className="p-5">
@@ -360,6 +434,31 @@ export default function Settings() {
                     <Field label={t("settings.woPad")}>
                       <input value={numbering.woPad} onChange={(e) => setNumbering({ ...numbering, woPad: e.target.value })} />
                     </Field>
+                    <Field label={t("settings.estPrefix")}>
+                      <input value={numbering.estPrefix} onChange={(e) => setNumbering({ ...numbering, estPrefix: e.target.value })} />
+                    </Field>
+                    <Field label={t("settings.estNext")}>
+                      <input value={numbering.estNextNumber} onChange={(e) => setNumbering({ ...numbering, estNextNumber: e.target.value })} />
+                    </Field>
+                    <p className="self-end text-sm text-gold-400">{t("settings.woPreview", { number: numbering.estPreview })}</p>
+                    <Field label={t("settings.washPrefix")}>
+                      <input value={numbering.washPrefix} onChange={(e) => setNumbering({ ...numbering, washPrefix: e.target.value })} />
+                    </Field>
+                    <Field label={t("settings.washNext")}>
+                      <input value={numbering.washNextNumber} onChange={(e) => setNumbering({ ...numbering, washNextNumber: e.target.value })} />
+                    </Field>
+                    <p className="self-end text-sm text-gold-400">{t("settings.woPreview", { number: numbering.washPreview })}</p>
+                    {form.offerPartInvoices ? (
+                      <>
+                    <Field label={t("settings.piPrefix")}>
+                      <input value={numbering.piPrefix} onChange={(e) => setNumbering({ ...numbering, piPrefix: e.target.value })} />
+                    </Field>
+                    <Field label={t("settings.piNext")}>
+                      <input value={numbering.piNextNumber} onChange={(e) => setNumbering({ ...numbering, piNextNumber: e.target.value })} />
+                    </Field>
+                    <p className="self-end text-sm text-gold-400">{t("settings.woPreview", { number: numbering.piPreview })}</p>
+                      </>
+                    ) : null}
                   </div>
                   <div className="mt-4 flex flex-wrap items-center gap-3">
                     <Button onClick={() => void saveNumbering()}>{t("common.save")}</Button>

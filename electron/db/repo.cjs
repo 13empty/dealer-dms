@@ -155,6 +155,7 @@ function salePriceDown(data, current = {}, taxRate = 0) {
 }
 
 function customerTaxRate(customer, settings) {
+  if (settings && Number(settings.offerTax) === 0) return 0;
   if (Number(customer?.taxExempt)) return 0;
   return Math.max(0, Number(settings?.taxRate) || 0);
 }
@@ -1004,9 +1005,7 @@ function createVehicle(data) {
   const profile = vehicleProfile(data);
   const existing = db().select().from(vehicles).where(eq(vehicles.vin, profile.vin)).get();
   if (existing && !isGone(existing)) throw new Error("Ya existe un vehículo con ese VIN");
-  if (existing && isGone(existing)) {
-    return restoreVehicle(existing.id, data);
-  }
+  if (existing && isGone(existing)) buryDeletedUnique("vehicles", "vin", profile.vin);
   const createdAt = nowIso();
   const id = newGuid();
   db()
@@ -1447,7 +1446,9 @@ function parseCatalogList(raw, defaults) {
 }
 
 function countByColumn(table, column) {
-  const rows = getSqlite().prepare(`SELECT ${column} AS id, COUNT(*) AS n FROM ${table} GROUP BY ${column}`).all();
+  const rows = getSqlite()
+    .prepare(`SELECT ${column} AS id, COUNT(*) AS n FROM ${table} WHERE IFNULL(deleted, 0) = 0 GROUP BY ${column}`)
+    .all();
   const map = {};
   for (const row of rows) {
     const id = String(row.id || "").trim();
@@ -1667,9 +1668,9 @@ function applyWashTypesToOrder(orderId, typeIds, complaint) {
   }
 }
 
-function ensureCatalogValue(column, defaults, value, fallback) {
+function ensureCatalogValue(column, defaults, value, fallback, optional = false) {
   const name = cleanCatalogName(value);
-  if (!name) return fallback;
+  if (!name) return optional ? "" : fallback;
   const row = readSettingsRow();
   const list = parseCatalogList(row[column], defaults);
   const match = list.find((id) => catalogKey(id) === catalogKey(name));
@@ -1812,11 +1813,20 @@ function getPart(id) {
   return { ...part, movements, usage, lastSold, lastReceived };
 }
 
+function buryDeletedUnique(tableName, column, value) {
+  const row = getSqlite().prepare(`SELECT id, deleted FROM ${tableName} WHERE ${column} = ? LIMIT 1`).get(value);
+  if (row && Number(row.deleted) === 1) {
+    getSqlite()
+      .prepare(`UPDATE ${tableName} SET ${column} = ? WHERE id = ?`)
+      .run(`${value}~${String(row.id).slice(0, 8)}`, row.id);
+  }
+}
+
 function createPart(data) {
   const profile = partProfile(data);
   const existing = db().select().from(parts).where(eq(parts.sku, profile.sku)).get();
   if (existing && !isGone(existing)) throw new Error("Ya existe una parte con ese SKU");
-  if (existing && isGone(existing)) return restorePart(existing.id, data);
+  if (existing && isGone(existing)) buryDeletedUnique("parts", "sku", profile.sku);
   const stock = Math.max(0, Number(data.stock) || 0);
   const createdAt = nowIso();
   const id = newGuid();
@@ -1852,13 +1862,35 @@ function updatePart(id, data) {
   const profile = partProfile(data, current);
   if (profile.sku !== current.sku) {
     const clash = db().select().from(parts).where(eq(parts.sku, profile.sku)).get();
-    if (clash) throw new Error("Ya existe una parte con ese SKU");
+    if (clash && !isGone(clash)) throw new Error("Ya existe una parte con ese SKU");
+    if (clash && isGone(clash)) buryDeletedUnique("parts", "sku", profile.sku);
   }
-  db()
-    .update(parts)
-    .set({ ...profile, updatedAt: nowIso() })
-    .where(eq(parts.id, id))
-    .run();
+  const run = getSqlite().transaction(() => {
+    db()
+      .update(parts)
+      .set({ ...profile, updatedAt: nowIso() })
+      .where(eq(parts.id, id))
+      .run();
+    if (data.stock != null && data.stock !== "") {
+      const next = Math.max(0, Number(data.stock) || 0);
+      const delta = next - Number(current.stock || 0);
+      if (delta) {
+        db().update(parts).set({ stock: next, updatedAt: nowIso() }).where(eq(parts.id, id)).run();
+        db()
+          .insert(inventoryMovements)
+          .values({
+            id: newGuid(),
+            partId: id,
+            qty: delta,
+            reason: "correccion",
+            notes: "OH",
+            createdAt: nowIso(),
+          })
+          .run();
+      }
+    }
+  });
+  run();
   return getPart(id);
 }
 
@@ -2023,6 +2055,14 @@ function readSettingsRow() {
     serviceMode: serviceModeOf(row),
     allowUpdates: Number(row.allowUpdates) === 1 ? 1 : 0,
     offerWash: Number(row.offerWash) === 1 ? 1 : 0,
+    offerPartInvoices: Number(row.offerPartInvoices) === 1 ? 1 : 0,
+    offerTax: row.offerTax == null ? 1 : Number(row.offerTax) === 1 ? 1 : 0,
+    estPrefix: sanitizeWoPrefix(row.estPrefix || "PRE"),
+    estNextNumber: Math.max(1, Number(row.estNextNumber) || 1),
+    washPrefix: sanitizeWoPrefix(row.washPrefix || "DET"),
+    washNextNumber: Math.max(1, Number(row.washNextNumber) || 1),
+    piPrefix: sanitizeWoPrefix(row.piPrefix || "PI"),
+    piNextNumber: Math.max(1, Number(row.piNextNumber) || 1),
   };
 }
 
@@ -2032,6 +2072,15 @@ function updatesAllowed() {
 
 function offerWashOn() {
   return Number(readSettingsRow().offerWash) === 1;
+}
+
+function offerPartInvoicesOn() {
+  return Number(readSettingsRow().offerPartInvoices) === 1;
+}
+
+function offerTaxOn() {
+  const row = readSettingsRow();
+  return row.offerTax == null ? true : Number(row.offerTax) === 1;
 }
 
 function setUpdatesAllowed(on) {
@@ -2044,22 +2093,43 @@ function patchSettings(values) {
   db().update(shopSettings).set(values).where(eq(shopSettings.id, row.id)).run();
 }
 
-function peekNextWorkOrderNumber(row) {
-  const settings = row || readSettingsRow();
-  const prefix = sanitizeWoPrefix(settings.woPrefix);
-  const pad = woPadOf(settings);
-  let n = Math.max(1, Number(settings.woNextNumber) || 1);
-  let number = formatWorkOrderNumber(prefix, n, pad);
+function peekSeriesNumber(prefix, nextNumber, pad) {
+  const safePrefix = sanitizeWoPrefix(prefix);
+  const safePad = woPadOf({ woPad: pad });
+  let n = Math.max(1, Number(nextNumber) || 1);
+  let number = formatWorkOrderNumber(safePrefix, n, safePad);
   while (findWorkOrderByNumber(number)) {
     n += 1;
-    number = formatWorkOrderNumber(prefix, n, pad);
+    number = formatWorkOrderNumber(safePrefix, n, safePad);
   }
-  return { number, nextNumber: n, prefix, pad };
+  return { number, nextNumber: n, prefix: safePrefix, pad: safePad };
 }
 
-function nextWorkOrderNumber() {
-  const peek = peekNextWorkOrderNumber();
-  patchSettings({ woNextNumber: peek.nextNumber + 1 });
+function seriesForWorkOrder(kind, serviceLine) {
+  const settings = readSettingsRow();
+  if (kind === "presupuesto") {
+    return { prefix: settings.estPrefix || "PRE", nextKey: "estNextNumber", nextNumber: settings.estNextNumber };
+  }
+  if (kind === "factura_partes") {
+    return { prefix: settings.piPrefix || "PI", nextKey: "piNextNumber", nextNumber: settings.piNextNumber };
+  }
+  if (serviceLine === "lavado") {
+    return { prefix: settings.washPrefix || "DET", nextKey: "washNextNumber", nextNumber: settings.washNextNumber };
+  }
+  return { prefix: settings.woPrefix, nextKey: "woNextNumber", nextNumber: settings.woNextNumber };
+}
+
+function peekNextWorkOrderNumber(row, kind = "orden", serviceLine = "taller") {
+  const settings = row || readSettingsRow();
+  const series = seriesForWorkOrder(kind, serviceLine);
+  return peekSeriesNumber(series.prefix, series.nextNumber, settings.woPad);
+}
+
+function nextWorkOrderNumber(kind = "orden", serviceLine = "taller") {
+  const settings = readSettingsRow();
+  const series = seriesForWorkOrder(kind, serviceLine);
+  const peek = peekSeriesNumber(series.prefix, series.nextNumber, settings.woPad);
+  patchSettings({ [series.nextKey]: peek.nextNumber + 1 });
   return peek.number;
 }
 
@@ -2086,7 +2156,7 @@ function lineCost(line) {
 }
 
 const WO_STATUSES = ["recepcion", "autorizacion", "espera_partes", "en_taller", "en_espera", "lista", "entregada"];
-const WO_KINDS = ["orden", "presupuesto"];
+const WO_KINDS = ["orden", "presupuesto", "factura_partes"];
 const WO_SERVICE_LINES = ["taller", "lavado"];
 const LINE_PAYS = ["cliente", "garantia", "interno", "sublet"];
 
@@ -2242,10 +2312,14 @@ function attachWorkOrder(order) {
 
 function listWorkOrders(q, opts = {}) {
   const filters = [];
-  filters.push(alive(workOrders));
+  if (opts.deleted) filters.push(eq(workOrders.deleted, 1));
+  else filters.push(alive(workOrders));
   if (opts.kind) filters.push(eq(workOrders.kind, String(opts.kind)));
-  if (opts.serviceLine === "lavado" || opts.serviceLine === "taller") {
-    filters.push(eq(workOrders.serviceLine, opts.serviceLine));
+  if (opts.serviceLine === "lavado") {
+    filters.push(eq(workOrders.serviceLine, "lavado"));
+  } else if (opts.serviceLine === "taller") {
+    filters.push(eq(workOrders.serviceLine, "taller"));
+    if (!opts.kind) filters.push(ne(workOrders.kind, "factura_partes"));
   }
   if (opts.status) filters.push(eq(workOrders.status, String(opts.status)));
   if (opts.techUserId) filters.push(eq(workOrders.techUserId, asId(opts.techUserId)));
@@ -2270,49 +2344,53 @@ function listWorkOrders(q, opts = {}) {
 function getWorkOrder(id) {
   const attached = attachWorkOrder(db().select().from(workOrders).where(eq(workOrders.id, id)).get());
   if (!attached) return null;
-  const history = db()
-    .select()
-    .from(workOrders)
-    .where(eq(workOrders.vehicleId, attached.vehicleId))
-    .orderBy(desc(workOrders.createdAt))
-    .all()
-    .filter((o) => o.id !== attached.id && !isGone(o))
-    .slice(0, 6)
-    .map(lightWorkOrder);
+  const history = attached.vehicleId
+    ? db()
+        .select()
+        .from(workOrders)
+        .where(eq(workOrders.vehicleId, attached.vehicleId))
+        .orderBy(desc(workOrders.createdAt))
+        .all()
+        .filter((o) => o.id !== attached.id && !isGone(o))
+        .slice(0, 6)
+        .map(lightWorkOrder)
+    : [];
   return { ...attached, history };
 }
 
 function createWorkOrder(data) {
   const customerId = asId(data.customerId);
-  const vehicleId = asId(data.vehicleId);
+  const kind = pickEnum(data.kind, WO_KINDS, "orden");
+  const serviceLine = pickEnum(data.serviceLine, WO_SERVICE_LINES, "taller");
+  const partInvoice = kind === "factura_partes";
+  const vehicleId = partInvoice ? "" : asId(data.vehicleId);
   const customer = db().select().from(customers).where(eq(customers.id, customerId)).get();
   assertCustomerCanTransact(customer);
-  const vehicle = getVehicle(vehicleId);
-  if (!vehicle || isGone(vehicle)) throw new Error("Vehículo no encontrado");
-  if (vehicle.customerId && asId(vehicle.customerId) !== customerId) {
+  const vehicle = partInvoice ? null : getVehicle(vehicleId);
+  if (!partInvoice && (!vehicle || isGone(vehicle))) throw new Error("Vehículo no encontrado");
+  if (!partInvoice && vehicle.customerId && asId(vehicle.customerId) !== customerId) {
     throw new Error("Ese vehículo pertenece a otro cliente");
   }
   const settings = getSettings();
-  const kmIn = data.kmIn != null ? Number(data.kmIn) || 0 : Number(vehicle.km) || 0;
-  const kind = pickEnum(data.kind, WO_KINDS, "orden");
-  const serviceLine = pickEnum(data.serviceLine, WO_SERVICE_LINES, "taller");
+  const kmIn = partInvoice ? 0 : data.kmIn != null ? Number(data.kmIn) || 0 : Number(vehicle.km) || 0;
   const createdAt = nowIso();
   const id = newGuid();
-  const simple = (settings.serviceMode === "sencillo" || serviceLine === "lavado") && kind !== "presupuesto";
+  const simple = (settings.serviceMode === "sencillo" || serviceLine === "lavado" || partInvoice) && kind !== "presupuesto";
+  const taxRate = data.taxExempt || Number(customer.taxExempt) || !offerTaxOn() ? 0 : customerTaxRate(customer, settings);
   const run = getSqlite().transaction(() => {
-    if (!vehicle.customerId) {
+    if (!partInvoice && !vehicle.customerId) {
       db().update(vehicles).set({ customerId }).where(eq(vehicles.id, vehicleId)).run();
     }
     db()
       .insert(workOrders)
       .values({
         id,
-        number: nextWorkOrderNumber(),
+        number: nextWorkOrderNumber(kind, serviceLine),
         customerId,
-        vehicleId,
+        vehicleId: partInvoice ? null : vehicleId,
         status: simple ? "en_taller" : "recepcion",
         kind,
-        serviceLine,
+        serviceLine: partInvoice ? "taller" : serviceLine,
         complaint: String(data.complaint || "").trim(),
         cause: String(data.cause || "").trim(),
         correction: String(data.correction || "").trim(),
@@ -2321,7 +2399,7 @@ function createWorkOrder(data) {
         kmOut: Number(data.kmOut) || 0,
         promisedAt: data.promisedAt ? String(data.promisedAt) : null,
         techUserId: data.techUserId ? asId(data.techUserId) : null,
-        taxRate: Number(customer.taxExempt) ? 0 : Number(settings.taxRate) || 0,
+        taxRate,
         discountPct: clampPct(data.discountPct != null ? data.discountPct : customer.discountPct),
         waiter: flag01(data.waiter, 0),
         priority: pickEnum(data.priority, ["normal", "urgente"], "normal"),
@@ -2333,7 +2411,7 @@ function createWorkOrder(data) {
         updatedAt: createdAt,
       })
       .run();
-    if (kmIn > Number(vehicle.km || 0)) {
+    if (!partInvoice && kmIn > Number(vehicle.km || 0)) {
       db().update(vehicles).set({ km: kmIn }).where(eq(vehicles.id, vehicleId)).run();
     }
     return id;
@@ -2367,6 +2445,16 @@ function updateWorkOrder(id, data) {
       priority: data.priority != null ? pickEnum(data.priority, ["normal", "urgente"], current.priority || "normal") : current.priority || "normal",
       poNumber: data.poNumber != null ? String(data.poNumber).trim() : current.poNumber || "",
       holdReason: data.holdReason != null ? String(data.holdReason).trim() : current.holdReason || "",
+      taxRate: data.taxExempt
+        ? 0
+        : data.taxExempt === false
+          ? customerTaxRate(
+              db().select().from(customers).where(eq(customers.id, current.customerId)).get(),
+              getSettings()
+            )
+          : data.taxRate != null
+            ? Math.max(0, Number(data.taxRate) || 0)
+            : current.taxRate,
       updatedAt: nowIso(),
     })
     .where(eq(workOrders.id, id))
@@ -2664,6 +2752,7 @@ function convertEstimate(id) {
       .update(workOrders)
       .set({
         kind: "orden",
+        number: nextWorkOrderNumber("orden", order.serviceLine || "taller"),
         status: isSimpleOrder(order) || order.authorizedAt ? "en_taller" : "recepcion",
         authorizedAt: isSimpleOrder(order) ? order.authorizedAt || nowIso() : order.authorizedAt,
         authorizedBy: isSimpleOrder(order) ? order.authorizedBy || (isWashOrder(order) ? "lavado" : "taller") : order.authorizedBy,
@@ -2690,23 +2779,42 @@ function removeWorkOrderLine(lineId) {
   return getWorkOrder(line.workOrderId);
 }
 
-function removeWorkOrder(id) {
+function archiveRecord(tableName, recordId, payload) {
+  getSqlite()
+    .prepare("INSERT INTO record_history (id, table_name, record_id, payload, deleted_at) VALUES (?, ?, ?, ?, ?)")
+    .run(newGuid(), tableName, String(recordId || ""), JSON.stringify(payload || {}), nowIso());
+}
+
+function pruneUnusedOpcodeCategories(usedIds) {
+  const names = [...new Set((usedIds || []).map((id) => cleanCatalogName(id)).filter(Boolean))];
+  if (!names.length) return;
+  const current = getCatalogs().opcodeCategories;
+  const keep = current.filter((item) => item.inUse > 0 || !names.some((name) => catalogKey(name) === catalogKey(item.id)));
+  saveCatalogs({ opcodeCategories: keep.map((item) => item.id) });
+}
+
+function removeWorkOrder(id, opts = {}) {
   const order = getWorkOrder(id);
   if (!order) throw new Error("Orden no encontrada");
   if (isGone(order)) return { id };
   if (order.status === "entregada") throw new Error("La orden ya fue entregada");
-  if (!isEstimate(order) && order.status !== "recepcion" && !(isSimpleOrder(order) && order.status === "en_taller")) {
+  if (!isEstimate(order) && order.status !== "recepcion" && !(isSimpleOrder(order) && order.status === "en_taller") && order.kind !== "factura_partes") {
     throw new Error("Solo se puede borrar un presupuesto o una OT recién abierta");
   }
   if (Number(order.paid) > 0.009) throw new Error("Esta OT ya tiene cobros. No se puede borrar.");
   const run = getSqlite().transaction(() => {
     const lines = db().select().from(workOrderLines).where(eq(workOrderLines.workOrderId, id)).all();
+    archiveRecord("work_orders", id, { order, lines });
     if (!isEstimate(order)) {
       for (const line of lines) restorePartStock(order, line);
     }
     markDeleted(workOrders, id, { updatedAt: nowIso() });
   });
   run();
+  if (opts.pruneCategories) {
+    const cats = (order.lines || []).map((line) => line.opcode?.category).filter(Boolean);
+    pruneUnusedOpcodeCategories(cats);
+  }
   return { id };
 }
 
@@ -2772,17 +2880,25 @@ function shopDisplayName() {
 
 function getSettings() {
   const row = readSettingsRow();
-  const peek = peekNextWorkOrderNumber(row);
+  const peek = peekNextWorkOrderNumber(row, "orden", "taller");
+  const estPeek = peekNextWorkOrderNumber(row, "presupuesto", "taller");
+  const washPeek = peekNextWorkOrderNumber(row, "orden", "lavado");
+  const piPeek = peekNextWorkOrderNumber(row, "factura_partes", "taller");
   const catalogs = getCatalogs();
   return {
     ...row,
     woPreview: peek.number,
+    estPreview: estPeek.number,
+    washPreview: washPeek.number,
+    piPreview: piPeek.number,
     opcodeCategories: catalogs.opcodeCategories.map((item) => item.id),
     partCategories: catalogs.partCategories.map((item) => item.id),
     partUoms: catalogs.partUoms.map((item) => item.id),
     catalogs,
     allowUpdates: updatesAllowed(),
     offerWash: offerWashOn(),
+    offerPartInvoices: offerPartInvoicesOn(),
+    offerTax: offerTaxOn() ? 1 : 0,
   };
 }
 
@@ -2791,18 +2907,22 @@ function saveSettings(data) {
   const taxRate = data.taxRate != null ? Math.max(0, Number(data.taxRate) || 0) : Math.max(0, Number(current.taxRate) || 0);
   const laborRate = data.laborRate != null ? Math.max(0, Number(data.laborRate) || 0) : Math.max(0, Number(current.laborRate) || 0);
   const offerWash = data.offerWash != null ? (data.offerWash ? 1 : 0) : Number(current.offerWash) === 1 ? 1 : 0;
+  const offerPartInvoices = data.offerPartInvoices != null ? (data.offerPartInvoices ? 1 : 0) : Number(current.offerPartInvoices) === 1 ? 1 : 0;
+  const offerTax = data.offerTax != null ? (data.offerTax ? 1 : 0) : current.offerTax == null ? 1 : Number(current.offerTax) === 1 ? 1 : 0;
   patchSettings({
     name: String(data.name || current.name || "Dealer DMS").trim() || "Dealer DMS",
     phone: data.phone != null ? String(data.phone).trim() : current.phone || "",
     email: data.email != null ? String(data.email).trim() : current.email || "",
     address: data.address != null ? String(data.address).trim() : current.address || "",
     taxLabel: String(data.taxLabel || current.taxLabel || "GST").trim() || "GST",
-    taxRate,
+    taxRate: offerTax ? taxRate : 0,
     gstNumber: data.gstNumber != null ? String(data.gstNumber).trim() : current.gstNumber || "",
     laborRate,
     invoiceNotes: data.invoiceNotes != null ? String(data.invoiceNotes).trim() : current.invoiceNotes || "",
     serviceMode: serviceModeOf({ serviceMode: data.serviceMode != null ? data.serviceMode : current.serviceMode }),
     offerWash,
+    offerPartInvoices,
+    offerTax,
   });
   if (offerWash) ensureWashSetup();
   return getSettings();
@@ -2812,7 +2932,13 @@ function saveWorkOrderNumbering(data) {
   const woPrefix = sanitizeWoPrefix(data.woPrefix);
   const woPad = woPadOf({ woPad: data.woPad });
   const woNextNumber = Math.max(1, Math.min(99999999, Math.floor(Number(data.woNextNumber) || 1)));
-  patchSettings({ woPrefix, woNextNumber, woPad });
+  const estPrefix = sanitizeWoPrefix(data.estPrefix || "PRE");
+  const estNextNumber = Math.max(1, Math.min(99999999, Math.floor(Number(data.estNextNumber) || 1)));
+  const washPrefix = sanitizeWoPrefix(data.washPrefix || "DET");
+  const washNextNumber = Math.max(1, Math.min(99999999, Math.floor(Number(data.washNextNumber) || 1)));
+  const piPrefix = sanitizeWoPrefix(data.piPrefix || "PI");
+  const piNextNumber = Math.max(1, Math.min(99999999, Math.floor(Number(data.piNextNumber) || 1)));
+  patchSettings({ woPrefix, woNextNumber, woPad, estPrefix, estNextNumber, washPrefix, washNextNumber, piPrefix, piNextNumber });
   return getSettings();
 }
 
@@ -3486,10 +3612,7 @@ function createOpCode(data) {
   }
   const existing = db().select().from(opCodes).where(eq(opCodes.code, code)).get();
   if (existing && !isGone(existing)) throw new Error("Ya existe ese Op Code");
-  if (existing && isGone(existing)) {
-    db().update(opCodes).set({ deleted: 0, active: 1 }).where(eq(opCodes.id, existing.id)).run();
-    return updateOpCode(existing.id, { ...data, active: 1 });
-  }
+  if (existing && isGone(existing)) buryDeletedUnique("op_codes", "code", code);
   const laborHours = Number(data.laborHours) || 1;
   const laborRate = Number(data.laborRate) || 0;
   const id = newGuid();
@@ -3499,7 +3622,7 @@ function createOpCode(data) {
       id,
       code,
       description,
-      category: ensureCatalogValue("opcodeCategories", OP_CATEGORIES, data.category, "mantenimiento"),
+      category: ensureCatalogValue("opcodeCategories", OP_CATEGORIES, data.category, "mantenimiento", true),
       payType: OP_PAY_TYPES.includes(data.payType) ? data.payType : "cliente",
       laborHours,
       laborRate,
@@ -3534,7 +3657,7 @@ function updateOpCode(id, data) {
     .set({
       code,
       description: data.description != null ? String(data.description).trim() : current.description,
-      category: data.category != null ? ensureCatalogValue("opcodeCategories", OP_CATEGORIES, data.category, current.category) : current.category,
+      category: data.category != null ? ensureCatalogValue("opcodeCategories", OP_CATEGORIES, data.category, current.category, true) : current.category,
       payType: data.payType && OP_PAY_TYPES.includes(data.payType) ? data.payType : current.payType,
       laborHours,
       laborRate,
@@ -3702,6 +3825,8 @@ module.exports = {
   getSettings,
   shopDisplayName,
   offerWashOn,
+  offerPartInvoicesOn,
+  offerTaxOn,
   updatesAllowed,
   setUpdatesAllowed,
   saveSettings,

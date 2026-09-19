@@ -12,6 +12,8 @@ import { useAuth } from "../lib/auth";
 import { catalogLabel, useCatalogs } from "../lib/catalogs";
 import { call, dateEs, dateTimeEs, money } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
+import { askConfirm } from "../lib/ask";
+import { useShop } from "../lib/shop-context";
 import type { Part } from "../vite-env";
 
 function Spec({ label, value }: { label: string; value: string }) {
@@ -28,6 +30,7 @@ export default function PartDetail() {
   const navigate = useNavigate();
   const { can } = useAuth();
   const { t } = useI18n();
+  const { offerTax } = useShop();
   const { catalogs } = useCatalogs();
   const [row, setRow] = useState<Part | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +64,7 @@ export default function PartDetail() {
     if (!row || !form) return;
     try {
       setError(null);
-      setRow(await call(window.dms.parts.update(row.id, partFormPayload(form))));
+      setRow(await call(window.dms.parts.update(row.id, partFormPayload(form, { includeStock: true }))));
       setOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -109,7 +112,7 @@ export default function PartDetail() {
 
   async function remove() {
     if (!row) return;
-    if (!confirm(t("parts.deleteConfirm"))) return;
+    if (!askConfirm(t("parts.deleteConfirm"))) return;
     try {
       await call(window.dms.parts.remove(row.id));
       navigate("/partes");
@@ -203,7 +206,7 @@ export default function PartDetail() {
             <Spec label={t("parts.brand")} value={row.brand || t("common.dash")} />
             <Spec label={t("parts.vendor")} value={row.vendor || t("common.dash")} />
             <Spec label={t("parts.uom")} value={catalogLabel(t, "partUom", row.uom || "pza")} />
-            <Spec label={t("parts.taxable")} value={row.taxable === 0 ? t("common.inactive") : t("common.active")} />
+            {offerTax ? <Spec label={t("parts.taxable")} value={row.taxable === 0 ? t("common.inactive") : t("common.active")} /> : null}
           </dl>
           {row.description ? <p className="mt-4 whitespace-pre-wrap text-sm text-slate-300">{row.description}</p> : null}
         </Card>
@@ -308,6 +311,7 @@ export default function PartDetail() {
             form={form}
             setForm={setForm}
             t={t}
+            includeStock
             categories={catalogs?.partCategories.map((item) => item.id)}
             uoms={catalogs?.partUoms.map((item) => item.id)}
           />

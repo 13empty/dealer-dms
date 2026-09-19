@@ -215,7 +215,7 @@ CREATE TABLE work_orders (
   id TEXT PRIMARY KEY,
   number TEXT NOT NULL UNIQUE,
   customer_id TEXT NOT NULL,
-  vehicle_id TEXT NOT NULL,
+  vehicle_id TEXT,
   status TEXT NOT NULL DEFAULT 'recepcion',
   kind TEXT NOT NULL DEFAULT 'orden',
   service_line TEXT NOT NULL DEFAULT 'taller',

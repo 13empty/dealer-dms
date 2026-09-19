@@ -10,12 +10,14 @@ export function PrintDoc({
   backTo,
   backLabel,
   children,
+  extraActions,
 }: {
   title: string;
   subtitle?: string;
   backTo: string;
   backLabel: string;
   children: ReactNode;
+  extraActions?: ReactNode;
 }) {
   const { t } = useI18n();
   return (
@@ -29,6 +31,7 @@ export function PrintDoc({
               <Link className="rounded-md border border-ink-600 px-3 py-2 text-sm text-slate-100" to={backTo}>
                 {backLabel}
               </Link>
+              {extraActions}
               <Button onClick={() => window.print()}>{t("common.print")}</Button>
             </>
           }

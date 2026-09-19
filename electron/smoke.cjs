@@ -287,6 +287,45 @@ app.whenReady().then(async () => {
   if (again.number !== "RO-0100") throw new Error("El siguiente número no avanzó: " + again.number);
   const hits = repo.searchGlobal("RO-0100");
   if (!hits.workOrders.some((h) => h.id === again.id)) throw new Error("El buscador global no halla la OT");
+
+  const nums = repo.getSettings();
+  repo.saveWorkOrderNumbering({
+    woPrefix: nums.woPrefix,
+    woNextNumber: nums.woNextNumber,
+    woPad: nums.woPad,
+    estPrefix: "PRE",
+    estNextNumber: 7,
+    washPrefix: "DET",
+    washNextNumber: 3,
+    piPrefix: "PI",
+    piNextNumber: 5,
+  });
+  const estimateN = repo.createWorkOrder({
+    customerId: plated.customerId,
+    vehicleId: plated.id,
+    kind: "presupuesto",
+    complaint: "Serie presupuesto",
+  });
+  if (estimateN.number !== "PRE-0007") throw new Error("Los presupuestos no tienen numeración aparte: " + estimateN.number);
+  const detailN = repo.createWorkOrder({
+    customerId: plated.customerId,
+    vehicleId: plated.id,
+    serviceLine: "lavado",
+    complaint: "Serie detailing",
+  });
+  if (detailN.number !== "DET-0003") throw new Error("Los detailing no tienen numeración aparte: " + detailN.number);
+  const partInv = repo.createWorkOrder({
+    customerId: plated.customerId,
+    kind: "factura_partes",
+    complaint: "Factura partes",
+  });
+  if (partInv.number !== "PI-0005") throw new Error("Las facturas de partes no tienen numeración aparte: " + partInv.number);
+  const stillOt = repo.createWorkOrder({
+    customerId: plated.customerId,
+    vehicleId: plated.id,
+    complaint: "Serie OT",
+  });
+  if (stillOt.number !== "RO-0101") throw new Error("La OT no siguió su propia serie: " + stillOt.number);
   if (!repo.searchGlobal(ana.firstName || "Ana").customers.length) throw new Error("El buscador global no halla clientes");
   if (!repo.searchGlobal("PUE-4418").vehicles.length) throw new Error("El buscador global no halla vehículos");
   if (!repo.searchGlobal("Mazda").sales.length && !repo.searchGlobal("CX-5").sales.length) throw new Error("El buscador global no halla ventas");
@@ -610,6 +649,11 @@ app.whenReady().then(async () => {
   repo.removeWorkOrder(simpleWo.id);
   if (repo.listWorkOrders().some((o) => o.id === simpleWo.id)) throw new Error("La lista de OT muestra una borrada");
   if (Number(repo.getWorkOrder(simpleWo.id)?.deleted) !== 1) throw new Error("La OT se borró del todo");
+  if (!repo.listWorkOrders("", { deleted: true }).some((o) => o.id === simpleWo.id)) {
+    throw new Error("El historial no lista la OT eliminada");
+  }
+  const hist = repo.sqlQuery(`SELECT COUNT(*) AS n FROM record_history WHERE record_id = '${simpleWo.id}'`);
+  if (Number(hist.rows[0]?.n) < 1) throw new Error("No se guardó backup al borrar la OT");
 
   const ghostCust = repo.createCustomer({ firstName: "Archivo", lastName: "Cliente" });
   repo.removeCustomer(ghostCust.id);
@@ -636,8 +680,8 @@ app.whenReady().then(async () => {
     status: "cliente",
     customerId: plated.customerId,
   });
-  if (revivedCar.id !== ghostCar.id || Number(revivedCar.deleted) === 1) {
-    throw new Error("Reusar VIN no restauró el vehículo");
+  if (revivedCar.id === ghostCar.id || Number(revivedCar.deleted) === 1) {
+    throw new Error("Reusar VIN reabrió el vehículo borrado");
   }
 
   const ghostPart = repo.createPart({ sku: "DEL-SOFT-1", name: "Tornillo archivo", stock: 1, cost: 1, price: 2 });
@@ -645,9 +689,36 @@ app.whenReady().then(async () => {
   if (repo.listParts().some((p) => p.id === ghostPart.id)) throw new Error("La lista de partes muestra una borrada");
   if (Number(repo.getPart(ghostPart.id)?.deleted) !== 1) throw new Error("La parte se borró del todo");
   const revivedPart = repo.createPart({ sku: "DEL-SOFT-1", name: "Tornillo archivo", stock: 3, cost: 1, price: 2 });
-  if (revivedPart.id !== ghostPart.id || Number(revivedPart.deleted) === 1) {
-    throw new Error("Reusar SKU no restauró la parte");
+  if (revivedPart.id === ghostPart.id || Number(revivedPart.deleted) === 1) {
+    throw new Error("Reusar SKU reabrió la parte borrada");
   }
+  repo.updatePart(revivedPart.id, { sku: "DEL-SOFT-1", name: "Tornillo archivo", stock: 9, cost: 1, price: 2 });
+  if (Number(repo.getPart(revivedPart.id).stock) !== 9) throw new Error("No se pudo editar el OH de la parte");
+
+  const catHold = repo.createOpCode({
+    code: "HOLD117",
+    description: "Cat temporal",
+    category: "humo-117",
+    payType: "cliente",
+    laborHours: 1,
+    laborRate: 100,
+  });
+  if (!(repo.getCatalogs().opcodeCategories.find((c) => c.id === "humo-117")?.inUse > 0)) {
+    throw new Error("La categoría nueva no quedó en uso");
+  }
+  repo.removeOpCode(catHold.id);
+  if ((repo.getCatalogs().opcodeCategories.find((c) => c.id === "humo-117")?.inUse || 0) > 0) {
+    throw new Error("Una categoría sigue bloqueada por un registro eliminado");
+  }
+  const noCat = repo.createOpCode({
+    code: "NOCAT1",
+    description: "Sin categoría",
+    category: "",
+    payType: "cliente",
+    laborHours: 1,
+    laborRate: 100,
+  });
+  if (String(noCat.category || "")) throw new Error("La categoría de servicio debería ser opcional");
 
   repo.removeOpCode(custom.id);
   if (repo.listOpCodes().some((o) => o.id === custom.id)) throw new Error("La lista de Op Codes muestra uno borrado");
@@ -660,9 +731,18 @@ app.whenReady().then(async () => {
     laborHours: 1,
     laborRate: 800,
   });
-  if (revivedOp.id !== custom.id || Number(revivedOp.deleted) === 1) {
-    throw new Error("Reusar Op Code no restauró el registro");
+  if (revivedOp.id === custom.id || Number(revivedOp.deleted) === 1) {
+    throw new Error("Reusar Op Code reabrió el registro borrado");
   }
+
+  repo.saveSettings({ ...repo.getSettings(), offerTax: 0 });
+  const noTaxWo = repo.createWorkOrder({
+    customerId: plated.customerId,
+    vehicleId: plated.id,
+    complaint: "Sin impuesto",
+  });
+  if (Number(noTaxWo.taxRate) !== 0) throw new Error("Con impuestos apagados la OT no debe cobrar tax");
+  repo.saveSettings({ ...repo.getSettings(), offerTax: 1 });
 
   const ghostExp = repo.createExpense({ amount: 11, category: "otros", method: "efectivo", notes: "archivo" });
   repo.removeExpense(ghostExp.id);

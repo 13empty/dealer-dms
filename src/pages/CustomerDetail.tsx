@@ -14,12 +14,15 @@ import { SearchPicker } from "../components/SearchPicker";
 import { Badge, Button, Card, ErrorText, Field, Modal, PageHeader, GuidCopy } from "../components/ui";
 import { call, customerName, customerPerson, dateEs, dateTimeEs, formatAddress, money, vehicleLabel, vehicleSearchHint } from "../lib/format";
 import { k, phoneLabel, useI18n } from "../lib/i18n";
+import { askConfirm } from "../lib/ask";
+import { useShop } from "../lib/shop-context";
 import type { Customer } from "../vite-env";
 
 export default function CustomerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useI18n();
+  const { offerTax } = useShop();
   const [row, setRow] = useState<Customer | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -113,7 +116,7 @@ export default function CustomerDetail() {
   }
 
   async function unlink(vehicleId: string) {
-    if (!row || !confirm(t("customers.unlinkConfirm"))) return;
+    if (!row || !askConfirm(t("customers.unlinkConfirm"))) return;
     try {
       await call(window.dms.customers.unlinkVehicle(row.id, vehicleId));
       await load();
@@ -197,7 +200,7 @@ export default function CustomerDetail() {
         <Badge status={row.type || "particular"} label={t(k(`customers.type.${row.type || "particular"}`))} />
         <Badge status={row.status || "activo"} label={t(k(`customers.status.${row.status || "activo"}`))} />
         <Badge status={row.source || "mostrador"} label={t(k(`customers.source.${row.source || "mostrador"}`))} />
-        {row.taxExempt ? <Badge status="lista" label={t("customers.taxExempt")} /> : null}
+        {row.taxExempt && offerTax ? <Badge status="lista" label={t("customers.taxExempt")} /> : null}
         {row.accountOpen ? <Badge status="financiado" label={t("customers.accountOpen")} /> : null}
       </div>
 
@@ -280,10 +283,12 @@ export default function CustomerDetail() {
         <Card className="p-5">
           <h2 className="mb-3 font-medium">{t("customers.account")}</h2>
           <dl className="space-y-2 text-sm">
+            {offerTax ? (
             <div>
               <dt className="text-xs uppercase text-slate-500">{t("customers.taxExempt")}</dt>
               <dd>{row.taxExempt ? t("common.active") : t("common.dash")}</dd>
             </div>
+            ) : null}
             <div>
               <dt className="text-xs uppercase text-slate-500">{t("customers.discount")}</dt>
               <dd>{Number(row.discountPct) ? `${row.discountPct}%` : t("common.dash")}</dd>
