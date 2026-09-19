@@ -603,21 +603,29 @@ export default function WorkOrderDetail() {
             )}
           </div>
           <div className="overflow-auto">
-            <table className="w-full text-left text-sm">
+            <table className="w-full table-fixed text-left text-sm">
+              <colgroup>
+                <col style={{ width: "7.5rem" }} />
+                <col />
+                <col style={{ width: "8.25rem" }} />
+                <col style={{ width: "4.5rem" }} />
+                <col style={{ width: "7.25rem" }} />
+                <col style={{ width: "5.75rem" }} />
+              </colgroup>
               <thead className="text-slate-400">
                 <tr>
-                  <th className="px-4 py-2">{t("workshop.type")}</th>
-                  <th className="px-4 py-2">{t("workshop.description")}</th>
-                  <th className="px-4 py-2">{t("workshop.payType")}</th>
-                  <th className="px-4 py-2">{t("workshop.qty")}</th>
-                  <th className="px-4 py-2">{t("workshop.amount")}</th>
+                  <th className="px-3 py-2">{t("workshop.type")}</th>
+                  <th className="px-3 py-2">{t("workshop.description")}</th>
+                  <th className="px-3 py-2">{t("workshop.payType")}</th>
+                  <th className="px-3 py-2">{t("workshop.qty")}</th>
+                  <th className="px-3 py-2 text-right">{t("workshop.amount")}</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 {(order.lines || []).length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-500">
+                    <td colSpan={6} className="px-3 py-6 text-center text-sm text-slate-500">
                       {t("workshop.quickAddHint")}
                     </td>
                   </tr>
@@ -631,7 +639,7 @@ export default function WorkOrderDetail() {
                     className={`cursor-pointer border-t border-ink-600 ${selectedLineId === line.id ? "bg-gold-400/10" : ""} ${Number(line.authorized) === 0 ? "opacity-50" : ""}`}
                     onClick={() => selectLine(line)}
                   >
-                    <td className="px-4 py-2">
+                    <td className="px-3 py-2 align-middle whitespace-nowrap">
                       {offerWash && isWashCategory(line.opcode?.category)
                         ? t(k(`op.${line.opcode?.category === "detailing" ? "detailing" : "lavado"}`))
                         : line.type === "part"
@@ -641,29 +649,30 @@ export default function WorkOrderDetail() {
                             : t("workshop.labor")}
                       {Number(line.authorized) === 0 ? <div className="text-xs text-red-300">{t("workshop.declined")}</div> : null}
                     </td>
-                    <td className="px-4 py-2">
-                      <div>{line.description}</div>
-                      {concern ? <div className="text-xs text-slate-400">{concern}</div> : null}
+                    <td className="px-3 py-2 align-middle">
+                      <div className="truncate">{line.description}</div>
+                      {concern ? <div className="truncate text-xs text-slate-400">{concern}</div> : null}
                     </td>
-                    <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex flex-wrap items-center gap-2">
+                    <td className="px-3 py-2 align-middle" onClick={(e) => e.stopPropagation()}>
+                      {locked ? (
                         <Badge status={pay} label={t(k(`woPay.${pay}`))} />
-                        {locked ? null : paySelect(pay, (value) =>
+                      ) : (
+                        paySelect(pay, (value) =>
                           void act(() =>
                             call(
                               window.dms.workOrders.updateLine(line.id, {
                                 payType: value as "cliente" | "garantia" | "interno" | "sublet",
                               })
                             )
-                          ), "min-w-28")}
-                      </div>
+                          ), "!w-full !min-w-0 px-2")
+                      )}
                     </td>
-                    <td className="px-4 py-2">
+                    <td className="px-3 py-2 align-middle">
                       {locked ? (
                         line.qty
                       ) : (
                         <input
-                          className="w-16"
+                          className="!w-full min-w-0 px-2 text-center"
                           defaultValue={String(line.qty)}
                           key={`${line.id}-${line.qty}`}
                           onBlur={(e) => {
@@ -674,10 +683,10 @@ export default function WorkOrderDetail() {
                         />
                       )}
                     </td>
-                    <td className="px-4 py-2">{money(line.qty * line.unitPrice)}</td>
-                    <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-3 py-2 align-middle whitespace-nowrap text-right tabular-nums">{money(line.qty * line.unitPrice)}</td>
+                    <td className="px-3 py-2 align-middle text-right" onClick={(e) => e.stopPropagation()}>
                       {!locked ? (
-                        <div className="flex justify-end gap-3">
+                        <div className="flex flex-col items-end gap-1">
                           {!simple ? (
                           <button
                             className="text-xs text-gold-400"
