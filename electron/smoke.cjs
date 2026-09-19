@@ -269,6 +269,20 @@ app.whenReady().then(async () => {
   if (repo.getPart(beforeStock.id).stock !== beforeStock.stock - 1) throw new Error("Al convertir no descontó la parte");
   repo.authorizeWorkOrder(converted.id, { authorizedBy: "smoke" });
   if (!repo.getWorkOrder(converted.id).authorizedAt) throw new Error("No se autorizó la OT");
+  const dropPart = repo.listParts().find((p) => Number(p.stock) > 0 && !Number(p.specialOrder));
+  if (!dropPart) throw new Error("Falta una parte con stock para quitar la línea");
+  const dropWo = repo.createWorkOrder({
+    customerId: plated.customerId,
+    vehicleId: plated.id,
+    complaint: "Quitar linea",
+  });
+  const withLine = repo.addWorkOrderLine(dropWo.id, { type: "part", partId: dropPart.id, qty: 1 });
+  const partLine = (withLine.lines || []).find((l) => l.partId === dropPart.id);
+  if (!partLine) throw new Error("No se agregó la parte a la OT");
+  const stockAfterAdd = Number(repo.getPart(dropPart.id).stock);
+  repo.removeWorkOrderLine(partLine.id);
+  if (repo.getWorkOrder(dropWo.id).lines.some((l) => l.id === partLine.id)) throw new Error("No se quitó la línea");
+  if (Number(repo.getPart(dropPart.id).stock) !== stockAfterAdd + 1) throw new Error("Al quitar la línea no devolvió el OH");
 
   repo.saveWorkOrderNumbering({ woPrefix: "RO", woNextNumber: 42, woPad: 4 });
   const numbered = repo.createWorkOrder({

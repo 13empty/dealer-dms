@@ -2555,6 +2555,10 @@ function restorePartStock(order, line, qty) {
     .run();
 }
 
+function detachLineInventory(lineId) {
+  getSqlite().prepare("UPDATE inventory_movements SET work_order_line_id = NULL WHERE work_order_line_id = ?").run(lineId);
+}
+
 function addWorkOrderLine(id, data) {
   const order = db().select().from(workOrders).where(eq(workOrders.id, id)).get();
   if (!order || isGone(order)) throw new Error("Orden no encontrada");
@@ -2773,6 +2777,7 @@ function removeWorkOrderLine(lineId) {
 
   const run = getSqlite().transaction(() => {
     if (!isEstimate(order) && Number(line.authorized) !== 0) restorePartStock(order, line);
+    detachLineInventory(lineId);
     db().delete(workOrderLines).where(eq(workOrderLines.id, lineId)).run();
   });
   run();
