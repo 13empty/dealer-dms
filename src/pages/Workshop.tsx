@@ -28,11 +28,13 @@ const COL_TONE: Record<string, string> = {
   en_taller: "border-t-gold-400",
   en_espera: "border-t-orange-400",
   lista: "border-t-emerald-400",
+  entregada: "border-t-slate-500",
 };
 
 const BOARD_STATUSES: WorkOrderStatus[] = ["recepcion", "autorizacion", "espera_partes", "en_taller", "en_espera", "lista"];
 const SIMPLE_BOARD: WorkOrderStatus[] = ["en_taller", "lista"];
 const VIEW_KEY = "dms.workshop.view";
+const CLOSED_KEY = "dms.workshop.showClosed";
 
 function readWorkshopView(): "board" | "list" {
   try {
@@ -47,6 +49,22 @@ function readWorkshopView(): "board" | "list" {
 function writeWorkshopView(next: "board" | "list") {
   try {
     localStorage.setItem(VIEW_KEY, next);
+  } catch {
+    /* ignore */
+  }
+}
+
+function readShowClosed() {
+  try {
+    return localStorage.getItem(CLOSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeShowClosed(on: boolean) {
+  try {
+    localStorage.setItem(CLOSED_KEY, on ? "1" : "0");
   } catch {
     /* ignore */
   }
@@ -82,7 +100,9 @@ export default function Workshop() {
   const [kind, setKind] = useState(() => params.get("kind") || "");
   const [unpaid, setUnpaid] = useState(() => params.get("unpaid") === "1");
   const [overdue, setOverdue] = useState(() => params.get("overdue") === "1");
-  const [showDelivered, setShowDelivered] = useState(() => params.get("entregada") === "1" || params.get("status") === "entregada");
+  const [showDelivered, setShowDelivered] = useState(
+    () => params.get("entregada") === "1" || params.get("status") === "entregada" || readShowClosed()
+  );
   const [showDeleted, setShowDeleted] = useState(() => params.get("eliminadas") === "1");
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -367,14 +387,18 @@ export default function Workshop() {
   }
 
   const estimates = useMemo(() => (Array.isArray(rows) ? rows.filter((r) => r.kind === "presupuesto") : []), [rows]);
-  const boardStatuses = simple ? SIMPLE_BOARD : BOARD_STATUSES;
+  const boardStatuses = useMemo(() => {
+    const base = simple ? [...SIMPLE_BOARD] : [...BOARD_STATUSES];
+    if (showDelivered) base.push("entregada");
+    return base;
+  }, [simple, showDelivered]);
   const board = useMemo(() => {
     const map: Record<string, WorkOrder[]> = {};
     for (const statusKey of boardStatuses) map[statusKey] = [];
     for (const row of Array.isArray(rows) ? rows : []) {
       if (row.kind === "presupuesto") continue;
       if (simple) {
-        const col = row.status === "lista" ? "lista" : row.status === "entregada" ? "" : "en_taller";
+        const col = row.status === "lista" ? "lista" : row.status === "entregada" ? "entregada" : "en_taller";
         if (col && map[col]) map[col].push(row);
         continue;
       }
@@ -463,8 +487,17 @@ export default function Workshop() {
           </label>
         ) : null}
         <label className="mb-0 flex items-center gap-2 text-sm normal-case tracking-normal text-slate-300">
-          <input type="checkbox" checked={showDelivered} onChange={(e) => setShowDelivered(e.target.checked)} />
-          {t("wo.entregada")}
+          <input
+            type="checkbox"
+            checked={showDelivered}
+            onChange={(e) => {
+              const on = e.target.checked;
+              setShowDelivered(on);
+              writeShowClosed(on);
+              if (!on && status === "entregada") setStatus("");
+            }}
+          />
+          {t("workshop.showClosed")}
         </label>
         <label className="mb-0 flex items-center gap-2 text-sm normal-case tracking-normal text-slate-300">
           <input
