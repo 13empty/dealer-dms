@@ -72,7 +72,7 @@ export default function Workshop() {
   const [params, setParams] = useSearchParams();
   const { t } = useI18n();
   const { user } = useAuth();
-  const { offerTax } = useShop();
+  const { offerTax, offerPartInvoices } = useShop();
   const { prefs } = usePrefs();
   const [rows, setRows] = useState<WorkOrder[]>([]);
   const [q, setQ] = useState(() => params.get("q") || "");
@@ -440,6 +440,9 @@ export default function Workshop() {
           <option value="">{t("common.all")}</option>
           <option value="orden">{t("workshop.order")}</option>
           <option value="presupuesto">{t("workshop.estimate")}</option>
+          {offerPartInvoices || kind === "factura_partes" ? (
+            <option value="factura_partes">{t("workshop.partsInvoice")}</option>
+          ) : null}
         </select>
         <select className="w-44" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">{t("workshop.status")}: {t("common.all")}</option>

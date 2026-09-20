@@ -666,6 +666,12 @@ app.whenReady().then(async () => {
   if (!repo.listWorkOrders("", { deleted: true }).some((o) => o.id === simpleWo.id)) {
     throw new Error("El historial no lista la OT eliminada");
   }
+  repo.saveSettings({ ...repo.getSettings(), serviceMode: "completo" });
+  const advancedWo = repo.createWorkOrder({ customerId: plated.customerId, vehicleId: plated.id, complaint: "OT abierta avanzada" });
+  repo.setWorkOrderStatus(advancedWo.id, "en_taller");
+  if (repo.getWorkOrder(advancedWo.id)?.status !== "en_taller") throw new Error("No avanzó la OT abierta");
+  repo.removeWorkOrder(advancedWo.id);
+  if (Number(repo.getWorkOrder(advancedWo.id)?.deleted) !== 1) throw new Error("No se pudo borrar una OT abierta");
   const hist = repo.sqlQuery(`SELECT COUNT(*) AS n FROM record_history WHERE record_id = '${simpleWo.id}'`);
   if (Number(hist.rows[0]?.n) < 1) throw new Error("No se guardó backup al borrar la OT");
 
@@ -786,6 +792,12 @@ app.whenReady().then(async () => {
   if (!repo.listWorkOrders(openWo.id).some((o) => o.id === openWo.id)) throw new Error("No busca OT por GUID");
 
   const kpis = repo.dashboardKpis();
+  if (typeof kpis.closedRosThisMonth !== "number" || !Array.isArray(kpis.closedRos)) {
+    throw new Error("Falta el reporte de OT cerradas");
+  }
+  if (typeof kpis.closedPartsThisMonth !== "number" || !Array.isArray(kpis.closedParts)) {
+    throw new Error("Falta el reporte de facturas de partes cerradas");
+  }
   const snap = await backupShopData({ userDataDir: dir, reason: "smoke", version: "test" });
   if (!fs.existsSync(snap.file) || fs.statSync(snap.file).size < 1000) {
     throw new Error("El respaldo SQLite no se escribió");

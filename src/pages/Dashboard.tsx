@@ -4,15 +4,15 @@ import { AppearancePanel } from "../components/Appearance";
 import { Badge, Button, Card, ErrorText, Field, Page, PageHeader } from "../components/ui";
 import { useAuth } from "../lib/auth";
 import { DASH_WIDGETS, DEFAULT_DASH_WIDGETS, readDashWidgets, toggleDashWidget, writeDashWidgets, type DashWidgetId } from "../lib/dash";
-import { call, money } from "../lib/format";
+import { call, dateEs, money } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
 import { useShop } from "../lib/shop-context";
-import type { DashboardKpis } from "../vite-env";
+import type { DashboardClosedRow, DashboardKpis } from "../vite-env";
 
 export default function Dashboard() {
   const { can, user } = useAuth();
   const { t } = useI18n();
-  const { offerWash } = useShop();
+  const { offerWash, offerPartInvoices } = useShop();
   const [kpis, setKpis] = useState<DashboardKpis | null>(null);
   const [dbPath, setDbPath] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +77,20 @@ export default function Dashboard() {
         label: t("dash.openOrders"),
         value: String(kpis.openWorkOrders),
         hint: t("dash.readyHint", { n: kpis.readyWorkOrders }),
+      },
+      {
+        id: "closedRos",
+        to: "/taller?status=entregada",
+        label: t("dash.closedRos"),
+        value: String(kpis.closedRosThisMonth || 0),
+        hint: t("dash.closedHint", { amount: money(kpis.closedRosAmount || 0) }),
+      },
+      {
+        id: "closedParts",
+        to: "/taller?kind=factura_partes&status=entregada",
+        label: t("dash.closedParts"),
+        value: String(kpis.closedPartsThisMonth || 0),
+        hint: t("dash.closedHint", { amount: money(kpis.closedPartsAmount || 0) }),
       },
       {
         id: "inShop",
@@ -170,8 +184,11 @@ export default function Dashboard() {
         hint: t("dash.priceCost"),
       },
     ];
-    return all.filter((card) => show(card.id));
-  }, [kpis, widgets, t, can.finance]);
+    return all.filter((card) => {
+      if (card.id === "closedParts" && !offerPartInvoices && !(kpis.closedPartsThisMonth || 0)) return false;
+      return show(card.id);
+    });
+  }, [kpis, widgets, t, can.finance, offerPartInvoices]);
 
   const queues = kpis
     ? [
@@ -276,6 +293,22 @@ export default function Dashboard() {
       ) : (
         <p className="text-sm text-slate-400">{t("dash.emptyWidgets")}</p>
       )}
+      {show("closedRos") && kpis ? (
+        <ClosedReport
+          title={t("dash.closedRosTable")}
+          empty={t("dash.closedEmpty")}
+          rows={kpis.closedRos || []}
+          moreTo="/taller?status=entregada"
+        />
+      ) : null}
+      {show("closedParts") && kpis && (offerPartInvoices || (kpis.closedPartsThisMonth || 0) > 0) ? (
+        <ClosedReport
+          title={t("dash.closedPartsTable")}
+          empty={t("dash.closedEmpty")}
+          rows={kpis.closedParts || []}
+          moreTo="/taller?kind=factura_partes&status=entregada"
+        />
+      ) : null}
       {show("lowTable") && kpis && kpis.lowStock.length > 0 ? (
         <Card className="mt-6 overflow-hidden">
           <div className="flex items-center justify-between border-b border-ink-600 px-5 py-3">
@@ -361,5 +394,59 @@ export default function Dashboard() {
         </Card>
       ) : null}
     </Page>
+  );
+}
+
+function ClosedReport({
+  title,
+  empty,
+  rows,
+  moreTo,
+}: {
+  title: string;
+  empty: string;
+  rows: DashboardClosedRow[];
+  moreTo: string;
+}) {
+  const { t } = useI18n();
+  return (
+    <Card className="mt-6 overflow-hidden">
+      <div className="flex items-center justify-between border-b border-ink-600 px-5 py-3">
+        <span className="font-medium">{title}</span>
+        <Link className="text-sm text-gold-400 hover:underline" to={moreTo}>
+          {t("dash.goClosed")}
+        </Link>
+      </div>
+      {rows.length ? (
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr>
+              <th className="px-5 py-2">{t("workshop.number")}</th>
+              <th className="px-5 py-2">{t("customers.name")}</th>
+              <th className="px-5 py-2">{t("workshop.vehicle")}</th>
+              <th className="px-5 py-2">{t("dash.deliveredAt")}</th>
+              <th className="px-5 py-2 text-right">{t("workshop.total")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} className="border-t border-ink-600">
+                <td className="px-5 py-2 font-mono text-xs">
+                  <Link className="text-gold-400 hover:underline" to={`/taller/${row.id}`}>
+                    {row.number}
+                  </Link>
+                </td>
+                <td className="px-5 py-2">{row.customerName || "—"}</td>
+                <td className="px-5 py-2 text-slate-400">{row.vehicleLabel || "—"}</td>
+                <td className="px-5 py-2">{dateEs(row.deliveredAt)}</td>
+                <td className="px-5 py-2 text-right tabular-nums">{money(row.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="px-5 py-4 text-sm text-slate-400">{empty}</p>
+      )}
+    </Card>
   );
 }

@@ -2803,9 +2803,6 @@ function removeWorkOrder(id, opts = {}) {
   if (!order) throw new Error("Orden no encontrada");
   if (isGone(order)) return { id };
   if (order.status === "entregada") throw new Error("La orden ya fue entregada");
-  if (!isEstimate(order) && order.status !== "recepcion" && !(isSimpleOrder(order) && order.status === "en_taller") && order.kind !== "factura_partes") {
-    throw new Error("Solo se puede borrar un presupuesto o una OT recién abierta");
-  }
   if (Number(order.paid) > 0.009) throw new Error("Esta OT ya tiene cobros. No se puede borrar.");
   const run = getSqlite().transaction(() => {
     const lines = db().select().from(workOrderLines).where(eq(workOrderLines.workOrderId, id)).all();
@@ -3104,6 +3101,12 @@ function dashboardKpis() {
   );
   const shopOpen = openDetailed.filter((o) => !isWashOrder(o));
   const washOpenRows = openDetailed.filter((o) => isWashOrder(o));
+  const closedRosRows = deliveredWo
+    .filter((o) => !isWashOrder(o) && o.kind !== "factura_partes")
+    .sort((a, b) => String(b.deliveredAt || b.createdAt || "").localeCompare(String(a.deliveredAt || a.createdAt || "")));
+  const closedPartsRows = deliveredWo
+    .filter((o) => o.kind === "factura_partes")
+    .sort((a, b) => String(b.deliveredAt || b.createdAt || "").localeCompare(String(a.deliveredAt || a.createdAt || "")));
   const unpaidOpen = shopOpen.filter((o) => o.kind !== "presupuesto" && o.balance > 0.009).length;
   const unpaidAmount = shopOpen.filter((o) => o.kind !== "presupuesto").reduce((s, o) => s + Math.max(0, Number(o.balance || 0)), 0);
   const inShopCount = shopOpen.filter((o) => o.status === "en_taller").length;
@@ -3136,6 +3139,28 @@ function dashboardKpis() {
     washOpen,
     offerWash: offerWashOn(),
     deliveredThisMonth: deliveredWo.length,
+    closedRosThisMonth: closedRosRows.length,
+    closedRosAmount: closedRosRows.reduce((s, o) => s + Number(o.total || 0), 0),
+    closedPartsThisMonth: closedPartsRows.length,
+    closedPartsAmount: closedPartsRows.reduce((s, o) => s + Number(o.total || 0), 0),
+    closedRos: closedRosRows.slice(0, 20).map(dashClosedRow),
+    closedParts: closedPartsRows.slice(0, 20).map(dashClosedRow),
+  };
+}
+
+function dashClosedRow(order) {
+  const customer = order.customer;
+  const vehicle = order.vehicle;
+  const person = [customer?.firstName, customer?.lastName].filter(Boolean).join(" ").trim();
+  const customerName = customer?.company && person ? `${customer.company} · ${person}` : customer?.company || person || customer?.name || "";
+  const car = vehicle ? [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") : "";
+  return {
+    id: order.id,
+    number: order.number,
+    customerName,
+    vehicleLabel: vehicle?.plate ? (car ? `${car} · ${vehicle.plate}` : vehicle.plate) : car,
+    total: Number(order.total || 0),
+    deliveredAt: order.deliveredAt || null,
   };
 }
 

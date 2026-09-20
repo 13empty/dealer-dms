@@ -493,6 +493,21 @@ export type DashboardKpis = {
   washOpen?: number;
   offerWash?: boolean;
   deliveredThisMonth?: number;
+  closedRosThisMonth?: number;
+  closedRosAmount?: number;
+  closedPartsThisMonth?: number;
+  closedPartsAmount?: number;
+  closedRos?: DashboardClosedRow[];
+  closedParts?: DashboardClosedRow[];
+};
+
+export type DashboardClosedRow = {
+  id: string;
+  number: string;
+  customerName: string;
+  vehicleLabel: string;
+  total: number;
+  deliveredAt: string | null;
 };
 
 export type Expense = {

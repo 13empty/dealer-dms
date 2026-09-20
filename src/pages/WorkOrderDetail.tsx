@@ -297,7 +297,7 @@ export default function WorkOrderDetail() {
             {estimate && !locked ? (
               <Button onClick={() => void act(() => call(window.dms.workOrders.convert(order.id)))}>{t("workshop.convert")}</Button>
             ) : null}
-            {!locked && (estimate || order.status === "recepcion" || (simple && order.status === "en_taller") || order.kind === "factura_partes") && Number(order.paid || 0) <= 0.009 ? (
+            {!locked && Number(order.paid || 0) <= 0.009 ? (
               <Button
                 variant="danger"
                 onClick={() =>
