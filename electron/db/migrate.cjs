@@ -506,6 +506,7 @@ function migrate(sqlite) {
   applyCanadaShopDefaults(sqlite);
   backfillCustomerNames(sqlite);
   backfillUserNames(sqlite);
+  addPerfIndexes(sqlite);
 }
 
 function isIntegerPk(sqlite, table) {
@@ -629,6 +630,24 @@ function backfillUserNames(sqlite) {
     if (row.first_name || row.last_name) continue;
     const split = splitEmployeeName(row.name);
     update.run(split.firstName, split.middleName, split.lastName, row.id);
+  }
+}
+
+function addPerfIndexes(sqlite) {
+  try {
+    sqlite.exec(`
+      CREATE INDEX IF NOT EXISTS idx_work_orders_deleted ON work_orders(deleted);
+      CREATE INDEX IF NOT EXISTS idx_work_orders_delivered ON work_orders(delivered_at);
+      CREATE INDEX IF NOT EXISTS idx_work_orders_kind ON work_orders(kind);
+      CREATE INDEX IF NOT EXISTS idx_customers_deleted ON customers(deleted);
+      CREATE INDEX IF NOT EXISTS idx_vehicles_deleted ON vehicles(deleted);
+      CREATE INDEX IF NOT EXISTS idx_parts_deleted ON parts(deleted);
+      CREATE INDEX IF NOT EXISTS idx_inv_mov_line ON inventory_movements(work_order_line_id);
+      CREATE INDEX IF NOT EXISTS idx_wo_pay_paid ON work_order_payments(paid_at);
+      CREATE INDEX IF NOT EXISTS idx_sale_pay_paid ON sale_payments(paid_at);
+    `);
+  } catch {
+    /* ignore if a table is still missing on a brand-new file */
   }
 }
 

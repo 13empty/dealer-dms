@@ -15,6 +15,7 @@ function openDatabase(userDataDir) {
   sqlite = new Database(dbPath);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
+  sqlite.pragma("busy_timeout = 5000");
   migrate(sqlite);
   db = drizzle(sqlite, { schema });
   return { sqlite, db, dbPath };

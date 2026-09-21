@@ -166,12 +166,14 @@ export default function Workshop() {
         const owned = customer?.vehicles || [];
         const chosen = vehicle || owned[0];
         const owner = customer || vehicle?.customer || null;
+        const staffRows = await call(window.dms.staff.list({ line: "taller" }));
+        const staffList = Array.isArray(staffRows) ? staffRows : [];
         setForm({
           ...emptyForm,
           customerId: owner ? String(owner.id) : "",
           vehicleId: chosen ? String(chosen.id) : "",
           kmIn: chosen ? String(chosen.km || 0) : "",
-          techUserId: user?.id && staff.some((u) => u.id === user.id) ? String(user.id) : "",
+          techUserId: user?.id && staffList.some((u) => u.id === user.id) ? String(user.id) : "",
         });
         setPicked({
           customerLabel: customerName(owner),

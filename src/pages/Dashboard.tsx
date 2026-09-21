@@ -46,11 +46,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     void load();
-    function onFocus() {
+    let last = Date.now();
+    function onVis() {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - last < 30000) return;
+      last = Date.now();
       void load();
     }
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
 
   async function changePassword() {

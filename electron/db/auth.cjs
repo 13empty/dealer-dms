@@ -168,7 +168,7 @@ function countUsers(role, onlyActive = false) {
 }
 
 function userCount() {
-  return Number(db().select({ n: sql`count(*)` }).from(users).get()?.n || 0);
+  return Number(db().select({ n: sql`count(*)` }).from(users).where(eq(users.deleted, 0)).get()?.n || 0);
 }
 
 function listUsers(actor, q) {

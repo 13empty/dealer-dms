@@ -446,7 +446,8 @@ function customerStatsMap() {
     if (sale.status !== "borrador" && balance > 0) st.receivable = roundMoney(st.receivable + balance);
   }
   for (const vehicle of db().select().from(vehicles).all()) {
-    if (vehicle.customerId) ensure(vehicle.customerId).vehicleCount += 1;
+    if (isGone(vehicle) || !vehicle.customerId) continue;
+    ensure(vehicle.customerId).vehicleCount += 1;
   }
   return stats;
 }
@@ -726,6 +727,18 @@ function removeCustomer(id) {
   const current = db().select().from(customers).where(eq(customers.id, id)).get();
   if (!current) throw new Error("Cliente no encontrado");
   if (isGone(current)) return { id };
+  const openWo = db()
+    .select({ id: workOrders.id })
+    .from(workOrders)
+    .where(and(alive(workOrders), ne(workOrders.status, "entregada"), eq(workOrders.customerId, id)))
+    .get();
+  if (openWo) throw new Error("Este cliente tiene órdenes abiertas. Ciérralas o bórralas primero.");
+  const openSale = db()
+    .select({ id: sales.id })
+    .from(sales)
+    .where(and(alive(sales), eq(sales.customerId, id), ne(sales.status, "entregada"), ne(sales.status, "borrador")))
+    .get();
+  if (openSale) throw new Error("Este cliente tiene una venta abierta. Ciérrala primero.");
   return markDeleted(customers, id, { updatedAt: nowIso() });
 }
 
@@ -883,7 +896,17 @@ function vehicleProfile(data, current = {}) {
   };
 }
 
-function decorateVehicle(row, stats) {
+function plateCountsMap() {
+  const counts = new Map();
+  for (const row of db().select({ plate: vehicles.plate }).from(vehicles).where(alive(vehicles)).all()) {
+    const plate = String(row.plate || "").trim();
+    if (!plate) continue;
+    counts.set(plate, (counts.get(plate) || 0) + 1);
+  }
+  return counts;
+}
+
+function decorateVehicle(row, stats, plateCounts) {
   if (!row) return null;
   const customer = row.customerId
     ? withPhones(db().select().from(customers).where(eq(customers.id, row.customerId)).get())
@@ -893,8 +916,15 @@ function decorateVehicle(row, stats) {
   const plate = String(row.plate || "").trim();
   let plateClash = false;
   if (plate) {
-    const other = db().select({ id: vehicles.id }).from(vehicles).where(eq(vehicles.plate, plate)).all();
-    plateClash = other.some((v) => asId(v.id) !== asId(row.id));
+    if (plateCounts) plateClash = (plateCounts.get(plate) || 0) > 1;
+    else {
+      const other = db()
+        .select({ id: vehicles.id })
+        .from(vehicles)
+        .where(and(eq(vehicles.plate, plate), alive(vehicles)))
+        .all();
+      plateClash = other.some((v) => asId(v.id) !== asId(row.id));
+    }
   }
   const vin = vinMeta(row.vin);
   return {
@@ -950,7 +980,8 @@ function listVehicles(q, status, opts = {}) {
   else if (filters.length > 1) stmt = stmt.where(and(...filters));
   stmt = stmt.orderBy(desc(vehicles.createdAt));
   const stats = vehicleStatsMap();
-  let rows = (limit > 0 ? stmt.limit(Math.max(limit * 3, limit)) : stmt).all().map((row) => decorateVehicle(row, stats));
+  const plates = plateCountsMap();
+  let rows = (limit > 0 ? stmt.limit(Math.max(limit * 3, limit)) : stmt).all().map((row) => decorateVehicle(row, stats, plates));
   if (query && limit <= 0) {
     const needle = query.toLowerCase();
     rows = rows.filter((v) => {
@@ -1128,39 +1159,57 @@ function removeVehicle(id) {
   const current = db().select().from(vehicles).where(eq(vehicles.id, id)).get();
   if (!current) throw new Error("Vehículo no encontrado");
   if (isGone(current)) return { id };
+  const openWo = db()
+    .select({ id: workOrders.id })
+    .from(workOrders)
+    .where(and(alive(workOrders), ne(workOrders.status, "entregada"), eq(workOrders.vehicleId, id)))
+    .get();
+  if (openWo) throw new Error("Este vehículo tiene órdenes abiertas. Ciérralas o bórralas primero.");
+  const openSale = db()
+    .select({ id: sales.id })
+    .from(sales)
+    .where(and(alive(sales), eq(sales.vehicleId, id), ne(sales.status, "entregada")))
+    .get();
+  if (openSale) throw new Error("Este vehículo está en una venta. Ciérrala primero.");
   return markDeleted(vehicles, id, { updatedAt: nowIso() });
+}
+
+function attachSales(rows) {
+  const list = (rows || []).filter(Boolean);
+  if (!list.length) return [];
+  const customerBy = new Map(fetchByIds(customers, customers.id, list.map((s) => s.customerId)).map((row) => [row.id, withPhones(row)]));
+  const vehicleBy = new Map(fetchByIds(vehicles, vehicles.id, list.map((s) => s.vehicleId)).map((row) => [row.id, row]));
+  const payBy = groupBy(fetchByIds(salePayments, salePayments.saleId, list.map((s) => s.id)), "saleId");
+  return list.map((sale) => {
+    const payments = (payBy.get(sale.id) || [])
+      .slice()
+      .sort((a, b) => String(b.paidAt || "").localeCompare(String(a.paidAt || "")));
+    const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+    const taxRate = Number(sale.taxRate) || 0;
+    const tax = roundMoney(sale.tax != null ? sale.tax : Number(sale.price || 0) * (taxRate / 100));
+    const total = roundMoney(Number(sale.price || 0) + tax);
+    return {
+      ...sale,
+      customer: customerBy.get(sale.customerId) || null,
+      vehicle: vehicleBy.get(sale.vehicleId) || null,
+      payments,
+      taxRate,
+      tax,
+      total,
+      paid: roundMoney(paid),
+      balance: roundMoney(total - paid),
+    };
+  });
 }
 
 function attachSaleExtras(sale) {
   if (!sale) return null;
-  const customer = withPhones(db().select().from(customers).where(eq(customers.id, sale.customerId)).get());
-  const vehicle = getVehicle(sale.vehicleId);
-  const payments = db()
-    .select()
-    .from(salePayments)
-    .where(eq(salePayments.saleId, sale.id))
-    .orderBy(desc(salePayments.paidAt))
-    .all();
-  const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
-  const taxRate = Number(sale.taxRate) || 0;
-  const tax = roundMoney(sale.tax != null ? sale.tax : Number(sale.price || 0) * (taxRate / 100));
-  const total = roundMoney(Number(sale.price || 0) + tax);
-  return {
-    ...sale,
-    customer,
-    vehicle,
-    payments,
-    taxRate,
-    tax,
-    total,
-    paid: roundMoney(paid),
-    balance: roundMoney(total - paid),
-  };
+  return attachSales([sale])[0] || null;
 }
 
 function listSales(q, opts = {}) {
   const rows = db().select().from(sales).where(alive(sales)).orderBy(desc(sales.createdAt)).all();
-  let detailed = rows.map(attachSaleExtras);
+  let detailed = attachSales(rows);
   const query = String(q || "").trim().toLowerCase();
   if (query) {
     detailed = detailed.filter((s) => {
@@ -1296,25 +1345,28 @@ function addSalePayment(id, data) {
   let amount = clampDue(data.amount, due);
   if (wantsClose && (!amount || amount <= 0)) amount = due;
   if (!(amount > 0)) throw new Error("El monto debe ser mayor a 0");
-  db()
-    .insert(salePayments)
-    .values({
-      id: newGuid(),
-      saleId: id,
-      amount,
-      method: ["efectivo", "tarjeta", "transferencia", "financiamiento", "enganche", "contado"].includes(String(data.method || "").toLowerCase())
-        ? String(data.method).toLowerCase()
-        : "efectivo",
-      paidAt: data.paidAt ? expenseTimestamp(data.paidAt) : nowIso(),
-      notes: String(data.notes || "").trim(),
-    })
-    .run();
-  const next = getSale(id);
-  if (wantsClose) {
-    if (Number(next.balance) > 0.009 && next.paymentMethod !== "financiado") return next;
-    return deliverSale(id);
-  }
-  return next;
+  const run = getSqlite().transaction(() => {
+    db()
+      .insert(salePayments)
+      .values({
+        id: newGuid(),
+        saleId: id,
+        amount,
+        method: ["efectivo", "tarjeta", "transferencia", "financiamiento", "enganche", "contado"].includes(String(data.method || "").toLowerCase())
+          ? String(data.method).toLowerCase()
+          : "efectivo",
+        paidAt: data.paidAt ? expenseTimestamp(data.paidAt) : nowIso(),
+        notes: String(data.notes || "").trim(),
+      })
+      .run();
+    const next = getSale(id);
+    if (wantsClose) {
+      if (Number(next.balance) > 0.009 && next.paymentMethod !== "financiado") return next;
+      return deliverSale(id);
+    }
+    return next;
+  });
+  return run();
 }
 
 function deleteSale(id) {
@@ -2248,9 +2300,10 @@ function decorateWorkOrderLine(line, opcode) {
   };
 }
 
-function attachWorkOrders(orders) {
+function attachWorkOrders(orders, opts = {}) {
   const list = (orders || []).filter(Boolean);
   if (!list.length) return [];
+  const lite = Boolean(opts.lite);
   const customerBy = new Map(fetchByIds(customers, customers.id, list.map((o) => o.customerId)).map((row) => [row.id, withPhones(row)]));
   const vehicleBy = new Map(
     fetchByIds(vehicles, vehicles.id, list.map((o) => o.vehicleId)).map((row) => {
@@ -2270,7 +2323,9 @@ function attachWorkOrders(orders) {
   const allLines = fetchByIds(workOrderLines, workOrderLines.workOrderId, list.map((o) => o.id));
   const linesBy = groupBy(allLines, "workOrderId");
   const payBy = groupBy(fetchByIds(workOrderPayments, workOrderPayments.workOrderId, list.map((o) => o.id)), "workOrderId");
-  const opBy = new Map(fetchByIds(opCodes, opCodes.id, allLines.map((l) => l.opCodeId)).map((row) => [row.id, row]));
+  const opBy = lite
+    ? new Map()
+    : new Map(fetchByIds(opCodes, opCodes.id, allLines.map((l) => l.opCodeId)).map((row) => [row.id, row]));
   const taxMap = new Map(
     fetchByIds(
       parts,
@@ -2280,7 +2335,8 @@ function attachWorkOrders(orders) {
   );
   const now = nowIso();
   return list.map((order) => {
-    const lines = (linesBy.get(order.id) || []).map((line) => decorateWorkOrderLine(line, line.opCodeId ? opBy.get(line.opCodeId) : null));
+    const rawLines = linesBy.get(order.id) || [];
+    const lines = lite ? rawLines : rawLines.map((line) => decorateWorkOrderLine(line, line.opCodeId ? opBy.get(line.opCodeId) : null));
     const payments = (payBy.get(order.id) || [])
       .slice()
       .sort((a, b) => String(b.paidAt || "").localeCompare(String(a.paidAt || "")));
@@ -2296,8 +2352,8 @@ function attachWorkOrders(orders) {
       customer: customerBy.get(order.customerId) || null,
       vehicle: vehicleBy.get(order.vehicleId) || null,
       tech: tech ? { id: tech.id, name: tech.name, username: tech.username, laborRate: Number(tech.laborRate) || 0 } : null,
-      lines,
-      payments,
+      lines: lite ? [] : lines,
+      payments: lite ? [] : payments,
       paid,
       balance,
       overdue: Boolean(order.promisedAt && order.status !== "entregada" && order.status !== "lista" && order.promisedAt < now),
@@ -2327,17 +2383,22 @@ function listWorkOrders(q, opts = {}) {
   let stmt = db().select().from(workOrders);
   if (filters.length === 1) stmt = stmt.where(filters[0]);
   else if (filters.length > 1) stmt = stmt.where(and(...filters));
-  let detailed = attachWorkOrders(stmt.orderBy(desc(workOrders.createdAt)).all());
+  let rows = stmt.orderBy(desc(workOrders.createdAt)).all();
+  const query = String(q || "").trim().toLowerCase();
+  const limit = Number(opts.limit) || 0;
+  if (!query && !opts.unpaid && !opts.overdue) {
+    const cap = limit > 0 ? limit : opts.open ? 0 : 200;
+    if (cap > 0 && rows.length > cap) rows = rows.slice(0, cap);
+  }
+  let detailed = attachWorkOrders(rows, { lite: !opts.full });
   if (opts.unpaid) detailed = detailed.filter((o) => o.kind !== "presupuesto" && Number(o.balance) > 0.009);
   if (opts.overdue) detailed = detailed.filter((o) => o.overdue);
-  const query = String(q || "").trim().toLowerCase();
   if (query) {
     detailed = detailed.filter((o) => {
       const hay = `${o.number} ${o.id || ""} ${o.customer?.name || ""} ${o.customer?.company || ""} ${o.vehicle?.make || ""} ${o.vehicle?.model || ""} ${o.vehicle?.plate || ""} ${o.vehicle?.vin || ""} ${o.status} ${o.kind} ${o.serviceLine || ""} ${o.complaint} ${o.poNumber || ""}`.toLowerCase();
       return hay.includes(query);
     });
   }
-  const limit = Number(opts.limit) || 0;
   return limit > 0 ? detailed.slice(0, limit) : detailed;
 }
 
@@ -2500,20 +2561,25 @@ function authorizeWorkOrder(id, data = {}) {
 }
 
 function consumePartStock(order, lineId, part, qty) {
-  let take = Number(qty) || 0;
-  if (take <= 0) return;
-  if (part.stock < take) {
-    if (!Number(part.specialOrder)) throw new Error(`Stock insuficiente de ${part.name} (${part.stock} disp.)`);
-    take = Math.max(0, Number(part.stock) || 0);
-    if (take <= 0) return;
+  const want = Number(qty) || 0;
+  if (want <= 0) return;
+  const stock = Number(part.stock) || 0;
+  if (stock >= want) {
+    /* take full qty */
+  } else if (Number(part.specialOrder) && stock <= 0) {
+    return;
+  } else if (Number(part.specialOrder)) {
+    throw new Error(`Hay ${stock} de ${part.name} en OH y pediste ${want}. Baja la cantidad o espera el pedido.`);
+  } else {
+    throw new Error(`Stock insuficiente de ${part.name} (${stock} disp.)`);
   }
-  db().update(parts).set({ stock: part.stock - take, updatedAt: nowIso() }).where(eq(parts.id, part.id)).run();
+  db().update(parts).set({ stock: stock - want, updatedAt: nowIso() }).where(eq(parts.id, part.id)).run();
   db()
     .insert(inventoryMovements)
     .values({
       id: newGuid(),
       partId: part.id,
-      qty: -take,
+      qty: -want,
       reason: "taller",
       workOrderLineId: lineId,
       notes: `OT ${order.number}`,
@@ -2853,23 +2919,26 @@ function addWorkOrderPayment(id, data) {
   if (wantsClose && (!amount || amount <= 0)) amount = due;
   if (!amount || amount <= 0) throw new Error("El monto debe ser mayor a 0");
   const method = ["efectivo", "tarjeta", "transferencia"].includes(data.method) ? data.method : "efectivo";
-  db()
-    .insert(workOrderPayments)
-    .values({
-      id: newGuid(),
-      workOrderId: id,
-      amount,
-      method,
-      paidAt: data.paidAt ? expenseTimestamp(data.paidAt) : nowIso(),
-      notes: String(data.notes || "").trim(),
-    })
-    .run();
-  const next = getWorkOrder(id);
-  if (wantsClose) {
-    if (Number(next.balance) > 0.009 && !Number(next.customer?.accountOpen)) return next;
-    return deliverWorkOrder(id, data);
-  }
-  return next;
+  const run = getSqlite().transaction(() => {
+    db()
+      .insert(workOrderPayments)
+      .values({
+        id: newGuid(),
+        workOrderId: id,
+        amount,
+        method,
+        paidAt: data.paidAt ? expenseTimestamp(data.paidAt) : nowIso(),
+        notes: String(data.notes || "").trim(),
+      })
+      .run();
+    const next = getWorkOrder(id);
+    if (wantsClose) {
+      if (Number(next.balance) > 0.009 && !Number(next.customer?.accountOpen)) return next;
+      return deliverWorkOrder(id, data);
+    }
+    return next;
+  });
+  return run();
 }
 
 function shopDisplayName() {
@@ -3086,8 +3155,10 @@ function dashboardKpis() {
     db()
       .select()
       .from(workOrders)
+      .where(and(eq(workOrders.status, "entregada"), alive(workOrders)))
       .all()
-      .filter((o) => !isGone(o) && o.status === "entregada" && (o.deliveredAt || o.createdAt) >= start)
+      .filter((o) => (o.deliveredAt || o.createdAt) >= start),
+    { lite: true }
   );
   const woRevenue = deliveredWo.reduce((s, o) => s + Number(o.total || 0), 0);
   const woPretax = deliveredWo.reduce((s, o) => s + Number(o.total || 0) - Number(o.tax || 0), 0);
@@ -3097,7 +3168,8 @@ function dashboardKpis() {
       .select()
       .from(workOrders)
       .where(and(ne(workOrders.status, "entregada"), alive(workOrders)))
-      .all()
+      .all(),
+    { lite: true }
   );
   const shopOpen = openDetailed.filter((o) => !isWashOrder(o));
   const washOpenRows = openDetailed.filter((o) => isWashOrder(o));
@@ -3169,16 +3241,17 @@ function financeSummary(period) {
   const kpis = dashboardKpis();
   const settings = getSettings();
 
-  const payments = db()
+  const paymentsRaw = db()
     .select()
     .from(salePayments)
     .orderBy(desc(salePayments.paidAt))
     .all()
-    .filter((p) => inPeriod(p.paidAt, bounds))
-    .map((p) => {
-      const sale = attachSaleExtras(db().select().from(sales).where(eq(sales.id, p.saleId)).get());
-      return { ...p, sale };
-    })
+    .filter((p) => inPeriod(p.paidAt, bounds));
+  const saleByPay = new Map(
+    attachSales(fetchByIds(sales, sales.id, paymentsRaw.map((p) => p.saleId))).map((sale) => [sale.id, sale])
+  );
+  const payments = paymentsRaw
+    .map((p) => ({ ...p, sale: saleByPay.get(p.saleId) || null }))
     .filter((p) => p.sale && !isGone(p.sale));
   const woPayments = db()
     .select()
@@ -3218,9 +3291,14 @@ function financeSummary(period) {
     net: roundMoney(inByMethod[method] - outByMethod[method]),
   }));
 
-  const allOrders = db().select().from(workOrders).all().filter((o) => !isGone(o)).map(attachWorkOrder);
-  const postedOrders = allOrders.filter(
-    (o) => o.kind !== "presupuesto" && o.status === "entregada" && inPeriod(o.deliveredAt || o.createdAt, bounds)
+  const allOrders = attachWorkOrders(db().select().from(workOrders).where(alive(workOrders)).all(), { lite: true });
+  const postedOrders = attachWorkOrders(
+    db()
+      .select()
+      .from(workOrders)
+      .where(and(alive(workOrders), eq(workOrders.status, "entregada")))
+      .all()
+      .filter((o) => (o.kind || "orden") !== "presupuesto" && inPeriod(o.deliveredAt || o.createdAt, bounds))
   );
 
   const woReceivables = allOrders
@@ -3236,7 +3314,7 @@ function financeSummary(period) {
       since: o.createdAt,
       bucket: agingBucket(o.createdAt),
     }));
-  const allSales = db().select().from(sales).all().filter((s) => !isGone(s)).map(attachSaleExtras);
+  const allSales = attachSales(db().select().from(sales).where(alive(sales)).all());
   const saleReceivables = allSales
     .filter((s) => (s.status === "cerrada" || s.status === "entregada") && Number(s.balance || 0) > 0.009)
     .map((s) => ({
@@ -3309,6 +3387,13 @@ function financeSummary(period) {
   const partRank = new Map();
   const opRank = new Map();
   const techRank = new Map();
+  const postedPartIds = [];
+  for (const order of postedOrders) {
+    for (const line of order.lines || []) {
+      if (line.partId) postedPartIds.push(line.partId);
+    }
+  }
+  const postedPartBy = new Map(fetchByIds(parts, parts.id, postedPartIds).map((p) => [p.id, p]));
   for (const order of postedOrders) {
     const techKey = order.techUserId || "none";
     const techRow = techRank.get(techKey) || {
@@ -3333,7 +3418,7 @@ function financeSummary(period) {
         mix.parts += amount;
         mix.partsCost += cost;
         const partKey = line.partId || line.description || "part";
-        const part = line.partId ? db().select().from(parts).where(eq(parts.id, line.partId)).get() : null;
+        const part = line.partId ? postedPartBy.get(line.partId) : null;
         const current = partRank.get(partKey) || {
           id: partKey,
           sku: part?.sku || "",
@@ -3767,6 +3852,9 @@ function assertReadOnlySql(sql) {
   const first = parts[0] || "";
   if (!/^(SELECT|WITH|PRAGMA|EXPLAIN)\b/i.test(first)) {
     throw new Error("Solo lectura: SELECT, WITH, PRAGMA o EXPLAIN");
+  }
+  if (/^PRAGMA\b/i.test(first) && !/^PRAGMA\s+(table_info|index_list|index_info|foreign_key_list|compile_options|database_list|table_list|function_list)\b/i.test(first)) {
+    throw new Error("Ese PRAGMA no es de solo lectura");
   }
   return first;
 }

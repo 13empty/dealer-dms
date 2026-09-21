@@ -607,11 +607,43 @@ app.whenReady().then(async () => {
     taxable: 0,
   });
   const restWo = repo.createWorkOrder({ customerId: plated.customerId, vehicleId: plated.id, complaint: "Reverso especial" });
-  repo.addWorkOrderLine(restWo.id, { type: "part", partId: soStock.id, qty: 10 });
+  let partialBlocked = false;
+  try {
+    repo.addWorkOrderLine(restWo.id, { type: "part", partId: soStock.id, qty: 10 });
+  } catch (e) {
+    partialBlocked = /OH|cantidad|pedido/i.test(String(e.message));
+  }
+  if (!partialBlocked) throw new Error("Pedido especial no debe vender de más si aún hay OH");
+  repo.addWorkOrderLine(restWo.id, { type: "part", partId: soStock.id, qty: 2 });
   const restLine = repo.getWorkOrder(restWo.id).lines.find((l) => l.partId === soStock.id);
   if (repo.getPart(soStock.id).stock !== 0) throw new Error("El pedido especial no consumió el stock disponible");
   repo.updateWorkOrderLine(restLine.id, { authorized: 0 });
   if (repo.getPart(soStock.id).stock !== 2) throw new Error("Al declinar no debe inflar el stock del pedido especial");
+
+  const busyCust = repo.createCustomer({ firstName: "Ocupado", lastName: "Cliente" });
+  const busyCar = repo.createVehicle({
+    vin: "ZZBUSYDELETE00001",
+    make: "Honda",
+    model: "Fit",
+    year: 2012,
+    status: "cliente",
+    customerId: busyCust.id,
+  });
+  repo.createWorkOrder({ customerId: busyCust.id, vehicleId: busyCar.id, complaint: "No borrar" });
+  let blockedCust = false;
+  try {
+    repo.removeCustomer(busyCust.id);
+  } catch (e) {
+    blockedCust = /órdenes abiertas/i.test(String(e.message));
+  }
+  if (!blockedCust) throw new Error("No debe borrar un cliente con OT abierta");
+  let blockedVeh = false;
+  try {
+    repo.removeVehicle(busyCar.id);
+  } catch (e) {
+    blockedVeh = /órdenes abiertas/i.test(String(e.message));
+  }
+  if (!blockedVeh) throw new Error("No debe borrar un vehículo con OT abierta");
 
   const moreStock = repo.listVehicles("", "en_stock")[0];
   if (moreStock) {
