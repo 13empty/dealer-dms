@@ -489,6 +489,9 @@ export type DashboardKpis = {
   waitingPartsCount?: number;
   waitingAuthCount?: number;
   estimatesOpen?: number;
+  estimatesAmount?: number;
+  estimatesDeclined?: number;
+  estimates?: DashboardEstimateRow[];
   overdueCount?: number;
   washOpen?: number;
   offerWash?: boolean;
@@ -499,6 +502,11 @@ export type DashboardKpis = {
   closedPartsAmount?: number;
   closedRos?: DashboardClosedRow[];
   closedParts?: DashboardClosedRow[];
+};
+
+export type DashboardEstimateRow = DashboardClosedRow & {
+  declined: number;
+  createdAt: string | null;
 };
 
 export type DashboardClosedRow = {
@@ -603,6 +611,12 @@ export type FinanceReport = {
   techs: FinanceTechRow[];
   expensesByCategory: Array<{ category: Expense["category"]; amount: number }>;
   aging: Array<{ bucket: "0-30" | "31-60" | "61-90" | "90+"; count: number; amount: number }>;
+  estimates?: {
+    count: number;
+    quoted: number;
+    declined: number;
+    rows: DashboardEstimateRow[];
+  };
 };
 
 export type FinanceSummary = {

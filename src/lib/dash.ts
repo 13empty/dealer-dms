@@ -29,6 +29,7 @@ export const DEFAULT_DASH_WIDGETS: DashWidgetId[] = [
   "openOrders",
   "closedRos",
   "closedParts",
+  "estimates",
   "inShop",
   "ready",
   "waitingParts",
@@ -42,6 +43,7 @@ export const DEFAULT_DASH_WIDGETS: DashWidgetId[] = [
 
 const KEY = "dms.dash.widgets";
 const ADDED_CLOSED = "dms.dash.added.closedReports";
+const ADDED_ESTIMATES = "dms.dash.added.estimates";
 const CLOSED_WIDGETS: DashWidgetId[] = ["closedRos", "closedParts"];
 const allowed = new Set<string>(DASH_WIDGETS.map((w) => w.id));
 
@@ -63,6 +65,13 @@ export function readDashWidgets(): DashWidgetId[] {
         }
         localStorage.setItem(ADDED_CLOSED, "1");
       }
+      if (!localStorage.getItem(ADDED_ESTIMATES) && !next.includes("estimates")) {
+        const at = next.indexOf("closedParts");
+        const insertAt = at >= 0 ? at + 1 : 0;
+        next = [...next.slice(0, insertAt), "estimates", ...next.slice(insertAt)];
+        writeDashWidgets(next);
+      }
+      localStorage.setItem(ADDED_ESTIMATES, "1");
     } catch {
       /* ignore */
     }

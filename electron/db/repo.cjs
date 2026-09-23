@@ -3184,7 +3184,10 @@ function dashboardKpis() {
   const inShopCount = shopOpen.filter((o) => o.status === "en_taller").length;
   const waitingPartsCount = shopOpen.filter((o) => o.status === "espera_partes").length;
   const waitingAuthCount = shopOpen.filter((o) => o.status === "autorizacion").length;
-  const estimatesOpen = shopOpen.filter((o) => o.kind === "presupuesto").length;
+  const estimateOpenRows = shopOpen
+    .filter((o) => o.kind === "presupuesto")
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  const estimatesOpen = estimateOpenRows.length;
   const overdueCount = shopOpen.filter((o) => o.overdue).length;
   const washOpen = washOpenRows.length;
 
@@ -3207,6 +3210,9 @@ function dashboardKpis() {
     waitingPartsCount,
     waitingAuthCount,
     estimatesOpen,
+    estimatesAmount: roundMoney(estimateOpenRows.reduce((s, o) => s + Number(o.total || 0), 0)),
+    estimatesDeclined: roundMoney(estimateOpenRows.reduce((s, o) => s + Number(o.declinedTotal || 0), 0)),
+    estimates: estimateOpenRows.slice(0, 20).map(dashEstimateRow),
     overdueCount,
     washOpen,
     offerWash: offerWashOn(),
@@ -3217,6 +3223,15 @@ function dashboardKpis() {
     closedPartsAmount: closedPartsRows.reduce((s, o) => s + Number(o.total || 0), 0),
     closedRos: closedRosRows.slice(0, 20).map(dashClosedRow),
     closedParts: closedPartsRows.slice(0, 20).map(dashClosedRow),
+  };
+}
+
+function dashEstimateRow(order) {
+  const row = dashClosedRow(order);
+  return {
+    ...row,
+    declined: Number(order.declinedTotal || 0),
+    createdAt: order.createdAt || null,
   };
 }
 
@@ -3553,7 +3568,22 @@ function financeSummary(period) {
         amount: roundMoney(expenseRows.filter((e) => e.category === category).reduce((s, e) => s + Number(e.amount || 0), 0)),
       })),
       aging: agingBuckets,
+      estimates: estimateReport(
+        allOrders.filter((o) => (o.kind || "orden") === "presupuesto" && inPeriod(o.createdAt, bounds))
+      ),
     },
+  };
+}
+
+function estimateReport(orders) {
+  const rows = orders
+    .slice()
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  return {
+    count: rows.length,
+    quoted: roundMoney(rows.reduce((s, o) => s + Number(o.total || 0), 0)),
+    declined: roundMoney(rows.reduce((s, o) => s + Number(o.declinedTotal || 0), 0)),
+    rows: rows.slice(0, 40).map(dashEstimateRow),
   };
 }
 

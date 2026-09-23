@@ -7,7 +7,7 @@ import { DASH_WIDGETS, DEFAULT_DASH_WIDGETS, readDashWidgets, toggleDashWidget, 
 import { call, dateEs, money } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
 import { useShop } from "../lib/shop-context";
-import type { DashboardClosedRow, DashboardKpis } from "../vite-env";
+import type { DashboardClosedRow, DashboardEstimateRow, DashboardKpis } from "../vite-env";
 
 export default function Dashboard() {
   const { can, user } = useAuth();
@@ -129,7 +129,7 @@ export default function Dashboard() {
         to: "/taller?kind=presupuesto",
         label: t("dash.estimates"),
         value: String(kpis.estimatesOpen || 0),
-        hint: t("dash.estimatesHint"),
+        hint: t("dash.estimatesHint", { amount: money(kpis.estimatesAmount || 0) }),
       },
       {
         id: "overdue",
@@ -297,6 +297,9 @@ export default function Dashboard() {
       ) : (
         <p className="text-sm text-slate-400">{t("dash.emptyWidgets")}</p>
       )}
+      {show("estimates") && kpis ? (
+        <EstimateReport rows={kpis.estimates || []} declined={kpis.estimatesDeclined || 0} />
+      ) : null}
       {show("closedRos") && kpis ? (
         <ClosedReport
           title={t("dash.closedRosTable")}
@@ -398,6 +401,54 @@ export default function Dashboard() {
         </Card>
       ) : null}
     </Page>
+  );
+}
+
+function EstimateReport({ rows, declined }: { rows: DashboardEstimateRow[]; declined: number }) {
+  const { t } = useI18n();
+  return (
+    <Card className="mt-6 overflow-hidden">
+      <div className="flex items-center justify-between border-b border-ink-600 px-5 py-3">
+        <span className="font-medium">{t("dash.estimatesTable")}</span>
+        <Link className="text-sm text-gold-400 hover:underline" to="/taller?kind=presupuesto">
+          {t("dash.goEstimates")}
+        </Link>
+      </div>
+      <p className="px-5 pt-3 text-sm text-slate-400">
+        {t("dash.estimatesNote")}
+        {declined > 0.009 ? ` ${t("dash.estimatesDeclined", { amount: money(declined) })}` : ""}
+      </p>
+      {rows.length ? (
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr>
+              <th className="px-5 py-2">{t("workshop.number")}</th>
+              <th className="px-5 py-2">{t("customers.name")}</th>
+              <th className="px-5 py-2">{t("workshop.vehicle")}</th>
+              <th className="px-5 py-2">{t("dash.createdAt")}</th>
+              <th className="px-5 py-2 text-right">{t("finance.estQuoted")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} className="border-t border-ink-600">
+                <td className="px-5 py-2 font-mono text-xs">
+                  <Link className="text-gold-400 hover:underline" to={`/taller/${row.id}`}>
+                    {row.number}
+                  </Link>
+                </td>
+                <td className="px-5 py-2">{row.customerName || "—"}</td>
+                <td className="px-5 py-2 text-slate-400">{row.vehicleLabel || "—"}</td>
+                <td className="px-5 py-2">{dateEs(row.createdAt)}</td>
+                <td className="px-5 py-2 text-right tabular-nums text-amber-200">{money(row.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="px-5 py-4 text-sm text-slate-400">{t("dash.estimatesEmpty")}</p>
+      )}
+    </Card>
   );
 }
 

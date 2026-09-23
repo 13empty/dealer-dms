@@ -445,6 +445,60 @@ export default function Finance() {
       </div>
       <div className={tab === "reportes" ? "mt-4 grid gap-4 xl:grid-cols-2" : "mt-4 hidden print:grid print:gap-4 xl:grid-cols-2"}>
         <p className="xl:col-span-2 text-sm text-slate-400">{t("finance.postedHint")}</p>
+        <div className="xl:col-span-2">
+          <ReportCard title={t("finance.estimates")}>
+            {report?.estimates ? (
+              <div className="p-5 text-sm">
+                <p className="mb-4 text-slate-400">{t("finance.estimatesHint")}</p>
+                <div className="mb-4 grid grid-cols-3 gap-3">
+                  <div>
+                    <div className="text-xs uppercase text-slate-500">{t("finance.estCount")}</div>
+                    <div className="mt-1 text-xl">{report.estimates.count}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-slate-500">{t("finance.estQuoted")}</div>
+                    <div className="mt-1 text-xl text-amber-200">{money(report.estimates.quoted)}</div>
+                    <div className="mt-1 text-xs text-slate-500">{t("finance.estLeft")}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-slate-500">{t("finance.estDeclined")}</div>
+                    <div className="mt-1 text-xl">{money(report.estimates.declined)}</div>
+                  </div>
+                </div>
+                {report.estimates.rows.length ? (
+                  <table className="w-full text-left">
+                    <thead className="text-slate-400">
+                      <tr>
+                        <th className="py-1">{t("workshop.number")}</th>
+                        <th className="py-1">{t("finance.customer")}</th>
+                        <th className="py-1">{t("finance.estDate")}</th>
+                        <th className="py-1 text-right">{t("finance.estQuoted")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.estimates.rows.map((row) => (
+                        <tr key={row.id} className="border-t border-ink-600">
+                          <td className="py-2">
+                            <Link className="text-gold-400" to={`/taller/${row.id}`}>
+                              {row.number}
+                            </Link>
+                          </td>
+                          <td className="py-2">{row.customerName || t("common.dash")}</td>
+                          <td className="py-2">{dateEs(row.createdAt)}</td>
+                          <td className="py-2 text-right tabular-nums text-amber-200">{money(row.total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="text-slate-400">{t("finance.noEstimates")}</p>
+                )}
+              </div>
+            ) : (
+              <p className="px-5 py-4 text-sm text-slate-400">{t("finance.noEstimates")}</p>
+            )}
+          </ReportCard>
+        </div>
         <ReportCard title={t("finance.shopMix")}>
           {report ? (
             <div className="space-y-4 p-5 text-sm">
