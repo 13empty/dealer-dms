@@ -143,7 +143,7 @@ export default function Finance() {
   }
 
   async function removeExpense(id: string) {
-    if (!askConfirm(t("finance.deleteExpense"))) return;
+    if (!(await askConfirm(t("finance.deleteExpense")))) return;
     try {
       await call(window.dms.finance.removeExpense(id));
       await load();
@@ -153,7 +153,7 @@ export default function Finance() {
   }
 
   async function removeIncome(id: string) {
-    if (!askConfirm(t("finance.deleteIncome"))) return;
+    if (!(await askConfirm(t("finance.deleteIncome")))) return;
     try {
       await call(window.dms.finance.removeIncome(id));
       await load();

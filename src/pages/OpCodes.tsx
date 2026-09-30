@@ -126,7 +126,7 @@ export default function OpCodes() {
   }
 
   async function remove(id: string) {
-    if (!askConfirm(t("opcodes.deleteConfirm"))) return;
+    if (!(await askConfirm(t("opcodes.deleteConfirm")))) return;
     try {
       await call(window.dms.opCodes.remove(id));
       await Promise.all([load(), reloadCatalogs()]);

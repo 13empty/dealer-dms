@@ -10,6 +10,7 @@ import { BrandMark } from "./components/BrandMark";
 import { UpdateBanner } from "./components/UpdatePanel";
 import { UpdateNotice } from "./components/UpdateNotice";
 import { LanguageSelect, k, useI18n } from "./lib/i18n";
+import { ConfirmHost } from "./lib/ask";
 import { call } from "./lib/format";
 import { usePrefs } from "./lib/prefs-context";
 import { useShop, ShopName } from "./lib/shop-context";
@@ -441,6 +442,7 @@ export default function App() {
         <ErrorBoundary>
           <Gate />
         </ErrorBoundary>
+        <ConfirmHost />
       </ShopProvider>
     </AuthProvider>
   );

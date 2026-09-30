@@ -113,7 +113,7 @@ export default function Customers() {
   }
 
   async function remove(id: string) {
-    if (!askConfirm(t("customers.deleteConfirm"))) return;
+    if (!(await askConfirm(t("customers.deleteConfirm")))) return;
     try {
       await call(window.dms.customers.remove(id));
       await load();

@@ -112,7 +112,7 @@ export default function PartDetail() {
 
   async function remove() {
     if (!row) return;
-    if (!askConfirm(t("parts.deleteConfirm"))) return;
+    if (!(await askConfirm(t("parts.deleteConfirm")))) return;
     try {
       await call(window.dms.parts.remove(row.id));
       navigate("/partes");

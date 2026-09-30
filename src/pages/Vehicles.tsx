@@ -85,7 +85,7 @@ export default function Vehicles() {
   }
 
   async function remove(id: string) {
-    if (!askConfirm(t("vehicles.deleteConfirm"))) return;
+    if (!(await askConfirm(t("vehicles.deleteConfirm")))) return;
     try {
       await call(window.dms.vehicles.remove(id));
       await load();

@@ -118,7 +118,7 @@ export default function CustomerDetail() {
   }
 
   async function unlink(vehicleId: string) {
-    if (!row || !askConfirm(t("customers.unlinkConfirm"))) return;
+    if (!row || !(await askConfirm(t("customers.unlinkConfirm")))) return;
     try {
       await call(window.dms.customers.unlinkVehicle(row.id, vehicleId));
       await load();
@@ -128,7 +128,7 @@ export default function CustomerDetail() {
   }
 
   async function removeCustomer() {
-    if (!row || !askConfirm(t("customers.deleteConfirm"))) return;
+    if (!row || !(await askConfirm(t("customers.deleteConfirm")))) return;
     try {
       await call(window.dms.customers.remove(row.id));
       navigate("/clientes");

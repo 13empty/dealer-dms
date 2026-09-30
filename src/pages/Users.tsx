@@ -180,7 +180,7 @@ export default function Users() {
   async function toggleActive(row: AppUser) {
     if (row.active) {
       const msg = row.assigned ? t("users.deactivateAssigned") : t("users.deactivateConfirm");
-      if (!askConfirm(msg)) return;
+      if (!(await askConfirm(msg))) return;
     }
     try {
       await call(window.dms.users.update(row.id, { active: row.active ? 0 : 1 }));
@@ -191,7 +191,7 @@ export default function Users() {
   }
 
   async function remove(row: AppUser) {
-    if (!askConfirm(t("users.deleteConfirm"))) return;
+    if (!(await askConfirm(t("users.deleteConfirm")))) return;
     try {
       await call(window.dms.users.remove(row.id));
       await load();

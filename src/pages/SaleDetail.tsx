@@ -78,7 +78,7 @@ export default function SaleDetail() {
                   variant="danger"
                   onClick={() =>
                     void act(async () => {
-                      if (!askConfirm(t("sales.deleteConfirm"))) return sale;
+                      if (!(await askConfirm(t("sales.deleteConfirm")))) return sale;
                       await call(window.dms.sales.remove(sale.id));
                       navigate("/ventas");
                       return sale;

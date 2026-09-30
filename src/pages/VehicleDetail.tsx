@@ -61,7 +61,7 @@ export default function VehicleDetail() {
   }
 
   async function removeVehicle() {
-    if (!row || !askConfirm(t("vehicles.deleteConfirm"))) return;
+    if (!row || !(await askConfirm(t("vehicles.deleteConfirm")))) return;
     try {
       await call(window.dms.vehicles.remove(row.id));
       navigate("/vehiculos");

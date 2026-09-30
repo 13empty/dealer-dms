@@ -302,8 +302,8 @@ export default function WorkOrderDetail() {
                 variant="danger"
                 onClick={() =>
                   void act(async () => {
-                    if (!askConfirm(t("workshop.deleteConfirm"))) return order;
-                    const pruneCategories = askConfirm(t("workshop.deleteCats"));
+                    if (!(await askConfirm(t("workshop.deleteConfirm")))) return order;
+                    const pruneCategories = await askConfirm(t("workshop.deleteCats"));
                     await call(window.dms.workOrders.remove(order.id, { pruneCategories }));
                     navigate(workOrderListPath(order));
                     return order;
@@ -691,8 +691,8 @@ export default function WorkOrderDetail() {
                           {!simple ? (
                           <button
                             className="text-xs text-gold-400"
-                            onClick={() => {
-                              if (Number(line.authorized) !== 0 && !askConfirm(t("workshop.declineConfirm"))) return;
+                            onClick={async () => {
+                              if (Number(line.authorized) !== 0 && !(await askConfirm(t("workshop.declineConfirm")))) return;
                               void act(() =>
                                 call(window.dms.workOrders.updateLine(line.id, { authorized: Number(line.authorized) === 0 ? 1 : 0 }))
                               );
@@ -703,8 +703,8 @@ export default function WorkOrderDetail() {
                           ) : null}
                           <button
                             className="text-red-300"
-                            onClick={() => {
-                              if (!askConfirm(t("workshop.removeLine"))) return;
+                            onClick={async () => {
+                              if (!(await askConfirm(t("workshop.removeLine")))) return;
                               void act(() => call(window.dms.workOrders.removeLine(line.id)));
                             }}
                           >
@@ -854,10 +854,10 @@ export default function WorkOrderDetail() {
                   compact
                   types={washTypes}
                   selectedIds={(order.lines || []).map((line) => line.opCodeId || "").filter(Boolean)}
-                  onToggle={(typeId) => {
+                  onToggle={async (typeId) => {
                     const existing = (order.lines || []).find((line) => line.opCodeId === typeId);
                     if (existing) {
-                      if (!askConfirm(t("workshop.removeLine"))) return;
+                      if (!(await askConfirm(t("workshop.removeLine")))) return;
                       void act(() => call(window.dms.workOrders.removeLine(existing.id)));
                       return;
                     }

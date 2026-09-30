@@ -112,7 +112,7 @@ export default function WashTicket() {
     if (!order || locked) return;
     const existing = (order.lines || []).find((line) => line.opCodeId === typeId);
     if (existing) {
-      if (!askConfirm(t("workshop.removeLine"))) return;
+      if (!(await askConfirm(t("workshop.removeLine")))) return;
       await act(() => call(window.dms.workOrders.removeLine(existing.id)));
       return;
     }
@@ -159,8 +159,8 @@ export default function WashTicket() {
                 variant="danger"
                 onClick={() =>
                   void act(async () => {
-                    if (!askConfirm(t("workshop.deleteConfirm"))) return order;
-                    const pruneCategories = askConfirm(t("workshop.deleteCats"));
+                    if (!(await askConfirm(t("workshop.deleteConfirm")))) return order;
+                    const pruneCategories = await askConfirm(t("workshop.deleteCats"));
                     await call(window.dms.workOrders.remove(order.id, { pruneCategories }));
                     navigate("/lavado");
                     return order;

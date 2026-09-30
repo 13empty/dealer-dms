@@ -70,7 +70,7 @@ export function WashTypesPanel({
   }
 
   async function remove(row: WashType) {
-    if (!askConfirm(t("wash.deleteConfirm", { name: row.name }))) return;
+    if (!(await askConfirm(t("wash.deleteConfirm", { name: row.name })))) return;
     try {
       setError(null);
       await call(window.dms.washTypes.remove(row.id));

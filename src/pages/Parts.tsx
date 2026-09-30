@@ -85,7 +85,7 @@ export default function Parts() {
   }
 
   async function remove(id: string) {
-    if (!askConfirm(t("parts.deleteConfirm"))) return;
+    if (!(await askConfirm(t("parts.deleteConfirm")))) return;
     try {
       await call(window.dms.parts.remove(id));
       await load();
