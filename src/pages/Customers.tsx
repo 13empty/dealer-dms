@@ -25,6 +25,7 @@ export default function Customers() {
   const [type, setType] = useState("");
   const [status, setStatus] = useState(() => (params.get("balance") === "1" ? "" : "activo"));
   const [balanceOnly, setBalanceOnly] = useState(() => params.get("balance") === "1");
+  const [showDeleted, setShowDeleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
@@ -41,6 +42,7 @@ export default function Customers() {
             type: type || undefined,
             status: status || undefined,
             balance: balanceOnly || undefined,
+            deleted: showDeleted || undefined,
           })
         )
       );
@@ -51,7 +53,7 @@ export default function Customers() {
 
   useEffect(() => {
     void load();
-  }, [q, type, status, balanceOnly]);
+  }, [q, type, status, balanceOnly, showDeleted]);
 
   useEffect(() => {
     if (params.get("nuevo") !== "1") return;
@@ -151,6 +153,10 @@ export default function Customers() {
           <input type="checkbox" checked={balanceOnly} onChange={(e) => setBalanceOnly(e.target.checked)} />
           {t("customers.filterBalance")}
         </label>
+        <label className="mb-0 flex items-center gap-2 text-sm normal-case tracking-normal text-slate-300">
+          <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
+          {t("customers.showDeleted")}
+        </label>
         <div className="ml-auto text-xs text-slate-500">{t("customers.count", { n: rows.length })}</div>
       </Toolbar>
       <ErrorText error={error} />
@@ -185,6 +191,7 @@ export default function Customers() {
                     {customerName(row) || t("common.dash")}
                   </Link>
                   {row.city ? <div className="mt-1 text-xs text-slate-500">{row.city}</div> : null}
+                  {row.deleted ? <div className="mt-1 text-xs text-red-300">{t("customers.deleted")}</div> : null}
                 </td>
                 <td className="px-4 py-3">
                   <Badge status={row.type || "particular"} label={t(k(`customers.type.${row.type || "particular"}`))} />
@@ -212,7 +219,7 @@ export default function Customers() {
                   <button className="mr-3 text-gold-400" onClick={() => startEdit(row)}>
                     {t("common.edit")}
                   </button>
-                  {can.destructive ? (
+                  {can.destructive && !row.deleted ? (
                     <button className="text-red-300" onClick={() => void remove(row.id)}>
                       {t("common.delete")}
                     </button>

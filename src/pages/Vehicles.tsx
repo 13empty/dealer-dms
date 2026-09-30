@@ -26,6 +26,7 @@ export default function Vehicles() {
   const [kind, setKind] = useState(() => params.get("kind") || "");
   const [condition, setCondition] = useState("");
   const [aging, setAging] = useState("");
+  const [showDeleted, setShowDeleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Vehicle | null>(null);
@@ -41,6 +42,7 @@ export default function Vehicles() {
             kind: kind || undefined,
             condition: condition || undefined,
             aging: aging ? Number(aging) : undefined,
+            deleted: showDeleted || undefined,
           })
         )
       );
@@ -51,7 +53,7 @@ export default function Vehicles() {
 
   useEffect(() => {
     void load();
-  }, [q, status, kind, condition, aging]);
+  }, [q, status, kind, condition, aging, showDeleted]);
 
   function startCreate() {
     setEditing(null);
@@ -130,6 +132,10 @@ export default function Vehicles() {
           <option value="60">{t("vehicles.agingDays", { n: 60 })}</option>
           <option value="90">{t("vehicles.agingDays", { n: 90 })}</option>
         </select>
+        <label className="mb-0 flex items-center gap-2 text-sm normal-case tracking-normal text-slate-300">
+          <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
+          {t("vehicles.showDeleted")}
+        </label>
         <div className="ml-auto text-xs text-slate-500">{t("vehicles.count", { n: rows.length })}</div>
       </Toolbar>
       <ErrorText error={error} />
@@ -168,6 +174,7 @@ export default function Vehicles() {
                     {[row.color, row.location].filter(Boolean).join(" · ") || t("common.dash")}
                     {row.openOrders ? ` · ${t("vehicles.openRos", { n: row.openOrders })}` : ""}
                   </div>
+                  {row.deleted ? <div className="text-xs text-red-300">{t("vehicles.deleted")}</div> : null}
                 </td>
                 <td className="px-4 py-3">
                   {row.customer ? (
@@ -196,7 +203,7 @@ export default function Vehicles() {
                   <button className="mr-3 text-gold-400" onClick={() => startEdit(row)}>
                     {t("common.edit")}
                   </button>
-                  {can.destructive ? (
+                  {can.destructive && !row.deleted ? (
                     <button className="text-red-300" onClick={() => void remove(row.id)}>
                       {t("common.delete")}
                     </button>

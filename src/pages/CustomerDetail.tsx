@@ -15,6 +15,7 @@ import { Badge, Button, Card, ErrorText, Field, Modal, PageHeader, GuidCopy } fr
 import { call, customerName, customerPerson, dateEs, dateTimeEs, formatAddress, money, vehicleLabel, vehicleSearchHint } from "../lib/format";
 import { k, phoneLabel, useI18n } from "../lib/i18n";
 import { askConfirm } from "../lib/ask";
+import { useAuth } from "../lib/auth";
 import { useShop } from "../lib/shop-context";
 import type { Customer } from "../vite-env";
 
@@ -22,6 +23,7 @@ export default function CustomerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useI18n();
+  const { can } = useAuth();
   const { offerTax } = useShop();
   const [row, setRow] = useState<Customer | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +127,16 @@ export default function CustomerDetail() {
     }
   }
 
+  async function removeCustomer() {
+    if (!row || !askConfirm(t("customers.deleteConfirm"))) return;
+    try {
+      await call(window.dms.customers.remove(row.id));
+      navigate("/clientes");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   async function addNote() {
     if (!row || !note.trim()) return;
     try {
@@ -185,6 +197,11 @@ export default function CustomerDetail() {
             >
               {t("customers.linkVehicle")}
             </Button>
+            {can.destructive && Number(row.deleted) !== 1 ? (
+              <Button variant="danger" onClick={() => void removeCustomer()}>
+                {t("common.delete")}
+              </Button>
+            ) : null}
             <Button onClick={startEdit}>{t("common.edit")}</Button>
           </>
         }
@@ -193,6 +210,9 @@ export default function CustomerDetail() {
         <GuidCopy value={row.id} />
       </div>
       <ErrorText error={error} />
+      {Number(row.deleted) === 1 ? (
+        <p className="mb-4 rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-300">{t("customers.deletedHint")}</p>
+      ) : null}
       {blocked ? <p className="mb-4 rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-300">{t("customers.blockedHint")}</p> : null}
       {inactive ? <p className="mb-4 rounded-md bg-slate-500/10 px-3 py-2 text-sm text-slate-300">{t("customers.inactiveHint")}</p> : null}
 

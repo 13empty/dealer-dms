@@ -514,7 +514,8 @@ function listCustomers(q, opts = {}) {
   const limit = Number(opts.limit) || 0;
   const lite = Boolean(opts.lite || limit);
   const filters = [];
-  filters.push(alive(customers));
+  if (opts.deleted) filters.push(eq(customers.deleted, 1));
+  else filters.push(alive(customers));
   if (opts.type) filters.push(eq(customers.type, String(opts.type)));
   if (opts.status) filters.push(eq(customers.status, String(opts.status)));
   if (query) {
@@ -950,7 +951,8 @@ function listVehicles(q, status, opts = {}) {
   const query = String(q || "").trim();
   const limit = Number(opts.limit) || 0;
   const filters = [];
-  filters.push(alive(vehicles));
+  if (opts.deleted) filters.push(eq(vehicles.deleted, 1));
+  else filters.push(alive(vehicles));
   if (status) filters.push(eq(vehicles.status, status));
   if (opts.customerId) filters.push(eq(vehicles.customerId, asId(opts.customerId)));
   if (opts.condition) filters.push(eq(vehicles.condition, String(opts.condition)));

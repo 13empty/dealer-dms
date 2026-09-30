@@ -59,6 +59,7 @@ export type Customer = {
   notes: string;
   createdAt: string;
   updatedAt?: string;
+  deleted?: number;
   lastVisit?: string | null;
   lifetime?: number;
   receivable?: number;
@@ -178,6 +179,7 @@ export type Vehicle = {
   productionDate?: string;
   alert?: string;
   updatedAt?: string;
+  deleted?: number;
   daysInStock?: number;
   lastVisit?: string | null;
   openOrders?: number;
@@ -726,7 +728,7 @@ interface DmsApi {
     remove: (id: string) => Result<{ id: string }>;
   };
   customers: {
-    list: (q?: string, opts?: { limit?: number; lite?: boolean; type?: string; status?: string; balance?: boolean }) => Result<Customer[]>;
+    list: (q?: string, opts?: { limit?: number; lite?: boolean; type?: string; status?: string; balance?: boolean; deleted?: boolean }) => Result<Customer[]>;
     get: (id: string) => Result<Customer | null>;
     create: (data: Partial<Customer> & { vehicle?: Partial<Vehicle>; force?: boolean; contacts?: CustomerContact[] }) => Result<Customer>;
     update: (id: string, data: Partial<Customer> & { force?: boolean; contacts?: CustomerContact[] }) => Result<Customer>;
@@ -739,7 +741,7 @@ interface DmsApi {
     list: (
       q?: string,
       status?: string,
-      opts?: { limit?: number; customerId?: string; kind?: string; aging?: number; condition?: string }
+      opts?: { limit?: number; customerId?: string; kind?: string; aging?: number; condition?: string; deleted?: boolean }
     ) => Result<Vehicle[]>;
     get: (id: string, opts?: { history?: boolean }) => Result<Vehicle | null>;
     create: (data: Partial<Vehicle>) => Result<Vehicle>;

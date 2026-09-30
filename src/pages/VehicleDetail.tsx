@@ -8,6 +8,8 @@ import {
 } from "../components/VehicleForm";
 import { Badge, Button, Card, ErrorText, Modal, PageHeader, GuidCopy } from "../components/ui";
 import { call, customerName, customerSearchHint, dateEs, formatNumber, money, vehicleLabel } from "../lib/format";
+import { askConfirm } from "../lib/ask";
+import { useAuth } from "../lib/auth";
 import { k, useI18n } from "../lib/i18n";
 import type { Vehicle } from "../vite-env";
 
@@ -24,6 +26,7 @@ export default function VehicleDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useI18n();
+  const { can } = useAuth();
   const [row, setRow] = useState<Vehicle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -52,6 +55,16 @@ export default function VehicleDetail() {
       setError(null);
       setRow(await call(window.dms.vehicles.update(row.id, vehicleFormPayload(form))));
       setOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function removeVehicle() {
+    if (!row || !askConfirm(t("vehicles.deleteConfirm"))) return;
+    try {
+      await call(window.dms.vehicles.remove(row.id));
+      navigate("/vehiculos");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -108,6 +121,11 @@ export default function VehicleDetail() {
             >
               {t("common.edit")}
             </Button>
+            {can.destructive && Number(row.deleted) !== 1 ? (
+              <Button variant="danger" onClick={() => void removeVehicle()}>
+                {t("common.delete")}
+              </Button>
+            ) : null}
             <Button onClick={() => navigate(newOtTo)}>{t("vehicles.newRo")}</Button>
           </>
         }
@@ -116,6 +134,9 @@ export default function VehicleDetail() {
         <GuidCopy value={row.id} />
       </div>
       <ErrorText error={error} />
+      {Number(row.deleted) === 1 ? (
+        <p className="mb-4 rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-300">{t("vehicles.deletedHint")}</p>
+      ) : null}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Badge status={row.status} label={t(k(`vehicle.${row.status}`))} />
         <Badge status={row.condition || "usado"} label={t(k(`vehicleCond.${row.condition || "usado"}`))} />

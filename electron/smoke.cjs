@@ -711,6 +711,9 @@ app.whenReady().then(async () => {
   repo.removeCustomer(ghostCust.id);
   if (repo.listCustomers().some((c) => c.id === ghostCust.id)) throw new Error("La lista de clientes muestra uno borrado");
   if (Number(repo.getCustomer(ghostCust.id)?.deleted) !== 1) throw new Error("El cliente se borró del todo");
+  if (!repo.listCustomers("", { deleted: true }).some((c) => c.id === ghostCust.id)) {
+    throw new Error("El historial no lista el cliente eliminado");
+  }
 
   const ghostVin = "ZZSOFTDELETE00001";
   const ghostCar = repo.createVehicle({
@@ -724,6 +727,9 @@ app.whenReady().then(async () => {
   repo.removeVehicle(ghostCar.id);
   if (repo.listVehicles().some((v) => v.id === ghostCar.id)) throw new Error("La lista de vehículos muestra uno borrado");
   if (Number(repo.getVehicle(ghostCar.id)?.deleted) !== 1) throw new Error("El vehículo se borró del todo");
+  if (!repo.listVehicles("", undefined, { deleted: true }).some((v) => v.id === ghostCar.id)) {
+    throw new Error("El historial no lista el vehículo eliminado");
+  }
   const revivedCar = repo.createVehicle({
     vin: ghostVin,
     make: "Honda",
