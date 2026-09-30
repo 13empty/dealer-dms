@@ -485,6 +485,7 @@ export function VehicleDraftFields({
     <div className="grid gap-3 md:grid-cols-4">
       <div className="md:col-span-2">
         <VinField
+          required
           value={form.vin}
           onChange={(vin) => setForm({ ...form, vin })}
           apply={(decoded) => setForm(applyVinDecoded(form, decoded))}
@@ -500,10 +501,10 @@ export function VehicleDraftFields({
       <Field label={t("vehicles.kms")}>
         <input value={form.km} onChange={(e) => setForm({ ...form, km: e.target.value })} />
       </Field>
-      <Field label={t("vehicles.make")}>
+      <Field label={t("vehicles.make")} required>
         <input value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} />
       </Field>
-      <Field label={t("vehicles.model")}>
+      <Field label={t("vehicles.model")} required>
         <input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
       </Field>
       <Field label={t("vehicles.trim")}>

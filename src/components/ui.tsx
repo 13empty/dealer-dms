@@ -168,12 +168,25 @@ export function FormSection({
   );
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+export function Field({
+  label,
+  hint,
+  required,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  required?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div>
-      <label>{label}</label>
+      <label>
+        {label}
+        {required ? <span className="ml-1 text-gold-400">*</span> : null}
+      </label>
       {children}
-      {hint ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-[11px] normal-case tracking-normal text-slate-500">{hint}</p> : null}
     </div>
   );
 }

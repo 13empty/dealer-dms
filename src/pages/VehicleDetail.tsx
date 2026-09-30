@@ -289,7 +289,7 @@ export default function VehicleDetail() {
       </div>
 
       {open && form ? (
-        <Modal title={t("vehicles.edit")} onClose={() => setOpen(false)} wide>
+        <Modal title={t("vehicles.edit")} onClose={() => setOpen(false)} xl>
           <VehicleFormFields form={form} setForm={setForm} owner={owner} setOwner={setOwner} t={t} />
           <div className="mt-4 flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setOpen(false)}>

@@ -173,30 +173,72 @@ export function VehicleFormFields({
   t: Translate;
 }) {
   const inventory = form.status === "en_stock" || form.status === "reservado" || form.status === "consignacion";
+  const ownerRequired = form.status === "vendido" || form.status === "cliente" || form.status === "consignacion";
 
   return (
-    <div className="space-y-5">
-      <section>
-        <h3 className="mb-3 text-sm font-medium text-slate-300">{t("vehicles.sectionIdentity")}</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <VinField
-            value={form.vin}
-            onChange={(vin) => setForm({ ...form, vin })}
-            apply={(decoded) => setForm(applyVinDecoded(form, decoded))}
-            t={t}
+    <div className="vehicle-form space-y-3">
+      <p className="text-xs text-slate-400">{t("vehicles.requiredHint")}</p>
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <VinField
+          required
+          value={form.vin}
+          onChange={(vin) => setForm({ ...form, vin })}
+          apply={(decoded) => setForm(applyVinDecoded(form, decoded))}
+          t={t}
+        />
+        <Field label={t("vehicles.plate")}>
+          <input value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value })} />
+        </Field>
+        <Field label={t("vehicles.year")}>
+          <input value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
+        </Field>
+        <Field label={t("vehicles.kms")}>
+          <input value={form.km} onChange={(e) => setForm({ ...form, km: e.target.value })} />
+        </Field>
+        <Field label={t("vehicles.make")} required>
+          <input value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} />
+        </Field>
+        <Field label={t("vehicles.model")} required>
+          <input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
+        </Field>
+        <Field label={t("vehicles.status")}>
+          <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as VehicleStatus })}>
+            {VEHICLE_STATUSES.map((id) => (
+              <option key={id} value={id}>
+                {t(k(`vehicle.${id}`))}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t("vehicles.owner")} required={ownerRequired} hint={ownerRequired ? t("vehicles.ownerRequired") : undefined}>
+          <SearchPicker
+            value={form.customerId}
+            selectedLabel={owner.label}
+            selectedHint={owner.hint}
+            placeholder={t("picker.searchCustomer")}
+            allowEmpty
+            emptyText={t("vehicles.none")}
+            onChange={(id, option) => {
+              setForm({ ...form, customerId: id });
+              setOwner({ label: option?.label || "", hint: option?.hint || "" });
+            }}
+            search={async (query) => {
+              const rows = await call(window.dms.customers.list(query, { limit: 25, lite: true }));
+              return rows.map((c) => ({
+                id: c.id,
+                label: customerName(c),
+                hint: customerSearchHint(c),
+              }));
+            }}
           />
-          <Field label={t("vehicles.plate")}>
-            <input value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value })} />
-          </Field>
-          <Field label={t("vehicles.year")}>
-            <input value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
-          </Field>
-          <Field label={t("vehicles.make")}>
-            <input value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} />
-          </Field>
-          <Field label={t("vehicles.model")}>
-            <input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
-          </Field>
+        </Field>
+      </div>
+
+      <details className="rounded-lg border border-ink-600 px-3 py-2">
+        <summary className="cursor-pointer text-sm text-slate-200">
+          {t("vehicles.more")} <span className="text-xs normal-case text-slate-500">{t("vehicles.optional")}</span>
+        </summary>
+        <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
           <Field label={t("vehicles.trim")}>
             <input value={form.trim} onChange={(e) => setForm({ ...form, trim: e.target.value })} />
           </Field>
@@ -218,12 +260,15 @@ export function VehicleFormFields({
           <Field label={t("vehicles.doors")}>
             <input value={form.doors} onChange={(e) => setForm({ ...form, doors: e.target.value })} />
           </Field>
-        </div>
-      </section>
-
-      <section>
-        <h3 className="mb-3 text-sm font-medium text-slate-300">{t("vehicles.sectionSpecs")}</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t("vehicles.condition")}>
+            <select value={form.condition} onChange={(e) => setForm({ ...form, condition: e.target.value as VehicleCondition })}>
+              {VEHICLE_CONDITIONS.map((id) => (
+                <option key={id} value={id}>
+                  {t(k(`vehicleCond.${id}`))}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label={t("vehicles.engine")}>
             <input value={form.engine} onChange={(e) => setForm({ ...form, engine: e.target.value })} />
           </Field>
@@ -254,68 +299,21 @@ export function VehicleFormFields({
               ))}
             </select>
           </Field>
-          <Field label={t("vehicles.kms")}>
-            <input value={form.km} onChange={(e) => setForm({ ...form, km: e.target.value })} />
-          </Field>
           <Field label={t("vehicles.productionDate")}>
             <input value={form.productionDate} onChange={(e) => setForm({ ...form, productionDate: e.target.value })} placeholder="YYYY-MM" />
-          </Field>
-        </div>
-      </section>
-
-      <section>
-        <h3 className="mb-3 text-sm font-medium text-slate-300">{t("vehicles.sectionStatus")}</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={t("vehicles.status")}>
-            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as VehicleStatus })}>
-              {VEHICLE_STATUSES.map((id) => (
-                <option key={id} value={id}>
-                  {t(k(`vehicle.${id}`))}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label={t("vehicles.condition")}>
-            <select value={form.condition} onChange={(e) => setForm({ ...form, condition: e.target.value as VehicleCondition })}>
-              {VEHICLE_CONDITIONS.map((id) => (
-                <option key={id} value={id}>
-                  {t(k(`vehicleCond.${id}`))}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label={t("vehicles.owner")}>
-            <SearchPicker
-              value={form.customerId}
-              selectedLabel={owner.label}
-              selectedHint={owner.hint}
-              placeholder={t("picker.searchCustomer")}
-              allowEmpty
-              emptyText={t("vehicles.none")}
-              onChange={(id, option) => {
-                setForm({ ...form, customerId: id });
-                setOwner({ label: option?.label || "", hint: option?.hint || "" });
-              }}
-              search={async (query) => {
-                const rows = await call(window.dms.customers.list(query, { limit: 25, lite: true }));
-                return rows.map((c) => ({
-                  id: c.id,
-                  label: customerName(c),
-                  hint: customerSearchHint(c),
-                }));
-              }}
-            />
           </Field>
           <Field label={t("vehicles.unitNumber")}>
             <input value={form.unitNumber} onChange={(e) => setForm({ ...form, unitNumber: e.target.value })} />
           </Field>
         </div>
-      </section>
+      </details>
 
       {inventory ? (
-        <section>
-          <h3 className="mb-3 text-sm font-medium text-slate-300">{t("vehicles.sectionInventory")}</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
+        <details className="rounded-lg border border-ink-600 px-3 py-2">
+          <summary className="cursor-pointer text-sm text-slate-200">
+            {t("vehicles.sectionInventory")} <span className="text-xs normal-case text-slate-500">{t("vehicles.optional")}</span>
+          </summary>
+          <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
             <Field label={t("vehicles.stockNumber")}>
               <input value={form.stockNumber} onChange={(e) => setForm({ ...form, stockNumber: e.target.value })} placeholder="STK-0001" />
             </Field>
@@ -335,12 +333,14 @@ export function VehicleFormFields({
               <input value={form.keyNumber} onChange={(e) => setForm({ ...form, keyNumber: e.target.value })} />
             </Field>
           </div>
-        </section>
+        </details>
       ) : null}
 
-      <section>
-        <h3 className="mb-3 text-sm font-medium text-slate-300">{t("vehicles.sectionService")}</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
+      <details className="rounded-lg border border-ink-600 px-3 py-2">
+        <summary className="cursor-pointer text-sm text-slate-200">
+          {t("vehicles.sectionService")} <span className="text-xs normal-case text-slate-500">{t("vehicles.optional")}</span>
+        </summary>
+        <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
           <Field label={t("vehicles.insurance")}>
             <input value={form.insurance} onChange={(e) => setForm({ ...form, insurance: e.target.value })} />
           </Field>
@@ -353,18 +353,16 @@ export function VehicleFormFields({
           <Field label={t("vehicles.inspectionDue")}>
             <input value={form.inspectionDue} onChange={(e) => setForm({ ...form, inspectionDue: e.target.value })} placeholder="AAAA-MM-DD" />
           </Field>
-          <div className="sm:col-span-2">
-            <Field label={t("vehicles.alert")}>
-              <input value={form.alert} onChange={(e) => setForm({ ...form, alert: e.target.value })} />
-            </Field>
-          </div>
-          <div className="sm:col-span-2">
+          <Field label={t("vehicles.alert")}>
+            <input value={form.alert} onChange={(e) => setForm({ ...form, alert: e.target.value })} />
+          </Field>
+          <div className="col-span-2 lg:col-span-3">
             <Field label={t("common.notes")}>
               <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             </Field>
           </div>
         </div>
-      </section>
+      </details>
     </div>
   );
 }

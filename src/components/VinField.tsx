@@ -29,11 +29,13 @@ export function VinField({
   onChange,
   apply,
   t,
+  required,
 }: {
   value: string;
   onChange: (vin: string) => void;
   apply: (decoded: VinDecoded) => void;
   t: Translate;
+  required?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export function VinField({
   }
 
   return (
-    <Field label="VIN">
+    <Field label="VIN" required={required}>
       <div className="flex gap-2">
         <input className="min-w-0 flex-1" value={value} onChange={(e) => onChange(e.target.value)} />
         <Button type="button" variant="ghost" className="shrink-0" disabled={busy || !value.trim()} onClick={() => void decode()}>

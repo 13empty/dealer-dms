@@ -264,6 +264,16 @@ label {
   @apply mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400;
 }
 
+.vehicle-form input:not([type="checkbox"]):not([type="radio"]),
+.vehicle-form select,
+.vehicle-form textarea {
+  @apply px-2 py-1;
+}
+
+.vehicle-form label {
+  @apply mb-0.5;
+}
+
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
