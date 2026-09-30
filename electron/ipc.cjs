@@ -70,7 +70,33 @@ function handle(channel, listener) {
   ipcMain.handle(channel, listener);
 }
 
+function wakeWindow(win) {
+  if (!win || win.isDestroyed()) return;
+  const nudge = () => {
+    if (win.isDestroyed()) return;
+    if (process.platform === "win32") {
+      win.setEnabled(false);
+      win.setEnabled(true);
+    }
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    try {
+      win.webContents.focus();
+    } catch {
+      // ignore
+    }
+  };
+  nudge();
+  setTimeout(nudge, 60);
+}
+
 function registerIpc(app) {
+  ipcMain.removeAllListeners("app:refocus");
+  ipcMain.on("app:refocus", (event) => {
+    wakeWindow(BrowserWindow.fromWebContents(event.sender));
+  });
+
   handle(
     "auth:status",
     wrap(() => {

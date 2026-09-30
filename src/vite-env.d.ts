@@ -862,6 +862,9 @@ interface DmsApi {
     seed: () => Result<unknown>;
     isEmpty: () => Result<boolean>;
   };
+  app: {
+    refocus: () => void;
+  };
   meta: {
     dbPath: () => Result<string>;
     isPackaged: () => Result<boolean>;

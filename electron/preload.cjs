@@ -11,6 +11,9 @@ function invoke(channel, ...args) {
 }
 
 contextBridge.exposeInMainWorld("dms", {
+  app: {
+    refocus: () => ipcRenderer.send("app:refocus"),
+  },
   auth: {
     status: () => invoke("auth:status"),
     setup: (data) => invoke("auth:setup", data),
