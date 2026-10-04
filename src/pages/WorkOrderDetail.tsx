@@ -16,9 +16,9 @@ const PAYS = ["cliente", "garantia", "interno", "sublet"] as const;
 
 function lineCcc(line: WorkOrderLine) {
   return {
-    complaint: line.complaint || line.opcode?.concern || "",
-    cause: line.cause || line.opcode?.cause || "",
-    correction: line.correction || line.opcode?.correction || "",
+    complaint: line.complaint || "",
+    cause: line.cause || "",
+    correction: line.correction || "",
   };
 }
 
@@ -633,7 +633,9 @@ export default function WorkOrderDetail() {
                 ) : null}
                 {(order.lines || []).map((line) => {
                   const pay = (line.payType || "cliente") as (typeof PAYS)[number];
-                  const concern = line.complaint || line.opcode?.concern || "";
+                  const concern = line.type === "part" ? "" : String(line.complaint || "").trim();
+                  const template = String(line.opcode?.concern || "").trim();
+                  const showConcern = Boolean(concern) && concern.toLocaleLowerCase() !== template.toLocaleLowerCase();
                   return (
                   <tr
                     key={line.id}
@@ -652,7 +654,7 @@ export default function WorkOrderDetail() {
                     </td>
                     <td className="px-3 py-2 align-middle">
                       <div className="truncate">{line.description}</div>
-                      {concern ? <div className="truncate text-xs text-slate-400">{concern}</div> : null}
+                      {showConcern ? <div className="truncate text-xs text-slate-400">{concern}</div> : null}
                     </td>
                     <td className="px-3 py-2 align-middle" onClick={(e) => e.stopPropagation()}>
                       {locked ? (

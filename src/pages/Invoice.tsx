@@ -28,14 +28,39 @@ function clientVisible(line: WorkOrderLine, estimate: boolean, shopCopy: boolean
   return true;
 }
 
+function norm(value: unknown) {
+  return String(value || "").trim();
+}
+
+function sameText(a: unknown, b: unknown) {
+  return norm(a).toLocaleLowerCase() === norm(b).toLocaleLowerCase();
+}
+
 function clientDescription(line: WorkOrderLine) {
-  const raw = String(line.description || "").trim();
-  const code = String(line.opcode?.code || "").trim();
-  const cut = code
-    ? new RegExp(`^${code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*[-–:·]\\s*`, "i")
-    : /^[A-Z]{2,8}(?:-[A-Z0-9]{1,8})?\s*[-–:·]\s+/;
-  const stripped = raw.replace(cut, "").trim();
+  const raw = norm(line.description);
+  if (line.type === "part" || !line.opCodeId) return raw;
+  const stripped = raw.replace(/^[A-Z0-9][A-Z0-9/_-]{0,15}\s*[·:–-]\s+/i, "").trim();
   return stripped || raw;
+}
+
+function opcodeStory(line: WorkOrderLine, text: string) {
+  if (!text) return false;
+  return [line.opcode?.concern, line.opcode?.cause, line.opcode?.correction].some((item) => norm(item) && sameText(text, item));
+}
+
+function customerOrderNote(order: WorkOrder, lines: WorkOrderLine[], field: "complaint" | "cause" | "correction") {
+  const text = norm(order[field]);
+  if (!text) return "";
+  const opcodeField = field === "complaint" ? "concern" : field;
+  const copied = lines.some((line) => line.type !== "part" && norm(line.opcode?.[opcodeField]) && sameText(text, line.opcode?.[opcodeField]));
+  return copied ? "" : text;
+}
+
+function visibleLineNote(line: WorkOrderLine, field: "complaint" | "cause" | "correction", shopCopy: boolean) {
+  const text = norm(line[field]);
+  if (!text || !shopCopy) return "";
+  if (line.type === "part" && opcodeStory(line, text)) return "";
+  return text;
 }
 
 function lineCharge(line: WorkOrderLine) {
@@ -96,6 +121,10 @@ export default function Invoice() {
       : t("invoice.workTitle", { number: order.number });
   const paidOff = Number(order.balance || 0) <= 0.009 && Number(order.paid || 0) > 0.009;
   const date = dateEs(receipt ? order.deliveredAt || order.createdAt : order.createdAt);
+  const storyLines = order.lines || [];
+  const headerComplaint = shopCopy ? norm(order.complaint) : customerOrderNote(order, storyLines, "complaint");
+  const headerCause = shopCopy ? norm(order.cause) : customerOrderNote(order, storyLines, "cause");
+  const headerCorrection = shopCopy ? norm(order.correction) : customerOrderNote(order, storyLines, "correction");
 
   return (
     <PrintDoc
@@ -173,20 +202,22 @@ export default function Invoice() {
         </div>
       </div>
 
-      <p className="mt-6 text-sm">
-        <span className="font-medium text-neutral-500">{t("workshop.complaint")}: </span>
-        {order.complaint || t("workshop.noComplaint")}
-      </p>
-      {order.cause ? (
-        <p className="mt-1 text-sm">
-          <span className="font-medium text-neutral-500">{t("workshop.cause")}: </span>
-          {order.cause}
+      {shopCopy || headerComplaint ? (
+        <p className="mt-6 text-sm">
+          <span className="font-medium text-neutral-500">{t("workshop.complaint")}: </span>
+          {headerComplaint || t("workshop.noComplaint")}
         </p>
       ) : null}
-      {order.correction ? (
+      {headerCause ? (
+        <p className="mt-1 text-sm">
+          <span className="font-medium text-neutral-500">{t("workshop.cause")}: </span>
+          {headerCause}
+        </p>
+      ) : null}
+      {headerCorrection ? (
         <p className="mt-1 text-sm">
           <span className="font-medium text-neutral-500">{t("workshop.correction")}: </span>
-          {order.correction}
+          {headerCorrection}
         </p>
       ) : null}
 
@@ -205,6 +236,9 @@ export default function Invoice() {
               const charge = lineCharge(line);
               const warranty = payOf(line) === "garantia";
               const declined = Number(line.authorized) === 0;
+              const complaintNote = visibleLineNote(line, "complaint", shopCopy);
+              const causeNote = visibleLineNote(line, "cause", shopCopy);
+              const correctionNote = visibleLineNote(line, "correction", shopCopy);
               return (
                 <tr key={line.id} className="border-b border-neutral-200">
                   <td className="py-2.5 pr-3">
@@ -214,19 +248,19 @@ export default function Invoice() {
                       {warranty ? ` · ${t("invoice.warrantyLine")}` : ""}
                       {declined ? ` · ${t("invoice.notApproved")}` : ""}
                     </div>
-                    {line.complaint ? (
+                    {complaintNote ? (
                       <div className="mt-1 text-xs text-neutral-600">
-                        {t("workshop.complaint")}: {line.complaint}
+                        {t("workshop.complaint")}: {complaintNote}
                       </div>
                     ) : null}
-                    {line.cause ? (
+                    {causeNote ? (
                       <div className="text-xs text-neutral-600">
-                        {t("workshop.cause")}: {line.cause}
+                        {t("workshop.cause")}: {causeNote}
                       </div>
                     ) : null}
-                    {line.correction ? (
+                    {correctionNote ? (
                       <div className="text-xs text-neutral-600">
-                        {t("workshop.correction")}: {line.correction}
+                        {t("workshop.correction")}: {correctionNote}
                       </div>
                     ) : null}
                   </td>

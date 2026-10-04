@@ -2295,9 +2295,9 @@ function decorateWorkOrderLine(line, opcode) {
     ...line,
     payType: line.payType || "cliente",
     authorized: line.authorized == null ? 1 : Number(line.authorized),
-    complaint: line.complaint || opcode?.concern || "",
-    cause: line.cause || opcode?.cause || "",
-    correction: line.correction || opcode?.correction || "",
+    complaint: line.complaint || "",
+    cause: line.cause || "",
+    correction: line.correction || "",
     opcode: opcode || null,
   };
 }
@@ -2698,11 +2698,6 @@ function addWorkOrderLine(id, data) {
       cause = cause || op.cause || "";
       correction = correction || op.correction || "";
       bundled = op.parts || [];
-      const patch = {};
-      if (!order.complaint && complaint) patch.complaint = complaint;
-      if (!order.cause && cause) patch.cause = cause;
-      if (!order.correction && correction) patch.correction = correction;
-      if (Object.keys(patch).length) db().update(workOrders).set(patch).where(eq(workOrders.id, id)).run();
     }
 
     if (!description) throw new Error("Describe la mano de obra o elige un Op Code");
