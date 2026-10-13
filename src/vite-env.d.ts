@@ -835,6 +835,9 @@ interface DmsApi {
     create: (data: Partial<OpCode> & { parts?: Array<{ partId: string; qty?: number }> }) => Result<OpCode>;
     update: (id: string, data: Partial<OpCode> & { parts?: Array<{ partId: string; qty?: number }> }) => Result<OpCode>;
     remove: (id: string) => Result<{ id: string; deactivated?: boolean }>;
+    shortcuts: () => Result<OpCode[]>;
+    addShortcut: (opCodeId: string) => Result<OpCode[]>;
+    removeShortcut: (opCodeId: string) => Result<OpCode[]>;
   };
   washTypes: {
     list: (opts?: { activeOnly?: boolean }) => Result<WashType[]>;

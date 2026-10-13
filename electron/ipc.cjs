@@ -247,6 +247,9 @@ function registerIpc(app) {
   handle("opCodes:create", wrap((_u, data) => repo.createOpCode(data)));
   handle("opCodes:update", wrap((_u, { id, data }) => repo.updateOpCode(id, data)));
   handle("opCodes:remove", wrap((_u, id) => repo.removeOpCode(id), { minRank: 50 }));
+  handle("opCodes:shortcuts", wrap((user) => repo.listUserShortcuts(user.id)));
+  handle("opCodes:addShortcut", wrap((user, opCodeId) => repo.addUserShortcut(user.id, opCodeId)));
+  handle("opCodes:removeShortcut", wrap((user, opCodeId) => repo.removeUserShortcut(user.id, opCodeId)));
 
   handle("washTypes:list", wrap((_u, opts) => repo.listWashTypes(opts || {})));
   handle("washTypes:create", wrap((_u, data) => repo.createWashType(data), { minRank: 50 }));

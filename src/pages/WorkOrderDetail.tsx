@@ -7,6 +7,7 @@ import { SHOP_DEFAULTS } from "../lib/canada";
 import { call, customerName, dateEs, fromDateTimeLocal, isCollected, isWashCategory, money, toDateTimeLocal, vehicleLabel, workOrderListPath, workOrderPath } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
 import { askConfirm } from "../lib/ask";
+import { useAuth } from "../lib/auth";
 import { useShop } from "../lib/shop-context";
 import type { OpCode, StaffUser, WashType, WorkOrder, WorkOrderLine, WorkOrderStatus } from "../vite-env";
 
@@ -26,6 +27,7 @@ export default function WorkOrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useI18n();
+  const { user } = useAuth();
   const { offerWash, offerTax } = useShop();
   const [order, setOrder] = useState<WorkOrder | null>(null);
   const [staff, setStaff] = useState<StaffUser[]>([]);
@@ -116,14 +118,14 @@ export default function WorkOrderDetail() {
   }, [id]);
 
   useEffect(() => {
-    void call(window.dms.opCodes.list("", { activeOnly: true, serviceLine: "taller" }))
-      .then((found) => {
-        const list = (Array.isArray(found) ? found : []).filter((op) => op.popular);
-        list.sort((a, b) => a.description.localeCompare(b.description));
-        setQuickOps(list);
-      })
+    if (!user) {
+      setQuickOps([]);
+      return;
+    }
+    void call(window.dms.opCodes.shortcuts())
+      .then((found) => setQuickOps(Array.isArray(found) ? found : []))
       .catch(() => setQuickOps([]));
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!offerWash) {

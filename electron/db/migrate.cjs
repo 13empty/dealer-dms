@@ -506,6 +506,16 @@ function migrate(sqlite) {
   applyCanadaShopDefaults(sqlite);
   backfillCustomerNames(sqlite);
   backfillUserNames(sqlite);
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS user_op_shortcuts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      op_code_id TEXT NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_user_op_shortcuts_pair ON user_op_shortcuts(user_id, op_code_id);
+    CREATE INDEX IF NOT EXISTS idx_user_op_shortcuts_user ON user_op_shortcuts(user_id);
+  `);
   addPerfIndexes(sqlite);
 }
 

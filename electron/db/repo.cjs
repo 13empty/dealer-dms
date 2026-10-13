@@ -13,6 +13,7 @@ const {
   inventoryMovements,
   opCodes,
   opCodeParts,
+  userOpShortcuts,
   workOrderPayments,
   shopSettings,
   expenses,
@@ -3669,6 +3670,57 @@ function isEmpty() {
   return Number(c?.n) === 0 && Number(v?.n) === 0 && Number(p?.n) === 0;
 }
 
+const SHORTCUT_LIMIT = 12;
+
+function listUserShortcuts(userId) {
+  const rows = db()
+    .select()
+    .from(userOpShortcuts)
+    .where(eq(userOpShortcuts.userId, asId(userId)))
+    .all()
+    .sort((a, b) => Number(a.position) - Number(b.position));
+  const out = [];
+  for (const row of rows) {
+    const op = getOpCode(row.opCodeId);
+    if (!op || isGone(op) || !op.active || isWashCategory(op.category)) continue;
+    out.push(op);
+  }
+  return out;
+}
+
+function addUserShortcut(userId, opCodeId) {
+  const uid = asId(userId);
+  const op = getOpCode(opCodeId);
+  if (!op || isGone(op) || !op.active) throw new Error("Op Code no encontrado o inactivo");
+  if (isWashCategory(op.category)) throw new Error("Esa operación no es de taller");
+  const existing = db().select().from(userOpShortcuts).where(eq(userOpShortcuts.userId, uid)).all();
+  if (existing.some((row) => asId(row.opCodeId) === asId(op.id))) return listUserShortcuts(uid);
+  if (existing.length >= SHORTCUT_LIMIT) {
+    throw new Error("Solo puedes tener 12 atajos. Quita uno para agregar otro.");
+  }
+  const position = existing.reduce((max, row) => Math.max(max, Number(row.position) || 0), 0) + 1;
+  db()
+    .insert(userOpShortcuts)
+    .values({
+      id: newGuid(),
+      userId: uid,
+      opCodeId: asId(op.id),
+      position,
+    })
+    .run();
+  return listUserShortcuts(uid);
+}
+
+function removeUserShortcut(userId, opCodeId) {
+  const uid = asId(userId);
+  const rows = db().select().from(userOpShortcuts).where(eq(userOpShortcuts.userId, uid)).all();
+  for (const row of rows) {
+    if (asId(row.opCodeId) !== asId(opCodeId)) continue;
+    db().delete(userOpShortcuts).where(eq(userOpShortcuts.id, row.id)).run();
+  }
+  return listUserShortcuts(uid);
+}
+
 function listOpCodes(q, opts = {}) {
   const query = String(q || "").trim();
   let rows = db().select().from(opCodes).orderBy(opCodes.code).all().filter((r) => !isGone(r));
@@ -3989,6 +4041,9 @@ module.exports = {
   collectMoney,
   isEmpty,
   listOpCodes,
+  listUserShortcuts,
+  addUserShortcut,
+  removeUserShortcut,
   getOpCode,
   createOpCode,
   updateOpCode,

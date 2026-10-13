@@ -247,6 +247,13 @@ const opCodeParts = sqliteTable("op_code_parts", {
   qty: real("qty").notNull().default(1),
 });
 
+const userOpShortcuts = sqliteTable("user_op_shortcuts", {
+  id: id(),
+  userId: text("user_id").notNull(),
+  opCodeId: text("op_code_id").notNull(),
+  position: integer("position").notNull().default(0),
+});
+
 const workOrderPayments = sqliteTable("work_order_payments", {
   id: id(),
   workOrderId: text("work_order_id").notNull(),
@@ -330,6 +337,7 @@ module.exports = {
   inventoryMovements,
   opCodes,
   opCodeParts,
+  userOpShortcuts,
   workOrderPayments,
   shopSettings,
   expenses,

@@ -113,6 +113,9 @@ contextBridge.exposeInMainWorld("dms", {
     create: (data) => invoke("opCodes:create", data),
     update: (id, data) => invoke("opCodes:update", { id, data }),
     remove: (id) => invoke("opCodes:remove", id),
+    shortcuts: () => invoke("opCodes:shortcuts"),
+    addShortcut: (opCodeId) => invoke("opCodes:addShortcut", opCodeId),
+    removeShortcut: (opCodeId) => invoke("opCodes:removeShortcut", opCodeId),
   },
   washTypes: {
     list: (opts) => invoke("washTypes:list", opts || {}),

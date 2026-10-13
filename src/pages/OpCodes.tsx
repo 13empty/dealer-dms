@@ -31,7 +31,7 @@ const emptyForm = {
 };
 
 export default function OpCodes() {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const { t } = useI18n();
   const { catalogs, error: catalogError, reload: reloadCatalogs, save: saveCatalogs } = useCatalogs();
   const [rows, setRows] = useState<OpCode[]>([]);
@@ -58,10 +58,8 @@ export default function OpCodes() {
 
   async function loadQuick() {
     try {
-      const found = await call(window.dms.opCodes.list("", { activeOnly: true, serviceLine: "taller" }));
-      const list = (Array.isArray(found) ? found : []).filter((op) => op.popular);
-      list.sort((a, b) => a.description.localeCompare(b.description));
-      setQuick(list);
+      const found = await call(window.dms.opCodes.shortcuts());
+      setQuick(Array.isArray(found) ? found : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -73,7 +71,7 @@ export default function OpCodes() {
 
   useEffect(() => {
     void loadQuick();
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     void call(window.dms.settings.get())
@@ -144,8 +142,9 @@ export default function OpCodes() {
   async function markQuick(id: string, on: boolean) {
     try {
       setError(null);
-      await call(window.dms.opCodes.update(id, { popular: on ? 1 : 0 }));
-      await Promise.all([load(), loadQuick()]);
+      const next = on ? await call(window.dms.opCodes.addShortcut(id)) : await call(window.dms.opCodes.removeShortcut(id));
+      setQuick(Array.isArray(next) ? next : []);
+      await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -205,7 +204,7 @@ export default function OpCodes() {
                 <tr key={row.id} className={`border-t border-ink-600 ${row.active ? "" : "opacity-50"}`}>
                   <td className="px-4 py-3 font-mono text-xs">
                     {row.code}
-                    {row.popular ? (
+                    {quick.some((op) => op.id === row.id) ? (
                       <div className="mt-1">
                         <Badge status="cerrada" label={t("opcodes.quick")} />
                       </div>
@@ -240,7 +239,7 @@ export default function OpCodes() {
         <div className="space-y-4">
           <Card className="p-4">
             <div className="text-sm font-medium">{t("opcodes.quickTitle")}</div>
-            <p className="mt-1 text-xs text-slate-500">{t("opcodes.quickHint")}</p>
+            <p className="mt-1 text-xs text-slate-500">{t("opcodes.quickHint", { name: user?.name || t("opcodes.quickYou") })}</p>
             <div className="mt-3">
               <SearchPicker
                 value=""
@@ -251,8 +250,8 @@ export default function OpCodes() {
                 search={async (query) => {
                   const found = await call(window.dms.opCodes.list(query, { activeOnly: true, serviceLine: "taller" }));
                   return (Array.isArray(found) ? found : [])
-                    .filter((op) => !op.popular)
-                    .slice(0, 12)
+                    .filter((op) => !quick.some((item) => item.id === op.id))
+                    .slice(0, 25)
                     .map((op) => ({
                       id: op.id,
                       label: `${op.code} · ${op.description}`,
@@ -426,10 +425,6 @@ export default function OpCodes() {
                 <p className="mt-2 text-xs text-slate-500">{t("opcodes.noParts")}</p>
               )}
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={form.popular} onChange={(e) => setForm({ ...form, popular: e.target.checked })} />
-              {t("opcodes.quickFlag")}
-            </label>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
               {t("opcodes.activeFlag")}
