@@ -41,6 +41,7 @@ export default function OpCodes() {
   const [editing, setEditing] = useState<OpCode | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [defaultRate, setDefaultRate] = useState(String(SHOP_DEFAULTS.laborRate));
+  const [quick, setQuick] = useState<OpCode[]>([]);
   const categories = (catalogs?.opcodeCategories || [])
     .map((item) => item.id)
     .filter((id) => id !== "lavado" && id !== "detailing");
@@ -55,9 +56,24 @@ export default function OpCodes() {
     }
   }
 
+  async function loadQuick() {
+    try {
+      const found = await call(window.dms.opCodes.list("", { activeOnly: true, serviceLine: "taller" }));
+      const list = (Array.isArray(found) ? found : []).filter((op) => op.popular);
+      list.sort((a, b) => a.description.localeCompare(b.description));
+      setQuick(list);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   useEffect(() => {
     void load();
   }, [q]);
+
+  useEffect(() => {
+    void loadQuick();
+  }, []);
 
   useEffect(() => {
     void call(window.dms.settings.get())
@@ -119,7 +135,17 @@ export default function OpCodes() {
       if (editing) await call(window.dms.opCodes.update(editing.id, payload()));
       else await call(window.dms.opCodes.create(payload()));
       setOpen(false);
-      await Promise.all([load(), reloadCatalogs()]);
+      await Promise.all([load(), loadQuick(), reloadCatalogs()]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function markQuick(id: string, on: boolean) {
+    try {
+      setError(null);
+      await call(window.dms.opCodes.update(id, { popular: on ? 1 : 0 }));
+      await Promise.all([load(), loadQuick()]);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -129,7 +155,7 @@ export default function OpCodes() {
     if (!(await askConfirm(t("opcodes.deleteConfirm")))) return;
     try {
       await call(window.dms.opCodes.remove(id));
-      await Promise.all([load(), reloadCatalogs()]);
+      await Promise.all([load(), loadQuick(), reloadCatalogs()]);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -181,7 +207,7 @@ export default function OpCodes() {
                     {row.code}
                     {row.popular ? (
                       <div className="mt-1">
-                        <Badge status="cerrada" label={t("opcodes.popular")} />
+                        <Badge status="cerrada" label={t("opcodes.quick")} />
                       </div>
                     ) : null}
                   </td>
@@ -212,6 +238,49 @@ export default function OpCodes() {
           </table>
         </Card>
         <div className="space-y-4">
+          <Card className="p-4">
+            <div className="text-sm font-medium">{t("opcodes.quickTitle")}</div>
+            <p className="mt-1 text-xs text-slate-500">{t("opcodes.quickHint")}</p>
+            <div className="mt-3">
+              <SearchPicker
+                value=""
+                placeholder={t("opcodes.quickAdd")}
+                onChange={(id) => {
+                  if (id) void markQuick(id, true);
+                }}
+                search={async (query) => {
+                  const found = await call(window.dms.opCodes.list(query, { activeOnly: true, serviceLine: "taller" }));
+                  return (Array.isArray(found) ? found : [])
+                    .filter((op) => !op.popular)
+                    .slice(0, 12)
+                    .map((op) => ({
+                      id: op.id,
+                      label: `${op.code} · ${op.description}`,
+                      hint: `${op.laborHours} h · ${money(op.price)}`,
+                    }));
+                }}
+              />
+            </div>
+            {quick.length ? (
+              <ul className="mt-3 space-y-2">
+                {quick.map((op) => (
+                  <li key={op.id} className="flex items-start justify-between gap-2">
+                    <button type="button" className="min-w-0 text-left" onClick={() => startEdit(op)}>
+                      <div className="truncate text-sm font-medium">{op.description}</div>
+                      <div className="text-xs text-slate-500">
+                        {op.code} · {money(op.price)}
+                      </div>
+                    </button>
+                    <button type="button" className="shrink-0 text-xs text-red-300" onClick={() => void markQuick(op.id, false)}>
+                      {t("opcodes.quickRemove")}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-xs text-slate-500">{t("opcodes.quickEmpty")}</p>
+            )}
+          </Card>
           <CatalogEditor
             title={t("catalog.opcodeCats")}
             items={(catalogs?.opcodeCategories || []).filter((item) => item.id !== "lavado" && item.id !== "detailing")}
@@ -359,7 +428,7 @@ export default function OpCodes() {
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.popular} onChange={(e) => setForm({ ...form, popular: e.target.checked })} />
-              {t("opcodes.popularFlag")}
+              {t("opcodes.quickFlag")}
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />

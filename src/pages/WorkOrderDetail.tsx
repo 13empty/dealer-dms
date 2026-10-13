@@ -8,7 +8,7 @@ import { call, customerName, dateEs, fromDateTimeLocal, isCollected, isWashCateg
 import { k, useI18n } from "../lib/i18n";
 import { askConfirm } from "../lib/ask";
 import { useShop } from "../lib/shop-context";
-import type { StaffUser, WashType, WorkOrder, WorkOrderLine, WorkOrderStatus } from "../vite-env";
+import type { OpCode, StaffUser, WashType, WorkOrder, WorkOrderLine, WorkOrderStatus } from "../vite-env";
 
 const FULL_FLOW: WorkOrderStatus[] = ["recepcion", "autorizacion", "espera_partes", "en_taller", "en_espera", "lista"];
 const SIMPLE_FLOW: WorkOrderStatus[] = ["en_taller", "lista"];
@@ -56,6 +56,7 @@ export default function WorkOrderDetail() {
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [lineJob, setLineJob] = useState({ complaint: "", cause: "", correction: "" });
   const [washTypes, setWashTypes] = useState<WashType[]>([]);
+  const [quickOps, setQuickOps] = useState<OpCode[]>([]);
 
   async function load() {
     try {
@@ -113,6 +114,16 @@ export default function WorkOrderDetail() {
     setSelectedLineId(null);
     void load();
   }, [id]);
+
+  useEffect(() => {
+    void call(window.dms.opCodes.list("", { activeOnly: true, serviceLine: "taller" }))
+      .then((found) => {
+        const list = (Array.isArray(found) ? found : []).filter((op) => op.popular);
+        list.sort((a, b) => a.description.localeCompare(b.description));
+        setQuickOps(list);
+      })
+      .catch(() => setQuickOps([]));
+  }, []);
 
   useEffect(() => {
     if (!offerWash) {
@@ -603,6 +614,46 @@ export default function WorkOrderDetail() {
             </div>
             )}
           </div>
+          {order.kind !== "factura_partes" && (quickOps.length || !locked) ? (
+            <div className="border-b border-ink-600 px-4 py-3">
+              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{t("workshop.quickOps")}</div>
+                <Link className="text-xs text-gold-400 hover:underline" to="/taller/opcodes">
+                  {t("workshop.quickOpsEdit")}
+                </Link>
+              </div>
+              {quickOps.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {quickOps.map((op) => (
+                    <button
+                      key={op.id}
+                      type="button"
+                      disabled={locked}
+                      className="rounded-md border border-ink-600 bg-ink-800 px-3 py-1.5 text-left text-sm hover:border-gold-400/40 disabled:opacity-40"
+                      onClick={() =>
+                        void addAndSelect(() =>
+                          call(
+                            window.dms.workOrders.addLine(order.id, {
+                              type: "labor",
+                              opCodeId: op.id,
+                              payType: (op.payType as (typeof PAYS)[number]) || "cliente",
+                            })
+                          )
+                        )
+                      }
+                    >
+                      <span className="font-medium">{op.description}</span>
+                      <span className="ml-2 text-xs text-slate-400">
+                        {op.code} · {money(op.price)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">{t("workshop.quickOpsEmpty")}</p>
+              )}
+            </div>
+          ) : null}
           <div className="overflow-auto">
             <table className="w-full table-fixed text-left text-sm">
               <colgroup>
