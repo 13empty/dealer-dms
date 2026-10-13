@@ -42,6 +42,7 @@ export default function OpCodes() {
   const [form, setForm] = useState(emptyForm);
   const [defaultRate, setDefaultRate] = useState(String(SHOP_DEFAULTS.laborRate));
   const [quick, setQuick] = useState<OpCode[]>([]);
+  const [mine, setMine] = useState(false);
   const categories = (catalogs?.opcodeCategories || [])
     .map((item) => item.id)
     .filter((id) => id !== "lavado" && id !== "detailing");
@@ -81,12 +82,14 @@ export default function OpCodes() {
 
   function startCreate() {
     setEditing(null);
+    setMine(false);
     setForm({ ...emptyForm, laborRate: defaultRate, category: "", parts: [] });
     setOpen(true);
   }
 
   function startEdit(row: OpCode) {
     setEditing(row);
+    setMine(quick.some((op) => op.id === row.id));
     setForm({
       code: row.code,
       description: row.description,
@@ -130,8 +133,13 @@ export default function OpCodes() {
   async function save() {
     try {
       setError(null);
-      if (editing) await call(window.dms.opCodes.update(editing.id, payload()));
-      else await call(window.dms.opCodes.create(payload()));
+      const saved = editing
+        ? await call(window.dms.opCodes.update(editing.id, payload()))
+        : await call(window.dms.opCodes.create(payload()));
+      const wanted = mine;
+      const already = quick.some((op) => op.id === saved.id);
+      if (wanted && !already) await call(window.dms.opCodes.addShortcut(saved.id));
+      if (!wanted && already) await call(window.dms.opCodes.removeShortcut(saved.id));
       setOpen(false);
       await Promise.all([load(), loadQuick(), reloadCatalogs()]);
     } catch (e) {
@@ -222,6 +230,12 @@ export default function OpCodes() {
                   <td className="px-4 py-3">{catalogLabel(t, "opPay", row.payType)}</td>
                   <td className="px-4 py-3">{row.skillLevel}</td>
                   <td className="px-4 py-3 text-right">
+                    <button
+                      className="mr-3 text-gold-400"
+                      onClick={() => void markQuick(row.id, !quick.some((op) => op.id === row.id))}
+                    >
+                      {quick.some((op) => op.id === row.id) ? t("opcodes.quickRemove") : t("opcodes.quickPick")}
+                    </button>
                     <button className="mr-3 text-gold-400" onClick={() => startEdit(row)}>
                       {t("common.edit")}
                     </button>
@@ -425,6 +439,11 @@ export default function OpCodes() {
                 <p className="mt-2 text-xs text-slate-500">{t("opcodes.noParts")}</p>
               )}
             </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} />
+              {t("opcodes.quickMineFlag")}
+            </label>
+            <p className="-mt-2 text-xs text-slate-500">{t("opcodes.quickMineHint")}</p>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
               {t("opcodes.activeFlag")}
