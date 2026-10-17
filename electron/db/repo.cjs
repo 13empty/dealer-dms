@@ -3400,6 +3400,7 @@ function financeSummary(period) {
   ].sort((a, b) => String(b.at).localeCompare(String(a.at)));
 
   const mix = { labor: 0, parts: 0, sublet: 0, laborCost: 0, partsCost: 0, subletCost: 0 };
+  let soldHours = 0;
   const partRank = new Map();
   const opRank = new Map();
   const techRank = new Map();
@@ -3418,6 +3419,7 @@ function financeSummary(period) {
       roCount: 0,
       billed: 0,
       laborAmount: 0,
+      hours: 0,
     };
     techRow.roCount += 1;
     techRow.billed += Number(order.total || 0);
@@ -3451,6 +3453,8 @@ function financeSummary(period) {
         mix.labor += amount;
         mix.laborCost += cost;
         techRow.laborAmount += amount;
+        techRow.hours += qty;
+        soldHours += qty;
         const opKey = line.opCodeId || line.description || "labor";
         const current = opRank.get(opKey) || {
           id: opKey,
@@ -3539,6 +3543,8 @@ function financeSummary(period) {
         laborMargin: roundMoney(mix.labor - mix.laborCost),
         partsMargin: roundMoney(mix.parts - mix.partsCost),
         subletMargin: roundMoney(mix.sublet - mix.subletCost),
+        hours: Math.round(soldHours * 100) / 100,
+        effectiveRate: soldHours ? roundMoney(laborSales / soldHours) : 0,
       },
       sales: {
         units: closedSales.length,
@@ -3562,6 +3568,7 @@ function financeSummary(period) {
           roCount: row.roCount,
           billed: roundMoney(row.billed),
           laborAmount: roundMoney(row.laborAmount),
+          hours: Math.round((Number(row.hours) || 0) * 100) / 100,
         }))
         .sort((a, b) => b.billed - a.billed),
       expensesByCategory: ["partes", "renta", "servicios", "sueldos", "otros"].map((category) => ({
@@ -3575,7 +3582,30 @@ function financeSummary(period) {
       closedOrders: periodClosed(postedOrders.filter((o) => !isWashOrder(o) && o.kind !== "factura_partes")),
       closedParts: periodClosed(postedOrders.filter((o) => o.kind === "factura_partes")),
       closedWash: periodClosed(postedOrders.filter((o) => isWashOrder(o))),
+      partsStock: partsSnapshot(),
     },
+  };
+}
+
+function partsSnapshot() {
+  const rows = db().select().from(parts).all().filter((p) => !isGone(p));
+  let cost = 0;
+  let retail = 0;
+  let onOrder = 0;
+  let special = 0;
+  for (const p of rows) {
+    const stock = Math.max(0, Number(p.stock) || 0);
+    cost += stock * (Number(p.cost) || 0);
+    retail += stock * (Number(p.price) || 0);
+    if (Number(p.onOrder) > 0) onOrder += 1;
+    if (Number(p.specialOrder)) special += 1;
+  }
+  return {
+    skuCount: rows.length,
+    cost: roundMoney(cost),
+    retail: roundMoney(retail),
+    onOrder,
+    special,
   };
 }
 

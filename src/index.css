@@ -331,6 +331,47 @@ tbody tr:hover td {
   @page {
     margin: 14mm;
   }
+
+  body[data-report] [data-report-panel] {
+    display: none !important;
+  }
+
+  body[data-report="taller"] [data-report-panel="taller"],
+  body[data-report="partes"] [data-report-panel="partes"],
+  body[data-report="contaduria"] [data-report-panel="contaduria"],
+  body[data-report="ventas"] [data-report-panel="ventas"],
+  body[data-report="lavado"] [data-report-panel="lavado"] {
+    display: block !important;
+  }
+
+  body[data-report] .report-print-head {
+    display: block !important;
+  }
+
+  body[data-report] .page,
+  body[data-report] [data-report-panel],
+  body[data-report] .rounded-xl {
+    background: #fff !important;
+    color: #111 !important;
+    box-shadow: none !important;
+  }
+
+  body[data-report] .rounded-xl {
+    border-color: #d4d4d4 !important;
+  }
+
+  body[data-report] a,
+  body[data-report] .text-gold-400,
+  body[data-report] .text-amber-200,
+  body[data-report] .text-slate-300,
+  body[data-report] .text-slate-400,
+  body[data-report] .text-slate-500 {
+    color: #111 !important;
+  }
+}
+
+.report-print-head {
+  display: none;
 }
 
 .print-doc {

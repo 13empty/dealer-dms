@@ -265,6 +265,9 @@ app.whenReady().then(async () => {
   if (!weekBooks.report.closedOrders || !Array.isArray(weekBooks.report.closedOrders.rows)) {
     throw new Error("Falta el reporte de órdenes entregadas");
   }
+  if (typeof weekBooks.report.shop.hours !== "number" || !weekBooks.report.partsStock) {
+    throw new Error("Faltan horas vendidas o el valor del inventario");
+  }
   if (!weekBooks.report.aging || weekBooks.report.aging.length !== 4) throw new Error("Falta la antigüedad por cobrar");
   if (!weekBooks.from || !weekBooks.to) throw new Error("El reporte no trae rango de fechas");
   const yearBooks = repo.financeSummary("year");

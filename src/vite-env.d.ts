@@ -582,6 +582,7 @@ export type FinanceTechRow = {
   roCount: number;
   billed: number;
   laborAmount: number;
+  hours?: number;
 };
 
 export type FinanceReport = {
@@ -600,6 +601,8 @@ export type FinanceReport = {
     laborMargin: number;
     partsMargin: number;
     subletMargin: number;
+    hours?: number;
+    effectiveRate?: number;
   };
   sales: {
     units: number;
@@ -622,6 +625,13 @@ export type FinanceReport = {
   closedOrders?: FinanceClosedReport;
   closedParts?: FinanceClosedReport;
   closedWash?: FinanceClosedReport;
+  partsStock?: {
+    skuCount: number;
+    cost: number;
+    retail: number;
+    onOrder: number;
+    special: number;
+  };
 };
 
 export type FinanceClosedReport = {
