@@ -262,6 +262,9 @@ app.whenReady().then(async () => {
   if (Number(booksIn.books.collectedOther || 0) < 80) throw new Error("El ingreso suelto no sumó a caja");
   const weekBooks = repo.financeSummary("week");
   if (!weekBooks.report || !Array.isArray(weekBooks.report.topParts)) throw new Error("Falta el reporte de partes");
+  if (!weekBooks.report.closedOrders || !Array.isArray(weekBooks.report.closedOrders.rows)) {
+    throw new Error("Falta el reporte de órdenes entregadas");
+  }
   if (!weekBooks.report.aging || weekBooks.report.aging.length !== 4) throw new Error("Falta la antigüedad por cobrar");
   if (!weekBooks.from || !weekBooks.to) throw new Error("El reporte no trae rango de fechas");
   const yearBooks = repo.financeSummary("year");

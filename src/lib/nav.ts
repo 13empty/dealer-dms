@@ -1,5 +1,5 @@
 export const NAV_OPS = ["home", "workshop", "wash", "customers", "parts", "opcodes", "vehicles", "sales"] as const;
-export const NAV_OFFICE = ["finance", "settings", "sql", "users"] as const;
+export const NAV_OFFICE = ["finance", "reports", "settings", "sql", "users"] as const;
 export const NAV_IDS = [...NAV_OPS, ...NAV_OFFICE] as const;
 
 export type NavOpsId = (typeof NAV_OPS)[number];

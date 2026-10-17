@@ -619,6 +619,15 @@ export type FinanceReport = {
     declined: number;
     rows: DashboardEstimateRow[];
   };
+  closedOrders?: FinanceClosedReport;
+  closedParts?: FinanceClosedReport;
+  closedWash?: FinanceClosedReport;
+};
+
+export type FinanceClosedReport = {
+  count: number;
+  amount: number;
+  rows: DashboardClosedRow[];
 };
 
 export type FinanceSummary = {

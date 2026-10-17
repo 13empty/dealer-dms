@@ -34,6 +34,7 @@ import Wash from "./pages/Wash";
 import WashTicket from "./pages/WashTicket";
 import WorkOrderDetail from "./pages/WorkOrderDetail";
 import Finance from "./pages/Finance";
+import Reports from "./pages/Reports";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import Invoice from "./pages/Invoice";
@@ -228,6 +229,7 @@ function Shell() {
   ];
   const officeItems: MenuLink[] = [
     { id: "finance", to: "/finanzas", label: t("nav.finance"), icon: "ledger", show: can.finance },
+    { id: "reports", to: "/reportes", label: t("nav.reports"), icon: "chart", show: can.finance },
     {
       id: "settings",
       to: "/ajustes/taller",
@@ -392,6 +394,7 @@ function Shell() {
             <Route path="/lavado/:id/imprimir" element={<Invoice />} />
             <Route path="/lavado/:id" element={<WashTicket />} />
             <Route path="/finanzas" element={can.finance ? <Finance /> : <Navigate to="/" replace />} />
+            <Route path="/reportes" element={can.finance ? <Reports /> : <Navigate to="/" replace />} />
             <Route path="/ajustes" element={can.finance ? <Navigate to="/ajustes/taller" replace /> : <Navigate to="/" replace />} />
             <Route path="/ajustes/:section" element={can.finance ? <Settings /> : <Navigate to="/" replace />} />
             <Route path="/sql" element={can.options ? <SqlStudio /> : <Navigate to="/" replace />} />

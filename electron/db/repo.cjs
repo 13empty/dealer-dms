@@ -3572,7 +3572,21 @@ function financeSummary(period) {
       estimates: estimateReport(
         allOrders.filter((o) => (o.kind || "orden") === "presupuesto" && inPeriod(o.createdAt, bounds))
       ),
+      closedOrders: periodClosed(postedOrders.filter((o) => !isWashOrder(o) && o.kind !== "factura_partes")),
+      closedParts: periodClosed(postedOrders.filter((o) => o.kind === "factura_partes")),
+      closedWash: periodClosed(postedOrders.filter((o) => isWashOrder(o))),
     },
+  };
+}
+
+function periodClosed(orders) {
+  const rows = (orders || [])
+    .slice()
+    .sort((a, b) => String(b.deliveredAt || b.createdAt || "").localeCompare(String(a.deliveredAt || a.createdAt || "")));
+  return {
+    count: rows.length,
+    amount: roundMoney(rows.reduce((s, o) => s + Number(o.total || 0), 0)),
+    rows: rows.slice(0, 40).map(dashClosedRow),
   };
 }
 

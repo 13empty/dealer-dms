@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { SearchPicker, type SearchOption } from "../components/SearchPicker";
 import { Button, Card, ErrorText, Field, Modal, PageHeader } from "../components/ui";
@@ -10,29 +10,6 @@ import type { Expense, FinancePeriod, FinanceReceivable, FinanceSummary } from "
 const categories: Expense["category"][] = ["partes", "renta", "servicios", "sueldos", "otros"];
 const methods = ["efectivo", "tarjeta", "transferencia"];
 const PERIODS: FinancePeriod[] = ["today", "week", "month", "year"];
-
-function MixBar({ parts }: { parts: Array<{ key: string; amount: number; className: string }> }) {
-  const total = parts.reduce((s, p) => s + Number(p.amount || 0), 0);
-  if (total <= 0.009) return <div className="h-2 rounded-full bg-ink-700" />;
-  return (
-    <div className="flex h-2 overflow-hidden rounded-full bg-ink-700">
-      {parts
-        .filter((p) => p.amount > 0.009)
-        .map((p) => (
-          <div key={p.key} className={p.className} style={{ width: `${(p.amount / total) * 100}%` }} />
-        ))}
-    </div>
-  );
-}
-
-function ReportCard({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <Card className="overflow-hidden">
-      <div className="border-b border-ink-600 px-5 py-3 font-medium">{title}</div>
-      {children}
-    </Card>
-  );
-}
 
 function todayInput() {
   const d = new Date();
@@ -76,7 +53,6 @@ export default function Finance() {
   const [period, setPeriod] = useState<FinancePeriod>("month");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [tab, setTab] = useState<"caja" | "reportes">("reportes");
   const [data, setData] = useState<FinanceSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expenseOpen, setExpenseOpen] = useState(false);
@@ -184,7 +160,6 @@ export default function Finance() {
 
   const books = data?.books;
   const receivables = data?.receivables || [];
-  const report = data?.report;
 
   function pickPeriod(next: FinancePeriod) {
     setPeriod(next);
@@ -237,6 +212,9 @@ export default function Finance() {
                 {t("finance.range")}
               </Button>
             </div>
+            <Link className="rounded-md border border-ink-600 px-3 py-2 text-sm hover:bg-ink-700" to="/reportes">
+              {t("nav.reports")}
+            </Link>
             <Button variant="ghost" onClick={() => window.print()}>
               {t("common.print")}
             </Button>
@@ -248,25 +226,9 @@ export default function Finance() {
         }
       />
       <ErrorText error={error} />
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex rounded-md border border-ink-600">
-          <button
-            className={`px-3 py-2 text-sm ${tab === "caja" ? "bg-gold-400/15 text-gold-400" : "text-slate-300"}`}
-            onClick={() => setTab("caja")}
-          >
-            {t("finance.tabCash")}
-          </button>
-          <button
-            className={`px-3 py-2 text-sm ${tab === "reportes" ? "bg-gold-400/15 text-gold-400" : "text-slate-300"}`}
-            onClick={() => setTab("reportes")}
-          >
-            {t("finance.tabReports")}
-          </button>
-        </div>
+      <div className="mb-4 flex justify-end">
         {data?.from && data?.to ? (
-          <p className="text-sm text-slate-400">
-            {t("finance.periodRange", { from: data.from, to: data.to })}
-          </p>
+          <p className="text-sm text-slate-400">{t("finance.periodRange", { from: data.from, to: data.to })}</p>
         ) : null}
       </div>
       {books ? (
@@ -298,7 +260,7 @@ export default function Finance() {
           </Card>
         </div>
       ) : null}
-      <div className={tab === "caja" ? "grid gap-4 xl:grid-cols-2" : "hidden print:grid print:gap-4 xl:grid-cols-2"}>
+      <div className="grid gap-4 xl:grid-cols-2">
         <Card className="overflow-hidden">
           <div className="border-b border-ink-600 px-5 py-3 font-medium">{t("finance.cashbox")}</div>
           <table className="w-full text-left text-sm">
@@ -442,284 +404,6 @@ export default function Finance() {
             </table>
           )}
         </Card>
-      </div>
-      <div className={tab === "reportes" ? "mt-4 grid gap-4 xl:grid-cols-2" : "mt-4 hidden print:grid print:gap-4 xl:grid-cols-2"}>
-        <p className="xl:col-span-2 text-sm text-slate-400">{t("finance.postedHint")}</p>
-        <div className="xl:col-span-2">
-          <ReportCard title={t("finance.estimates")}>
-            {report?.estimates ? (
-              <div className="p-5 text-sm">
-                <p className="mb-4 text-slate-400">{t("finance.estimatesHint")}</p>
-                <div className="mb-4 grid grid-cols-3 gap-3">
-                  <div>
-                    <div className="text-xs uppercase text-slate-500">{t("finance.estCount")}</div>
-                    <div className="mt-1 text-xl">{report.estimates.count}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs uppercase text-slate-500">{t("finance.estQuoted")}</div>
-                    <div className="mt-1 text-xl text-amber-200">{money(report.estimates.quoted)}</div>
-                    <div className="mt-1 text-xs text-slate-500">{t("finance.estLeft")}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs uppercase text-slate-500">{t("finance.estDeclined")}</div>
-                    <div className="mt-1 text-xl">{money(report.estimates.declined)}</div>
-                  </div>
-                </div>
-                {report.estimates.rows.length ? (
-                  <table className="w-full text-left">
-                    <thead className="text-slate-400">
-                      <tr>
-                        <th className="py-1">{t("workshop.number")}</th>
-                        <th className="py-1">{t("finance.customer")}</th>
-                        <th className="py-1">{t("finance.estDate")}</th>
-                        <th className="py-1 text-right">{t("finance.estQuoted")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {report.estimates.rows.map((row) => (
-                        <tr key={row.id} className="border-t border-ink-600">
-                          <td className="py-2">
-                            <Link className="text-gold-400" to={`/taller/${row.id}`}>
-                              {row.number}
-                            </Link>
-                          </td>
-                          <td className="py-2">{row.customerName || t("common.dash")}</td>
-                          <td className="py-2">{dateEs(row.createdAt)}</td>
-                          <td className="py-2 text-right tabular-nums text-amber-200">{money(row.total)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="text-slate-400">{t("finance.noEstimates")}</p>
-                )}
-              </div>
-            ) : (
-              <p className="px-5 py-4 text-sm text-slate-400">{t("finance.noEstimates")}</p>
-            )}
-          </ReportCard>
-        </div>
-        <ReportCard title={t("finance.shopMix")}>
-          {report ? (
-            <div className="space-y-4 p-5 text-sm">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div>
-                  <div className="text-xs uppercase text-slate-500">{t("finance.roCount")}</div>
-                  <div className="mt-1 text-xl">{report.shop.roCount}</div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase text-slate-500">{t("finance.avgRo")}</div>
-                  <div className="mt-1 text-xl">{money(report.shop.avgRo)}</div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase text-slate-500">{t("finance.billed")}</div>
-                  <div className="mt-1 text-xl">{money(report.shop.billed)}</div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase text-slate-500">{t("finance.margin")}</div>
-                  <div className="mt-1 text-xl">{money(report.shop.margin)}</div>
-                </div>
-              </div>
-              <MixBar
-                parts={[
-                  { key: "labor", amount: report.shop.labor, className: "bg-gold-400" },
-                  { key: "parts", amount: report.shop.parts, className: "bg-sky-400" },
-                  { key: "sublet", amount: report.shop.sublet, className: "bg-violet-400" },
-                ]}
-              />
-              <table className="w-full text-left">
-                <thead className="text-slate-400">
-                  <tr>
-                    <th className="py-1">{t("finance.mix")}</th>
-                    <th className="py-1">{t("finance.billed")}</th>
-                    <th className="py-1">{t("finance.margin")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-t border-ink-600">
-                    <td className="py-2">{t("workshop.labor")}</td>
-                    <td>{money(report.shop.labor)}</td>
-                    <td>{money(report.shop.laborMargin)}</td>
-                  </tr>
-                  <tr className="border-t border-ink-600">
-                    <td className="py-2">{t("workshop.part")}</td>
-                    <td>{money(report.shop.parts)}</td>
-                    <td>{money(report.shop.partsMargin)}</td>
-                  </tr>
-                  <tr className="border-t border-ink-600">
-                    <td className="py-2">{t("woPay.sublet")}</td>
-                    <td>{money(report.shop.sublet)}</td>
-                    <td>{money(report.shop.subletMargin)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="px-5 py-4 text-sm text-slate-400">{t("finance.noSales")}</p>
-          )}
-        </ReportCard>
-        <ReportCard title={t("finance.unitsSold")}>
-          {report && report.sales.units > 0 ? (
-            <div className="p-5 text-sm">
-              <div className="mb-3 grid grid-cols-3 gap-3">
-                <div>
-                  <div className="text-xs uppercase text-slate-500">{t("finance.units")}</div>
-                  <div className="mt-1 text-xl">{report.sales.units}</div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase text-slate-500">{t("finance.billed")}</div>
-                  <div className="mt-1 text-xl">{money(report.sales.amount)}</div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase text-slate-500">{t("finance.margin")}</div>
-                  <div className="mt-1 text-xl">{money(report.sales.margin)}</div>
-                </div>
-              </div>
-              <table className="w-full text-left">
-                <thead className="text-slate-400">
-                  <tr>
-                    <th className="py-1">{t("vehicles.make")}</th>
-                    <th className="py-1">{t("finance.units")}</th>
-                    <th className="py-1">{t("finance.billed")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.sales.byMake.map((row) => (
-                    <tr key={row.id} className="border-t border-ink-600">
-                      <td className="py-2">{row.name}</td>
-                      <td>{row.units}</td>
-                      <td>{money(row.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="px-5 py-4 text-sm text-slate-400">{t("finance.noSales")}</p>
-          )}
-        </ReportCard>
-        <ReportCard title={t("finance.topParts")}>
-          {report && report.topParts.length ? (
-            <table className="w-full text-left text-sm">
-              <thead className="text-slate-400">
-                <tr>
-                  <th className="px-5 py-2">{t("workshop.part")}</th>
-                  <th className="px-5 py-2">{t("workshop.qty")}</th>
-                  <th className="px-5 py-2">{t("finance.billed")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.topParts.map((row) => (
-                  <tr key={row.id} className="border-t border-ink-600">
-                    <td className="px-5 py-2">
-                      {row.name}
-                      {row.sku ? <div className="text-xs text-slate-500">{row.sku}</div> : null}
-                    </td>
-                    <td className="px-5 py-2">{row.qty}</td>
-                    <td className="px-5 py-2">{money(row.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p className="px-5 py-4 text-sm text-slate-400">{t("finance.noSales")}</p>
-          )}
-        </ReportCard>
-        <ReportCard title={t("finance.topOps")}>
-          {report && report.topOps.length ? (
-            <table className="w-full text-left text-sm">
-              <thead className="text-slate-400">
-                <tr>
-                  <th className="px-5 py-2">{t("workshop.operation")}</th>
-                  <th className="px-5 py-2">{t("workshop.qty")}</th>
-                  <th className="px-5 py-2">{t("finance.billed")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.topOps.map((row) => (
-                  <tr key={row.id} className="border-t border-ink-600">
-                    <td className="px-5 py-2">
-                      {row.code ? `${row.code} · ${row.name}` : row.name}
-                    </td>
-                    <td className="px-5 py-2">{row.qty}</td>
-                    <td className="px-5 py-2">{money(row.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p className="px-5 py-4 text-sm text-slate-400">{t("finance.noSales")}</p>
-          )}
-        </ReportCard>
-        <ReportCard title={t("finance.techs")}>
-          {report && report.techs.length ? (
-            <table className="w-full text-left text-sm">
-              <thead className="text-slate-400">
-                <tr>
-                  <th className="px-5 py-2">{t("workshop.tech")}</th>
-                  <th className="px-5 py-2">{t("finance.roCount")}</th>
-                  <th className="px-5 py-2">{t("finance.billed")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.techs.map((row) => (
-                  <tr key={row.id} className="border-t border-ink-600">
-                    <td className="px-5 py-2">{row.name || t("workshop.noTech")}</td>
-                    <td className="px-5 py-2">{row.roCount}</td>
-                    <td className="px-5 py-2">{money(row.billed)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p className="px-5 py-4 text-sm text-slate-400">{t("finance.noSales")}</p>
-          )}
-        </ReportCard>
-        <ReportCard title={t("finance.expenseMix")}>
-          {report ? (
-            <div className="p-5 text-sm">
-              <MixBar
-                parts={report.expensesByCategory.map((row, i) => ({
-                  key: row.category,
-                  amount: row.amount,
-                  className: ["bg-gold-400", "bg-sky-400", "bg-violet-400", "bg-amber-400", "bg-slate-400"][i] || "bg-slate-400",
-                }))}
-              />
-              <table className="mt-3 w-full text-left">
-                <tbody>
-                  {report.expensesByCategory.map((row) => (
-                    <tr key={row.category} className="border-t border-ink-600">
-                      <td className="py-2">{t(k(`expense.${row.category}`))}</td>
-                      <td className="py-2 text-right">{money(row.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-        </ReportCard>
-        <ReportCard title={t("finance.aging")}>
-          {report ? (
-            <table className="w-full text-left text-sm">
-              <thead className="text-slate-400">
-                <tr>
-                  <th className="px-5 py-2">{t("finance.days")}</th>
-                  <th className="px-5 py-2">{t("finance.count")}</th>
-                  <th className="px-5 py-2">{t("finance.balance")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.aging.map((row) => (
-                  <tr key={row.bucket} className="border-t border-ink-600">
-                    <td className="px-5 py-2">{t(k(`finance.aging.${row.bucket}`))}</td>
-                    <td className="px-5 py-2">{row.count}</td>
-                    <td className="px-5 py-2">{money(row.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : null}
-        </ReportCard>
       </div>
       {expenseOpen ? (
         <Modal title={t("finance.addExpense")} onClose={() => setExpenseOpen(false)}>
