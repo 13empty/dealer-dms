@@ -604,6 +604,24 @@ function applyCanadaShopDefaults(sqlite) {
   );
 }
 
+function titleName(value) {
+  return String(value || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) =>
+      word
+        .split(/([-'])/)
+        .map((part) => {
+          if (!part || part === "-" || part === "'") return part;
+          const lower = part.toLocaleLowerCase("es");
+          return lower.charAt(0).toLocaleUpperCase("es") + lower.slice(1);
+        })
+        .join("")
+    )
+    .join(" ");
+}
+
 function splitLegacyName(name) {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return { firstName: "", middleName: "", lastName: "" };
@@ -661,4 +679,4 @@ function addPerfIndexes(sqlite) {
   }
 }
 
-module.exports = { migrate, nowIso, splitLegacyName, splitEmployeeName, newGuid };
+module.exports = { migrate, nowIso, splitLegacyName, splitEmployeeName, titleName, newGuid };

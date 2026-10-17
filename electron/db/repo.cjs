@@ -20,7 +20,7 @@ const {
   incomes,
 } = require("./schema.cjs");
 const { getDb, getSqlite } = require("./index.cjs");
-const { nowIso, splitLegacyName, newGuid } = require("./migrate.cjs");
+const { nowIso, splitLegacyName, titleName, newGuid } = require("./migrate.cjs");
 
 function db() {
   return getDb();
@@ -258,7 +258,7 @@ function parseJsonList(raw, mapFn) {
 
 function parseContacts(raw) {
   return parseJsonList(raw, (c) => {
-    const name = String(c?.name || "").trim();
+    const name = titleName(c?.name);
     const phone = String(c?.phone || "").trim();
     const email = String(c?.email || "").trim();
     const role = String(c?.role || "autorizado").trim() || "autorizado";
@@ -315,6 +315,9 @@ function composeName(data, current = {}) {
   if (["empresa", "flotilla", "seguro", "mayoreo"].includes(type) && !company) {
     throw new Error("Captura la razón social");
   }
+  firstName = titleName(firstName);
+  middleName = titleName(middleName);
+  lastName = titleName(lastName);
   if (!company && (!firstName || !lastName)) throw new Error("Primer nombre y apellido son obligatorios");
   const person = [firstName, middleName, lastName].filter(Boolean).join(" ");
   return {

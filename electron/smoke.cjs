@@ -180,6 +180,21 @@ app.whenReady().then(async () => {
     force: true,
   });
   if (!forced?.id) throw new Error("No dejó forzar el alta con duplicado");
+  const titled = repo.createCustomer({
+    firstName: "juan carlos",
+    middleName: "de la",
+    lastName: "cruz-garcía",
+    contacts: [{ name: "ana lópez", role: "autorizado", phone: "403 555 0199" }],
+  });
+  if (
+    titled.firstName !== "Juan Carlos" ||
+    titled.middleName !== "De La" ||
+    titled.lastName !== "Cruz-García" ||
+    titled.contacts?.[0]?.name !== "Ana López"
+  ) {
+    throw new Error("El cliente no guardó el nombre con mayúscula inicial");
+  }
+  repo.removeCustomer(titled.id);
   repo.updateCustomer(forced.id, { status: "bloqueado" });
   const blockedCar = repo.createVehicle({
     vin: "1HGCM82633A009999",
@@ -469,6 +484,18 @@ app.whenReady().then(async () => {
   if (techEmp.name !== "Técnico Luis Uno" || techEmp.firstName !== "Técnico" || techEmp.lastName !== "Uno") {
     throw new Error("El técnico no guardó el nombre partido");
   }
+  const titledEmp = auth.createUser(master, {
+    firstName: "pedro",
+    middleName: "josé",
+    lastName: "lópez",
+    username: "pedro1",
+    password: "pedro1",
+    role: "empleado",
+  });
+  if (titledEmp.name !== "Pedro José López" || titledEmp.firstName !== "Pedro" || titledEmp.lastName !== "López") {
+    throw new Error("El empleado no guardó el nombre con mayúscula inicial");
+  }
+  auth.removeUser(master, titledEmp.id);
   if (techEmp.job !== "tecnico" || !techEmp.canTech || Number(techEmp.laborRate) !== 900) {
     throw new Error("El técnico no guardó puesto, tarifa o taller");
   }

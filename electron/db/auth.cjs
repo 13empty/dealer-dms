@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const { eq, desc, sql } = require("drizzle-orm");
 const { users, workOrders } = require("./schema.cjs");
 const { getDb } = require("./index.cjs");
-const { nowIso, splitEmployeeName } = require("./migrate.cjs");
+const { nowIso, splitEmployeeName, titleName } = require("./migrate.cjs");
 
 const ROLES = {
   admin: {
@@ -89,10 +89,16 @@ function composePersonName(data, current = {}) {
     middleName = middleName || split.middleName;
     lastName = lastName || split.lastName;
   }
+  firstName = titleName(firstName);
+  middleName = titleName(middleName);
+  lastName = titleName(lastName);
   if (sentParts && (!firstName || !lastName)) {
     throw new Error("Primer nombre y apellido son obligatorios");
   }
-  const name = [firstName, middleName, lastName].filter(Boolean).join(" ") || rawName || String(current.name || "").trim();
+  const name =
+    [firstName, middleName, lastName].filter(Boolean).join(" ") ||
+    titleName(rawName) ||
+    titleName(current.name);
   if (!name) throw new Error("Nombre y usuario son obligatorios");
   return { firstName, middleName, lastName, name };
 }
