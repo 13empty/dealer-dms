@@ -3401,40 +3401,51 @@ function financeSummary(period) {
 
   const mix = { labor: 0, parts: 0, sublet: 0, laborCost: 0, partsCost: 0, subletCost: 0 };
   let soldHours = 0;
+  let counterParts = 0;
+  let counterPartsCost = 0;
   const partRank = new Map();
   const opRank = new Map();
   const techRank = new Map();
+  const shopOrders = postedOrders.filter((o) => !isWashOrder(o) && o.kind !== "factura_partes");
+  const partsOrders = postedOrders.filter((o) => !isWashOrder(o));
   const postedPartIds = [];
-  for (const order of postedOrders) {
+  for (const order of partsOrders) {
     for (const line of order.lines || []) {
       if (line.partId) postedPartIds.push(line.partId);
     }
   }
   const postedPartBy = new Map(fetchByIds(parts, parts.id, postedPartIds).map((p) => [p.id, p]));
-  for (const order of postedOrders) {
+  for (const order of partsOrders) {
+    const shopRo = order.kind !== "factura_partes";
     const techKey = order.techUserId || "none";
-    const techRow = techRank.get(techKey) || {
-      id: techKey,
-      name: order.tech?.name || "",
-      roCount: 0,
-      billed: 0,
-      laborAmount: 0,
-      hours: 0,
-    };
-    techRow.roCount += 1;
-    techRow.billed += Number(order.total || 0);
+    const techRow = shopRo
+      ? techRank.get(techKey) || {
+          id: techKey,
+          name: order.tech?.name || "",
+          roCount: 0,
+          billed: 0,
+          laborAmount: 0,
+          hours: 0,
+        }
+      : null;
+    if (techRow) {
+      techRow.roCount += 1;
+      techRow.billed += Number(order.total || 0);
+    }
     for (const line of order.lines || []) {
       if (Number(line.authorized) === 0) continue;
       const pay = line.payType || "cliente";
       const amount = lineTotal(line);
       const cost = lineCost(line);
       const qty = Number(line.qty || 0);
-      if (pay === "sublet") {
-        mix.sublet += amount;
-        mix.subletCost += cost;
-      } else if (line.type === "part") {
-        mix.parts += amount;
-        mix.partsCost += cost;
+      if (line.type === "part") {
+        if (shopRo) {
+          mix.parts += amount;
+          mix.partsCost += cost;
+        } else {
+          counterParts += amount;
+          counterPartsCost += cost;
+        }
         const partKey = line.partId || line.description || "part";
         const part = line.partId ? postedPartBy.get(line.partId) : null;
         const current = partRank.get(partKey) || {
@@ -3449,28 +3460,34 @@ function financeSummary(period) {
         current.amount += amount;
         current.cost += cost;
         partRank.set(partKey, current);
-      } else {
-        mix.labor += amount;
-        mix.laborCost += cost;
-        techRow.laborAmount += amount;
-        techRow.hours += qty;
-        soldHours += qty;
-        const opKey = line.opCodeId || line.description || "labor";
-        const current = opRank.get(opKey) || {
-          id: opKey,
-          code: line.opcode?.code || "",
-          name: line.opcode?.description || line.description || "",
-          qty: 0,
-          amount: 0,
-          cost: 0,
-        };
-        current.qty += qty;
-        current.amount += amount;
-        current.cost += cost;
-        opRank.set(opKey, current);
+        continue;
       }
+      if (!shopRo) continue;
+      if (pay === "sublet") {
+        mix.sublet += amount;
+        mix.subletCost += cost;
+        continue;
+      }
+      mix.labor += amount;
+      mix.laborCost += cost;
+      techRow.laborAmount += amount;
+      techRow.hours += qty;
+      soldHours += qty;
+      const opKey = line.opCodeId || line.description || "labor";
+      const current = opRank.get(opKey) || {
+        id: opKey,
+        code: line.opcode?.code || "",
+        name: line.opcode?.description || line.description || "",
+        qty: 0,
+        amount: 0,
+        cost: 0,
+      };
+      current.qty += qty;
+      current.amount += amount;
+      current.cost += cost;
+      opRank.set(opKey, current);
     }
-    techRank.set(techKey, techRow);
+    if (techRow) techRank.set(techKey, techRow);
   }
 
   const closedSales = allSales.filter((s) => s.status !== "borrador" && inPeriod(s.closedAt || s.createdAt, bounds));
@@ -3502,9 +3519,11 @@ function financeSummary(period) {
   const laborSales = roundMoney(mix.labor);
   const partsSales = roundMoney(mix.parts);
   const subletSales = roundMoney(mix.sublet);
-  const shopBilled = roundMoney(postedOrders.reduce((s, o) => s + Number(o.total || 0), 0));
-  const shopCost = roundMoney(postedOrders.reduce((s, o) => s + Number(o.cost || 0), 0));
-  const shopCount = postedOrders.length;
+  const partsDeptSales = roundMoney(mix.parts + counterParts);
+  const partsDeptCost = roundMoney(mix.partsCost + counterPartsCost);
+  const shopBilled = roundMoney(shopOrders.reduce((s, o) => s + Number(o.total || 0), 0));
+  const shopCost = roundMoney(shopOrders.reduce((s, o) => s + Number(o.cost || 0), 0));
+  const shopCount = shopOrders.length;
 
   return {
     period: bounds.period,
@@ -3545,6 +3564,11 @@ function financeSummary(period) {
         subletMargin: roundMoney(mix.sublet - mix.subletCost),
         hours: Math.round(soldHours * 100) / 100,
         effectiveRate: soldHours ? roundMoney(laborSales / soldHours) : 0,
+      },
+      partsDept: {
+        sales: partsDeptSales,
+        cost: partsDeptCost,
+        margin: roundMoney(partsDeptSales - partsDeptCost),
       },
       sales: {
         units: closedSales.length,

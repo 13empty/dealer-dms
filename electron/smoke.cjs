@@ -268,6 +268,56 @@ app.whenReady().then(async () => {
   if (typeof weekBooks.report.shop.hours !== "number" || !weekBooks.report.partsStock) {
     throw new Error("Faltan horas vendidas o el valor del inventario");
   }
+  if (!weekBooks.report.partsDept || typeof weekBooks.report.partsDept.margin !== "number") {
+    throw new Error("Falta el margen de partes");
+  }
+  const beforeSplit = repo.financeSummary("month");
+  const hoursWo = repo.createWorkOrder({
+    customerId: plated.customerId,
+    vehicleId: plated.id,
+    complaint: "Horas de reporte",
+  });
+  repo.addWorkOrderLine(hoursWo.id, { type: "labor", description: "Alineación", qty: 2.5, unitPrice: 80 });
+  const hoursDue = repo.getWorkOrder(hoursWo.id);
+  repo.addWorkOrderPayment(hoursWo.id, { amount: hoursDue.balance, method: "efectivo", close: true });
+  const washHours = repo.createWorkOrder({
+    customerId: plated.customerId,
+    vehicleId: plated.id,
+    serviceLine: "lavado",
+    complaint: "Lavado horas",
+  });
+  repo.addWorkOrderLine(washHours.id, { type: "labor", description: "Lavado completo", qty: 9, unitPrice: 10 });
+  const washDue = repo.getWorkOrder(washHours.id);
+  repo.addWorkOrderPayment(washHours.id, { amount: washDue.balance, method: "efectivo", close: true });
+  const counterPart = repo.listParts().find((p) => Number(p.stock) > 1 && Number(p.price) > 0);
+  if (!counterPart) throw new Error("Falta una parte con stock para la factura de mostrador");
+  const counter = repo.createWorkOrder({
+    customerId: plated.customerId,
+    kind: "factura_partes",
+    complaint: "Mostrador",
+  });
+  repo.addWorkOrderLine(counter.id, { type: "part", partId: counterPart.id, qty: 1 });
+  const counterDue = repo.getWorkOrder(counter.id);
+  repo.addWorkOrderPayment(counter.id, { amount: counterDue.balance, method: "efectivo", close: true });
+  const split = repo.financeSummary("month");
+  if (Math.abs(Number(split.report.shop.hours) - (Number(beforeSplit.report.shop.hours) + 2.5)) > 0.001) {
+    throw new Error("Las horas del taller mezclan lavado o facturas de partes");
+  }
+  if (split.report.shop.roCount !== beforeSplit.report.shop.roCount + 1) {
+    throw new Error("El conteo del taller incluye lavado o facturas de partes");
+  }
+  if (split.report.shop.roCount !== split.report.closedOrders.count) {
+    throw new Error("El conteo del taller no coincide con las órdenes entregadas");
+  }
+  if (split.report.closedWash.count < beforeSplit.report.closedWash.count + 1) {
+    throw new Error("El lavado entregado no quedó en su reporte");
+  }
+  if (split.report.closedParts.count < beforeSplit.report.closedParts.count + 1) {
+    throw new Error("La factura de partes no quedó en su reporte");
+  }
+  if (Number(split.report.partsDept.sales) <= Number(beforeSplit.report.partsDept.sales)) {
+    throw new Error("La factura de mostrador no sumó en partes");
+  }
   if (!weekBooks.report.aging || weekBooks.report.aging.length !== 4) throw new Error("Falta la antigüedad por cobrar");
   if (!weekBooks.from || !weekBooks.to) throw new Error("El reporte no trae rango de fechas");
   const yearBooks = repo.financeSummary("year");

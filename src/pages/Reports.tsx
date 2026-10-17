@@ -348,7 +348,7 @@ export default function Reports() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Stat label={t("reports.inventoryCost")} value={money(stock?.cost || 0)} hint={t("reports.skuCount", { n: stock?.skuCount || 0 })} />
           <Stat label={t("reports.inventoryRetail")} value={money(stock?.retail || 0)} />
-          <Stat label={t("reports.partsGross")} value={money(shop?.partsMargin || 0)} hint={money(shop?.parts || 0)} />
+          <Stat label={t("reports.partsGross")} value={money(report?.partsDept?.margin || 0)} hint={money(report?.partsDept?.sales || 0)} />
           <Stat label={t("reports.onOrder")} value={String(stock?.onOrder || 0)} hint={t("reports.specialOrder", { n: stock?.special || 0 })} />
         </div>
         <div className="grid gap-4 xl:grid-cols-2">

@@ -604,6 +604,11 @@ export type FinanceReport = {
     hours?: number;
     effectiveRate?: number;
   };
+  partsDept?: {
+    sales: number;
+    cost: number;
+    margin: number;
+  };
   sales: {
     units: number;
     amount: number;

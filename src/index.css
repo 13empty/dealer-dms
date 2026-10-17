@@ -341,7 +341,7 @@ tbody tr:hover td {
   body[data-report="contaduria"] [data-report-panel="contaduria"],
   body[data-report="ventas"] [data-report-panel="ventas"],
   body[data-report="lavado"] [data-report-panel="lavado"] {
-    display: block !important;
+    display: grid !important;
   }
 
   body[data-report] .report-print-head {
