@@ -173,6 +173,7 @@ export default function Workshop() {
           customerId: owner ? String(owner.id) : "",
           vehicleId: chosen ? String(chosen.id) : "",
           kmIn: chosen ? String(chosen.km || 0) : "",
+          promisedAt: defaultPromisedAt(prefs.promisedDays),
           techUserId: user?.id && staffList.some((u) => u.id === user.id) ? String(user.id) : "",
         });
         setPicked({
@@ -429,7 +430,13 @@ export default function Workshop() {
         </div>
         <div className="mt-2 truncate text-xs text-slate-500">{row.complaint || t("workshop.noComplaint")}</div>
         <div className="mt-2 flex items-center justify-between text-xs">
-          {simple ? <span /> : <span className={row.overdue ? "text-red-300" : "text-slate-500"}>{dateTimeEs(row.promisedAt)}</span>}
+          {simple ? (
+            <span />
+          ) : (
+            <span className={row.promisedAt && row.overdue ? "text-red-300" : "text-slate-500"}>
+              {dateTimeEs(row.promisedAt || row.createdAt)}
+            </span>
+          )}
           <span className="flex items-center gap-2">
             {isCollected(row) && row.status !== "entregada" ? (
               <Badge status="pagada" label={t("workshop.paidOff")} />
@@ -600,7 +607,9 @@ export default function Workshop() {
                     {row.vehicle?.year} {row.vehicle?.make} {row.vehicle?.model}
                     <div className="text-xs text-slate-500">{row.vehicle?.plate || row.complaint}</div>
                   </td>
-                  <td className={`px-4 py-3 text-xs ${row.overdue ? "text-red-300" : "text-slate-400"}`}>{dateTimeEs(row.promisedAt)}</td>
+                  <td className={`px-4 py-3 text-xs ${row.promisedAt && row.overdue ? "text-red-300" : "text-slate-400"}`}>
+                    {dateTimeEs(row.promisedAt || row.createdAt)}
+                  </td>
                   <td className="px-4 py-3">{money(row.total || 0)}</td>
                   <td className="px-4 py-3">{money(row.balance || 0)}</td>
                   <td className="px-4 py-3">
