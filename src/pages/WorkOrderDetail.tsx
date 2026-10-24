@@ -619,7 +619,7 @@ export default function WorkOrderDetail() {
           {order.kind !== "factura_partes" && (quickOps.length || !locked) ? (
             <div className="border-b border-ink-600 px-4 py-3">
               <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{t("workshop.quickOps")}</div>
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("workshop.quickOps")}</div>
                 <Link className="text-xs text-gold-400 hover:underline" to="/taller/opcodes">
                   {t("workshop.quickOpsEdit")}
                 </Link>
@@ -776,7 +776,7 @@ export default function WorkOrderDetail() {
           </div>
           <div className="grid gap-3 border-t border-ink-600 p-3 md:grid-cols-3">
             <div>
-              <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">{t("workshop.addOp")}</div>
+              <div className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">{t("workshop.addOp")}</div>
               <SearchPicker
                 value={opPicked.id}
                 selectedLabel={opPicked.label}
@@ -824,7 +824,7 @@ export default function WorkOrderDetail() {
               </div>
             </div>
             <div>
-              <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">{t("workshop.freeLabor")}</div>
+              <div className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">{t("workshop.freeLabor")}</div>
               <input disabled={locked} placeholder={t("workshop.description")} value={labor.description} onChange={(e) => setLabor({ ...labor, description: e.target.value })} />
               <div className="mt-2 flex gap-2">
                 <input
@@ -857,7 +857,7 @@ export default function WorkOrderDetail() {
               </div>
             </div>
             <div>
-              <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">{t("workshop.addPart")}</div>
+              <div className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">{t("workshop.addPart")}</div>
               <SearchPicker
                 value={partPicked.id}
                 selectedLabel={partPicked.label}

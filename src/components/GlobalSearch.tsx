@@ -129,7 +129,7 @@ export function GlobalSearch() {
         onKeyDown={onKeyDown}
         className="search-field w-full rounded-lg border border-ink-600 bg-ink-950 py-1.5 pr-2.5 text-sm"
       />
-      <div className="mt-1 text-[10px] uppercase tracking-wide text-slate-500">{t("search.hint")}</div>
+      <div className="mt-1 text-xs uppercase tracking-wide text-slate-500">{t("search.hint")}</div>
       {open ? (
         <div className="absolute left-0 z-40 mt-1 max-h-80 w-[22rem] overflow-auto rounded-xl border border-ink-600 bg-ink-900 shadow-2xl">
           {loading ? <div className="px-3 py-2 text-xs text-slate-500">{t("common.loading")}</div> : null}
@@ -142,7 +142,7 @@ export function GlobalSearch() {
             if (!rows.length) return null;
             return (
               <div key={group.key}>
-                <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wide text-slate-500">{group.label}</div>
+                <div className="px-3 pt-2 pb-1 text-xs uppercase tracking-wide text-slate-500">{group.label}</div>
                 {rows.map((row) => {
                   index += 1;
                   const current = index;

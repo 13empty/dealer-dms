@@ -190,14 +190,18 @@ export function Field({
         {required ? <span className="ml-1 text-gold-400">*</span> : null}
       </label>
       {children}
-      {hint ? <p className="mt-0.5 text-[11px] normal-case tracking-normal text-slate-500">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs normal-case tracking-normal text-slate-500">{hint}</p> : null}
     </div>
   );
 }
 
 export function ErrorText({ error }: { error: string | null }) {
   if (!error) return null;
-  return <p className="mb-3 rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>;
+  return (
+    <p role="alert" className="mb-3 rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-300">
+      {error}
+    </p>
+  );
 }
 
 export function Empty({ children }: { children: ReactNode }) {

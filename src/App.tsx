@@ -265,7 +265,7 @@ function Shell() {
           <div className="flex items-start gap-3">
             <BrandMark className="h-9 w-9 shrink-0" />
             <div className="min-w-0 flex-1">
-              <div className="text-[10px] uppercase tracking-[0.22em] text-gold-400">{t("nav.brand")}</div>
+              <div className="text-xs uppercase tracking-[0.22em] text-gold-400">{t("nav.brand")}</div>
               <div className="text-base font-semibold leading-tight">
                 <ShopName />
               </div>
@@ -284,7 +284,7 @@ function Shell() {
           />
           {office.length ? (
             <div>
-              <div className="mb-1 px-3 text-[10px] uppercase tracking-[0.16em] text-slate-500">{t("nav.office")}</div>
+              <div className="mb-1 px-3 text-xs uppercase tracking-[0.16em] text-slate-500">{t("nav.office")}</div>
               <NavList
                 items={office}
                 order={prefs.navOfficeOrder}
@@ -296,7 +296,7 @@ function Shell() {
           {navCustomized ? (
             <button
               type="button"
-              className="px-3 text-left text-[11px] text-slate-500 hover:text-gold-400"
+              className="px-3 text-left text-xs text-slate-500 hover:text-gold-400"
               onClick={() => {
                 setPref("navOpsOrder", [...DEFAULT_NAV_OPS]);
                 setPref("navOfficeOrder", [...DEFAULT_NAV_OFFICE]);
@@ -305,7 +305,7 @@ function Shell() {
               {t("nav.resetOrder")}
             </button>
           ) : (
-            <p className="px-3 text-[11px] leading-snug text-slate-600">{t("nav.reorderHint")}</p>
+            <p className="px-3 text-xs leading-snug text-slate-600">{t("nav.reorderHint")}</p>
           )}
         </nav>
         <div className="border-t border-ink-600 p-3">

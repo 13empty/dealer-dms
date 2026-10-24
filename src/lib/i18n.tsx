@@ -156,6 +156,7 @@ const es = {
   "changelog.empty": "No hay notas para esta versión.",
   "changelog.history": "Versiones anteriores",
   "changelog.clickHint": "Haz clic en la versión abajo a la izquierda cuando quieras volver a ver esto.",
+  "changelog.144.contrast": "El texto secundario y los botones de Día y Vino se leen mejor. El foco del teclado se ve y el error de un formulario se anuncia.",
   "changelog.143.calendar": "La agenda marca las citas de la página web, da de alta al cliente con un VIN temporal si falta, y el horario y los feriados se pueden cambiar.",
   "changelog.142.board": "La agenda muestra el día de 08:00 a 18:00 y un clic en una hora libre abre la cita. El tablero del taller se lee por columnas.",
   "changelog.141.safe": "La agenda da de alta cliente y vehículo en la misma cita. Listas, tablero y finanzas leen menos y dejan los mismos totales.",
@@ -1485,6 +1486,7 @@ const en: Record<Msg, string> = {
   "changelog.empty": "No notes for this version.",
   "changelog.history": "Earlier versions",
   "changelog.clickHint": "Click the version at the bottom left anytime to see this again.",
+  "changelog.144.contrast": "Secondary text and the Day and Wine buttons are easier to read. Keyboard focus is visible and a form error is announced.",
   "changelog.143.calendar": "The schedule marks website bookings, creates the customer with a temporary VIN when it is missing, and hours and holidays can be changed.",
   "changelog.142.board": "The schedule shows the day from 08:00 to 18:00, and a click on an open hour starts the booking. The shop board reads as columns.",
   "changelog.141.safe": "The schedule can add a customer and vehicle while booking. Lists, the dashboard and finance read fewer rows and keep the same totals.",
@@ -2812,6 +2814,7 @@ const fr: Record<Msg, string> = {
   "changelog.empty": "Aucune note pour cette version.",
   "changelog.history": "Versions précédentes",
   "changelog.clickHint": "Cliquez sur la version en bas à gauche pour revoir ceci.",
+  "changelog.144.contrast": "Le texte secondaire et les boutons Jour et Vin se lisent mieux. Le focus clavier est visible et l'erreur d'un formulaire est annoncée.",
   "changelog.143.calendar": "L'agenda marque les rendez-vous du site, crée le client avec un NIV temporaire s'il manque, et l'horaire et les fériés peuvent être modifiés.",
   "changelog.142.board": "L'agenda montre la journée de 08:00 à 18:00 et un clic sur une heure libre ouvre le rendez-vous. Le tableau de l'atelier se lit en colonnes.",
   "changelog.141.safe": "L'agenda peut créer un client et son véhicule pendant le rendez-vous. Les listes, le tableau de bord et les finances lisent moins de lignes et gardent les mêmes totaux.",
@@ -4039,7 +4042,7 @@ export function LanguageSelect({ className = "", compact = false }: { className?
   const { locale, setLocale, locales, t } = useI18n();
   return (
     <label className={`block ${className}`}>
-      {compact ? null : <span className="mb-1 block text-[11px] uppercase tracking-wide text-slate-500">{t("common.language")}</span>}
+      {compact ? null : <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t("common.language")}</span>}
       <select value={locale} onChange={(e) => setLocale(e.target.value as AppLocale)} className={compact ? "py-1.5 text-xs" : ""}>
         {locales.map((item) => (
           <option key={item.id} value={item.id}>

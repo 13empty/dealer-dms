@@ -47,7 +47,7 @@ export default function LoginGate() {
         <div className="mb-5 flex items-start gap-3">
           <BrandMark className="h-10 w-10 shrink-0" />
           <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-[0.22em] text-gold-400">{t("nav.brand")}</div>
+            <div className="text-xs uppercase tracking-[0.22em] text-gold-400">{t("nav.brand")}</div>
             <div className="text-sm font-semibold leading-snug text-slate-100">
               <ShopName />
             </div>

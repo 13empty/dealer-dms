@@ -19,7 +19,7 @@ export function VersionButton({
       type="button"
       onClick={onClick}
       title={t("changelog.clickHint")}
-      className={`text-[11px] tabular-nums text-slate-500 transition hover:text-gold-400 hover:underline ${className}`}
+      className={`text-xs tabular-nums text-slate-500 transition hover:text-gold-400 hover:underline ${className}`}
     >
       {t("nav.version", { version })}
     </button>

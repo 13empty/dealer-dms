@@ -72,7 +72,7 @@ export default function SqlStudio() {
             }`}
           >
             <div className="truncate font-mono text-xs">{table.name}</div>
-            <div className="text-[11px] text-slate-500">
+            <div className="text-xs text-slate-500">
               {table.rows} · {table.columns.length} {t("sql.cols")}
             </div>
           </button>

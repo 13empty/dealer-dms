@@ -267,7 +267,7 @@ export default function Agenda() {
               } ${shut || holiday ? "opacity-60" : ""}`}
             >
               <div className="truncate">{label}</div>
-              <div className="mt-1 text-[11px] text-slate-500">{holiday ? holiday.name : shut ? t("agenda.closedDay") : counts.get(key) || 0}</div>
+              <div className="mt-1 text-xs text-slate-500">{holiday ? holiday.name : shut ? t("agenda.closedDay") : counts.get(key) || 0}</div>
             </button>
           );
         })}
@@ -359,13 +359,13 @@ function DayBoard({
             {hours.map((minute) => (
               <div
                 key={minute}
-                className="absolute right-2 text-[11px] leading-none text-slate-500"
+                className="absolute right-2 text-xs leading-none text-slate-500"
                 style={{ top: minute === openMin ? 6 : ((minute - openMin) / 60) * HOUR_PX + 4 }}
               >
                 {pad(Math.floor(minute / 60))}:{pad(minute % 60)}
               </div>
             ))}
-            <div className="absolute bottom-1 right-2 text-[11px] leading-none text-slate-500">
+            <div className="absolute bottom-1 right-2 text-xs leading-none text-slate-500">
               {pad(Math.floor(closeMin / 60))}:{pad(closeMin % 60)}
             </div>
           </div>
@@ -394,7 +394,7 @@ function DayBoard({
                     {item.row.source === "web" ? "Web · " : ""}
                     {clock(item.row.startsAt)} {item.row.customer?.name || "—"}
                   </div>
-                  <div className="truncate text-[11px] text-slate-400">
+                  <div className="truncate text-xs text-slate-400">
                     {item.row.tech?.name || t("agenda.unassigned")}
                     {item.row.vehicle ? ` · ${item.row.vehicle.plate || vehicleLabel(item.row.vehicle)}` : ""}
                   </div>

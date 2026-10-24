@@ -247,7 +247,7 @@ export default function Users() {
                   {row.name}
                   {me?.id === row.id ? <span className="ml-2 text-xs text-slate-500">{t("common.you")}</span> : null}
                   {row.assigned ? (
-                    <span className="ml-2 text-[11px] text-slate-500">{t("users.assigned")}</span>
+                    <span className="ml-2 text-xs text-slate-500">{t("users.assigned")}</span>
                   ) : null}
                 </td>
                 <td className="px-4 py-3 font-mono text-xs">{row.username}</td>
