@@ -1258,6 +1258,52 @@ app.whenReady().then(async () => {
   });
   if (extAgain.id !== ext.id) throw new Error("El mismo folio web creó otra cita");
   if (repo.listCustomers().length !== beforeExt + 1) throw new Error("Un folio repetido dio de alta otro cliente");
+  const beforeClosedRetry = repo.listCustomers().length;
+  const extClosed = repo.createWebAppointment({
+    firstName: "No",
+    lastName: "Otra",
+    phone: "4035550100",
+    year: 2024,
+    make: "Ford",
+    model: "F-150",
+    startsAt: new Date(2026, 10, 2, 11, 0, 0, 0).toISOString(),
+    minutes: 30,
+    complaint: "Reintento",
+    externalId: "web-smoke-1",
+  });
+  if (extClosed.id !== ext.id) throw new Error("Un reintento en feriado no devolvió la cita original");
+  if (repo.listCustomers().length !== beforeClosedRetry) throw new Error("Un reintento en feriado dio de alta un cliente");
+  repo.cancelAppointment(ext.id);
+  const extRenew = repo.createWebAppointment({
+    firstName: "Folio",
+    lastName: "Web",
+    phone: "4035550177",
+    year: 2021,
+    make: "Mazda",
+    model: "3",
+    startsAt: nextWeekday(5, 11),
+    minutes: 30,
+    complaint: "De nuevo",
+    externalId: "web-smoke-1",
+  });
+  if (!extRenew?.id || extRenew.id === ext.id) throw new Error("Cancelar la cita web no permitió agendar el mismo folio");
+  if (extRenew.customerId !== ext.customerId) throw new Error("Reagendar el folio web cambió de cliente");
+  const beforeIncomplete = repo.listCustomers().length;
+  let incomplete = false;
+  try {
+    repo.createWebAppointment({
+      firstName: "Sin",
+      lastName: "Auto",
+      phone: "4035550144",
+      startsAt: nextWeekday(5, 14),
+      minutes: 30,
+      complaint: "Incompleto",
+    });
+  } catch (error) {
+    incomplete = /año, marca y modelo/i.test(String(error.message || error));
+  }
+  if (!incomplete) throw new Error("Aceptó una cita web sin auto");
+  if (repo.listCustomers().length !== beforeIncomplete) throw new Error("Una cita web incompleta dio de alta al cliente");
   const kept = (repo.getSettings().holidays || []).map((row) =>
     row.id === "labour:2026" ? { ...row, closed: true } : { ...row, closed: row.custom ? row.closed : false }
   );

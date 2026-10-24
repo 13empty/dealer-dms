@@ -328,14 +328,18 @@ function reuseWebVehicle(customerId, data) {
 function createWebAppointment(data) {
   const repo = require("./repo.cjs");
   const minutes = durationOf(data);
-  assertOpen(data.startsAt, minutes);
   if (data.externalId) {
-    const prev = db().select().from(appointments).where(eq(appointments.externalId, String(data.externalId))).get();
-    if (prev && !isGone(prev)) return getAppointment(prev.id);
+    const prevs = db().select().from(appointments).where(eq(appointments.externalId, String(data.externalId))).all();
+    const live = prevs.find((row) => !isGone(row) && row.status !== "cancelada");
+    if (live) return getAppointment(live.id);
   }
   const year = Number(data.year);
   const make = String(data.make || "").trim();
   const model = String(data.model || "").trim();
+  if (!data.vehicleId && (!year || year < 1950 || year > 2100 || !make || !model)) {
+    throw new Error("Año, marca y modelo son obligatorios");
+  }
+  assertOpen(data.startsAt, minutes);
   let customer = null;
   if (data.customerId) customer = readCustomer(data.customerId);
   else if (data.phone) {
