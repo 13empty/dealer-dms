@@ -35,4 +35,16 @@ function getDbPath() {
   return dbPath;
 }
 
-module.exports = { openDatabase, getDb, getSqlite, getDbPath };
+function withReadOnly(fn) {
+  if (!dbPath) throw new Error("La base de datos no está abierta");
+  const reader = new Database(dbPath, { readonly: true, fileMustExist: true });
+  try {
+    reader.pragma("query_only = ON");
+    reader.pragma("busy_timeout = 5000");
+    return fn(reader);
+  } finally {
+    reader.close();
+  }
+}
+
+module.exports = { openDatabase, getDb, getSqlite, getDbPath, withReadOnly };

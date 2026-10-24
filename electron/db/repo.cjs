@@ -19,7 +19,7 @@ const {
   expenses,
   incomes,
 } = require("./schema.cjs");
-const { getDb, getSqlite } = require("./index.cjs");
+const { getDb, getSqlite, withReadOnly } = require("./index.cjs");
 const { nowIso, splitLegacyName, titleName, newGuid } = require("./migrate.cjs");
 
 function db() {
@@ -2494,6 +2494,9 @@ function updateWorkOrder(id, data) {
   const current = db().select().from(workOrders).where(eq(workOrders.id, id)).get();
   if (!current || isGone(current)) throw new Error("Orden no encontrada");
   if (current.status === "entregada") throw new Error("La orden ya fue entregada");
+  if (String(data.status || "") === "entregada") {
+    throw new Error("Usa entregar para cerrar la orden");
+  }
   db()
     .update(workOrders)
     .set({
@@ -2892,7 +2895,7 @@ function deliverWorkOrder(id, data = {}) {
   if (!order || isGone(order)) throw new Error("Orden no encontrada");
   if (order.status === "entregada") return order;
   if (isEstimate(order)) throw new Error("Convierte el presupuesto a OT antes de entregar");
-  if (Number(order.balance) > 0.009 && !Number(order.customer?.accountOpen) && !data.force) {
+  if (Number(order.balance) > 0.009 && !Number(order.customer?.accountOpen)) {
     throw new Error("Hay saldo. Cobra o abre cuenta al cliente para entregar.");
   }
   const kmOut = data.kmOut != null ? Number(data.kmOut) || 0 : Number(order.kmOut || order.kmIn || 0);
@@ -3196,17 +3199,17 @@ function dashboardKpis() {
     vehiclesInStock: Number(inStock?.n) || 0,
     vehiclesReserved: Number(reserved?.n) || 0,
     salesThisMonth: monthSales.length,
-    salesAmount,
-    salesMargin: salesPretax - salesCost,
+    salesAmount: roundMoney(salesAmount),
+    salesMargin: roundMoney(salesPretax - salesCost),
     openWorkOrders: shopOpen.length,
     readyWorkOrders: shopOpen.filter((o) => o.status === "lista").length,
     unpaidOpenOrders: unpaidOpen,
-    unpaidAmount,
+    unpaidAmount: roundMoney(unpaidAmount),
     lowStockCount: lowStock.length,
     lowStock,
-    workshopRevenue: woRevenue,
-    workshopMargin: woPretax - woCost,
-    totalMargin: salesPretax - salesCost + (woPretax - woCost),
+    workshopRevenue: roundMoney(woRevenue),
+    workshopMargin: roundMoney(woPretax - woCost),
+    totalMargin: roundMoney(salesPretax - salesCost + (woPretax - woCost)),
     inShopCount,
     waitingPartsCount,
     waitingAuthCount,
@@ -3219,9 +3222,9 @@ function dashboardKpis() {
     offerWash: offerWashOn(),
     deliveredThisMonth: deliveredWo.length,
     closedRosThisMonth: closedRosRows.length,
-    closedRosAmount: closedRosRows.reduce((s, o) => s + Number(o.total || 0), 0),
+    closedRosAmount: roundMoney(closedRosRows.reduce((s, o) => s + Number(o.total || 0), 0)),
     closedPartsThisMonth: closedPartsRows.length,
-    closedPartsAmount: closedPartsRows.reduce((s, o) => s + Number(o.total || 0), 0),
+    closedPartsAmount: roundMoney(closedPartsRows.reduce((s, o) => s + Number(o.total || 0), 0)),
     closedRos: closedRosRows.slice(0, 20).map(dashClosedRow),
     closedParts: closedPartsRows.slice(0, 20).map(dashClosedRow),
   };
@@ -3986,8 +3989,18 @@ function serializeSqlValue(value) {
 
 function serializeSqlRow(row) {
   const out = {};
-  for (const [key, value] of Object.entries(row || {})) out[key] = serializeSqlValue(value);
+  for (const [key, value] of Object.entries(row || {})) {
+    if (String(key).replace(/["`[\]]/g, "").toLowerCase() === "password_hash") {
+      out[key] = null;
+      continue;
+    }
+    out[key] = serializeSqlValue(value);
+  }
   return out;
+}
+
+function sqlCode(sql) {
+  return String(sql || "").replace(/'(?:''|[^'])*'/g, "''");
 }
 
 function assertReadOnlySql(sql) {
@@ -4006,6 +4019,9 @@ function assertReadOnlySql(sql) {
   if (/^PRAGMA\b/i.test(first) && !/^PRAGMA\s+(table_info|index_list|index_info|foreign_key_list|compile_options|database_list|table_list|function_list)\b/i.test(first)) {
     throw new Error("Ese PRAGMA no es de solo lectura");
   }
+  const code = sqlCode(first);
+  if (/\bpassword_hash\b/i.test(code)) throw new Error("Esa columna no se puede consultar");
+  if (/\b(load_extension|writefile|readfile)\b/i.test(code)) throw new Error("Esa función no está permitida");
   return first;
 }
 
@@ -4029,20 +4045,35 @@ function listSqlTables() {
 function sqlQuery(sql, opts = {}) {
   const statement = assertReadOnlySql(sql);
   const limit = Math.min(Math.max(1, Number(opts.limit) || 500), 2000);
-  const stmt = getSqlite().prepare(statement);
-  if (stmt.reader === false) throw new Error("Esa sentencia no es de lectura");
-  const columns = (stmt.columns() || []).map((c) => c.name);
-  const rows = [];
-  let truncated = false;
-  for (const row of stmt.iterate()) {
-    if (rows.length >= limit) {
-      truncated = true;
-      break;
+  return withReadOnly((reader) => {
+    let stmt;
+    try {
+      stmt = reader.prepare(statement);
+    } catch (error) {
+      const message = String(error?.message || error);
+      if (/readonly|query_only|read-only/i.test(message)) throw new Error("Solo lectura");
+      throw error;
     }
-    rows.push(serializeSqlRow(row));
-  }
-  const names = columns.length ? columns : rows[0] ? Object.keys(rows[0]) : [];
-  return { columns: names, rows, rowCount: rows.length, truncated, limit };
+    if (stmt.reader === false) throw new Error("Esa sentencia no es de lectura");
+    const columns = (stmt.columns() || []).map((c) => c.name);
+    const rows = [];
+    let truncated = false;
+    try {
+      for (const row of stmt.iterate()) {
+        if (rows.length >= limit) {
+          truncated = true;
+          break;
+        }
+        rows.push(serializeSqlRow(row));
+      }
+    } catch (error) {
+      const message = String(error?.message || error);
+      if (/readonly|query_only|read-only/i.test(message)) throw new Error("Solo lectura");
+      throw error;
+    }
+    const names = columns.length ? columns : rows[0] ? Object.keys(rows[0]) : [];
+    return { columns: names, rows, rowCount: rows.length, truncated, limit };
+  });
 }
 
 module.exports = {

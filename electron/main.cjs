@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, Menu } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const { openDatabase } = require("./db/index.cjs");
@@ -26,6 +26,42 @@ function shopTitle() {
   }
 }
 
+function isAllowedAppUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "file:") return true;
+    if (
+      isDev &&
+      parsed.protocol === "http:" &&
+      (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") &&
+      parsed.port === "5173"
+    ) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function hardenWindow(win) {
+  win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  const guard = (event, url) => {
+    if (!isAllowedAppUrl(url)) event.preventDefault();
+  };
+  win.webContents.on("will-navigate", guard);
+  win.webContents.on("will-redirect", guard);
+  if (app.isPackaged) {
+    win.webContents.on("devtools-opened", () => {
+      try {
+        win.webContents.closeDevTools();
+      } catch {
+        // ignore
+      }
+    });
+  }
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
@@ -40,8 +76,11 @@ function createWindow() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
+      devTools: !app.isPackaged,
     },
   });
+  hardenWindow(win);
 
   win.setMenuBarVisibility(false);
   win.once("ready-to-show", () => win.show());
@@ -71,6 +110,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  if (app.isPackaged) Menu.setApplicationMenu(null);
   const userData = app.getPath("userData");
   openDatabase(userData);
   setSessionPath(userData);

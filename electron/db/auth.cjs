@@ -45,12 +45,42 @@ function hashPassword(password) {
   return `${salt}:${hash}`;
 }
 
+const DUMMY_PASSWORD_HASH = hashPassword("dealer-dms-dummy-login");
+const LOGIN_LIMIT = 8;
+const LOGIN_LOCK_MS = 60_000;
+const loginFailures = new Map();
+
 function verifyPassword(password, stored) {
   if (!stored || !stored.includes(":")) return false;
   const [salt, hash] = stored.split(":");
-  const test = crypto.scryptSync(String(password), salt, 64).toString("hex");
-  if (hash.length !== test.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(test, "hex"));
+  let test;
+  try {
+    test = crypto.scryptSync(String(password), salt, 64).toString("hex");
+  } catch {
+    return false;
+  }
+  const left = Buffer.from(hash, "hex");
+  const right = Buffer.from(test, "hex");
+  if (left.length !== right.length || left.length === 0) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
+function loginKey(username) {
+  return String(username || "").trim().toLowerCase();
+}
+
+function noteLoginFailure(key) {
+  const row = loginFailures.get(key) || { count: 0, until: 0 };
+  if (row.until && row.until <= Date.now()) {
+    row.count = 0;
+    row.until = 0;
+  }
+  row.count += 1;
+  if (row.count >= LOGIN_LIMIT) {
+    row.until = Date.now() + LOGIN_LOCK_MS;
+    row.count = 0;
+  }
+  loginFailures.set(key, row);
 }
 
 const JOBS = ["tecnico", "asesor", "lavado", "partes", "ventas", "caja", "otro"];
@@ -374,12 +404,21 @@ function removeUser(actor, id) {
 }
 
 function login(username, password) {
+  const key = loginKey(username);
+  const state = loginFailures.get(key);
+  if (state?.until > Date.now()) {
+    throw new Error("Demasiados intentos. Espera un minuto e inténtalo de nuevo");
+  }
   const user = getUserByUsername(username);
-  if (!user || Number(user.deleted) === 1 || !verifyPassword(password, user.passwordHash)) {
+  const usable = user && Number(user.deleted) !== 1 ? user : null;
+  const passwordOk = verifyPassword(password, usable ? usable.passwordHash : DUMMY_PASSWORD_HASH);
+  if (!usable || !passwordOk) {
+    noteLoginFailure(key);
     throw new Error("Usuario o contraseña incorrectos");
   }
-  if (!user.active) throw new Error("Esta cuenta está desactivada");
-  return stripUser(user);
+  if (!usable.active) throw new Error("Esta cuenta está desactivada");
+  loginFailures.delete(key);
+  return stripUser(usable);
 }
 
 function setupAdmin(data) {

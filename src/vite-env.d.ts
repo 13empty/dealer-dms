@@ -813,7 +813,7 @@ interface DmsApi {
     updateLine: (lineId: string, data: Partial<WorkOrderLine>) => Result<WorkOrder>;
     removeLine: (lineId: string) => Result<WorkOrder>;
     remove: (id: string, opts?: { pruneCategories?: boolean }) => Result<{ id: string }>;
-    deliver: (id: string, data?: { kmOut?: number; force?: boolean }) => Result<WorkOrder>;
+    deliver: (id: string, data?: { kmOut?: number }) => Result<WorkOrder>;
     addPayment: (id: string, data: Partial<WorkOrderPayment> & { close?: boolean; kmOut?: number }) => Result<WorkOrder>;
     authorize: (id: string, data?: { authorizedBy?: string }) => Result<WorkOrder>;
     convert: (id: string) => Result<WorkOrder>;

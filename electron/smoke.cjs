@@ -895,7 +895,78 @@ app.whenReady().then(async () => {
   if (repo.getSettings().serviceMode !== "completo") throw new Error("No se restauró el modo completo");
   const sqlOne = repo.sqlQuery("SELECT 1 AS n");
   if (sqlOne.rows[0].n !== 1) throw new Error("SQL Studio no ejecutó SELECT");
+  const sqlLiteral = repo.sqlQuery("SELECT 'DELETE FROM users' AS n");
+  if (sqlLiteral.rows[0].n !== "DELETE FROM users") throw new Error("SQL Studio rompió un texto que solo menciona DELETE");
+  let sqlWrote = false;
+  try {
+    repo.sqlQuery("WITH x AS (SELECT 1 AS n) DELETE FROM customer_notes WHERE 0 RETURNING id");
+    sqlWrote = true;
+  } catch {
+    sqlWrote = false;
+  }
+  if (sqlWrote) throw new Error("SQL Studio ejecutó una escritura");
+  let hashLeaked = false;
+  try {
+    const hashes = repo.sqlQuery("SELECT password_hash FROM users LIMIT 1");
+    hashLeaked = hashes.rows.some((row) => row.password_hash);
+  } catch {
+    hashLeaked = false;
+  }
+  if (hashLeaked) throw new Error("SQL Studio devolvió hashes de contraseña");
+  let hashAliased = false;
+  try {
+    const aliased = repo.sqlQuery("SELECT password_hash AS h FROM users LIMIT 1");
+    hashAliased = aliased.rows.some((row) => row.h);
+  } catch {
+    hashAliased = false;
+  }
+  if (hashAliased) throw new Error("SQL Studio devolvió el hash con otro nombre");
+  const usersStar = repo.sqlQuery("SELECT * FROM users LIMIT 1");
+  if (usersStar.rows.some((row) => row.password_hash)) throw new Error("SELECT * devolvió hashes de contraseña");
   if (!repo.listSqlTables().some((t) => t.name === "parts")) throw new Error("SQL Studio no lista tablas");
+
+  const unpaid = repo.createWorkOrder({
+    customerId: plated.customerId,
+    vehicleId: plated.id,
+    complaint: "Cobro pendiente",
+  });
+  repo.addWorkOrderLine(unpaid.id, { type: "labor", description: "Mano de obra", qty: 1, unitPrice: 80 });
+  let skippedPay = false;
+  try {
+    const sneaky = repo.updateWorkOrder(unpaid.id, { status: "entregada" });
+    skippedPay = sneaky.status === "entregada";
+  } catch {
+    skippedPay = false;
+  }
+  if (skippedPay || repo.getWorkOrder(unpaid.id).status === "entregada") {
+    throw new Error("Se marcó entregada una OT con saldo sin pasar por entregar");
+  }
+  let forcedOut = false;
+  try {
+    const forcedDeliver = repo.deliverWorkOrder(unpaid.id, { force: true });
+    forcedOut = forcedDeliver.status === "entregada";
+  } catch {
+    forcedOut = false;
+  }
+  if (forcedOut || repo.getWorkOrder(unpaid.id).status === "entregada") {
+    throw new Error("force entregó una OT con saldo");
+  }
+
+  auth.createUser(admin, { name: "Candado", username: "candado", password: "candado1", role: "empleado" });
+  for (let i = 0; i < 8; i += 1) {
+    try {
+      auth.login("candado", "mala");
+    } catch {
+      // intento fallido esperado
+    }
+  }
+  let locked = false;
+  try {
+    auth.login("candado", "candado1");
+  } catch (error) {
+    locked = /demasiados intentos/i.test(String(error.message || error));
+  }
+  if (!locked) throw new Error("El login no se bloqueó tras varios intentos");
 
   const guidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   const guidRows = [ana, stockUnit, lamp, closed, openWo];
@@ -913,6 +984,12 @@ app.whenReady().then(async () => {
   if (!repo.listWorkOrders(openWo.id).some((o) => o.id === openWo.id)) throw new Error("No busca OT por GUID");
 
   const kpis = repo.dashboardKpis();
+  for (const key of ["salesAmount", "salesMargin", "unpaidAmount", "workshopRevenue", "workshopMargin", "totalMargin", "closedRosAmount", "closedPartsAmount"]) {
+    const n = Number(kpis[key]);
+    if (!Number.isFinite(n) || Math.abs(n - Math.round(n * 100) / 100) > 1e-9) {
+      throw new Error(`Dinero sin redondear: ${key}=${kpis[key]}`);
+    }
+  }
   if (typeof kpis.closedRosThisMonth !== "number" || !Array.isArray(kpis.closedRos)) {
     throw new Error("Falta el reporte de OT cerradas");
   }
