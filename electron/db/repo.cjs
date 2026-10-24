@@ -2970,6 +2970,10 @@ function shopDisplayName() {
   }
 }
 
+function calendarSettings() {
+  return require("./calendar.cjs").fromSettings(readSettingsRow());
+}
+
 function getSettings() {
   const row = readSettingsRow();
   const peek = peekNextWorkOrderNumber(row, "orden", "taller");
@@ -2991,6 +2995,31 @@ function getSettings() {
     offerWash: offerWashOn(),
     offerPartInvoices: offerPartInvoicesOn(),
     offerTax: offerTaxOn() ? 1 : 0,
+    ...require("./calendar.cjs").fromSettings(row),
+  };
+}
+
+function calendarPatch(data, current) {
+  const { parseClock, parseDays, clock, packHolidays } = require("./calendar.cjs");
+  const openMin = parseClock(data.openTime != null ? data.openTime : current.openTime, 8 * 60);
+  const closeMin = parseClock(data.closeTime != null ? data.closeTime : current.closeTime, 18 * 60);
+  if (closeMin <= openMin) throw new Error("La hora de cierre tiene que ser después de la apertura");
+  const days = parseDays(data.openDays != null ? data.openDays : current.openDays);
+  const observe =
+    data.observeHolidays != null ? (data.observeHolidays ? 1 : 0) : Number(current.observeHolidays) === 0 ? 0 : 1;
+  const skip = data.holidaySkip != null ? String(data.holidaySkip) : current.holidaySkip || "";
+  const shopHolidays = Array.isArray(data.holidays) ? packHolidays(data.holidays, observe) : current.shopHolidays || "";
+  return {
+    openTime: clock(openMin),
+    closeTime: clock(closeMin),
+    openDays: days.join(","),
+    observeHolidays: observe,
+    shopHolidays,
+    holidaySkip: skip
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) => /^\d{4}-\d{2}-\d{2}$/.test(part))
+      .join(","),
   };
 }
 
@@ -3015,6 +3044,7 @@ function saveSettings(data) {
     offerWash,
     offerPartInvoices,
     offerTax,
+    ...calendarPatch(data, current),
   });
   if (offerWash) ensureWashSetup();
   return getSettings();
@@ -4164,6 +4194,7 @@ module.exports = {
   addWorkOrderPayment,
   setWorkOrderNumber,
   getSettings,
+  calendarSettings,
   shopDisplayName,
   offerWashOn,
   offerPartInvoicesOn,
@@ -4203,6 +4234,7 @@ module.exports = {
   listAppointments: appointmentsApi.listAppointments,
   getAppointment: appointmentsApi.getAppointment,
   createAppointment: appointmentsApi.createAppointment,
+  createWebAppointment: appointmentsApi.createWebAppointment,
   updateAppointment: appointmentsApi.updateAppointment,
   cancelAppointment: appointmentsApi.cancelAppointment,
   nextAppointmentSlot: appointmentsApi.nextAppointmentSlot,

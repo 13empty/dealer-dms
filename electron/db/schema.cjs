@@ -291,6 +291,12 @@ const shopSettings = sqliteTable("shop_settings", {
   piNextNumber: integer("pi_next_number").notNull().default(1),
   offerPartInvoices: integer("offer_part_invoices").notNull().default(0),
   offerTax: integer("offer_tax").notNull().default(1),
+  openTime: text("open_time").notNull().default("08:00"),
+  closeTime: text("close_time").notNull().default("18:00"),
+  openDays: text("open_days").notNull().default("1,2,3,4,5"),
+  observeHolidays: integer("observe_holidays").notNull().default(1),
+  holidaySkip: text("holiday_skip").notNull().default(""),
+  shopHolidays: text("shop_holidays").notNull().default(""),
 });
 
 const expenses = sqliteTable("expenses", {
@@ -326,6 +332,8 @@ const appointments = sqliteTable("appointments", {
   notes: text("notes").notNull().default(""),
   workOrderId: text("work_order_id"),
   deleted: integer("deleted").notNull().default(0),
+  source: text("source").notNull().default("mostrador"),
+  externalId: text("external_id"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

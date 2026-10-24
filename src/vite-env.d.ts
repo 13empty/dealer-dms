@@ -416,6 +416,14 @@ export type ShopSettings = {
   offerWash?: boolean;
   offerPartInvoices?: boolean;
   offerTax?: boolean | number;
+  openTime?: string;
+  closeTime?: string;
+  openMin?: number;
+  closeMin?: number;
+  openDays?: number[];
+  observeHolidays?: boolean | number;
+  holidaySkip?: string;
+  holidays?: { id: string; baseId?: string; date: string; name: string; closed: boolean; custom?: boolean; year?: number }[];
   estPrefix?: string;
   estNextNumber?: number;
   estPreview?: string;
@@ -486,9 +494,10 @@ export type Appointment = {
   minutes: number;
   complaint: string;
   notes: string;
+  source?: "mostrador" | "web";
   workOrderId: string | null;
   customer: { id: string; name: string; phone: string } | null;
-  vehicle: { id: string; year?: number; make?: string; model?: string; plate?: string } | null;
+  vehicle: { id: string; year?: number; make?: string; model?: string; plate?: string; vin?: string; tempVin?: boolean } | null;
   tech: { id: string; name: string } | null;
 };
 
@@ -502,7 +511,29 @@ export type AppointmentInput = {
   minutes?: number;
   complaint?: string;
   notes?: string;
+  source?: "mostrador" | "web";
   excludeId?: string;
+};
+
+export type WebAppointmentInput = {
+  customerId?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  email?: string;
+  year?: number;
+  make?: string;
+  model?: string;
+  plate?: string;
+  vin?: string;
+  vehicleId?: string;
+  techUserId?: string | null;
+  serviceLine?: "taller" | "lavado";
+  startsAt?: string;
+  minutes?: number;
+  complaint?: string;
+  notes?: string;
+  externalId?: string;
 };
 
 export type DashboardKpis = {
@@ -944,6 +975,7 @@ interface DmsApi {
     list: (opts?: { from?: string; to?: string; serviceLine?: "taller" | "lavado"; techUserId?: string }) => Result<Appointment[]>;
     get: (id: string) => Result<Appointment | null>;
     create: (data: AppointmentInput) => Result<Appointment>;
+    createWeb: (data: WebAppointmentInput) => Result<Appointment>;
     update: (id: string, data: AppointmentInput) => Result<Appointment>;
     cancel: (id: string) => Result<Appointment>;
     next: (data: AppointmentInput) => Result<{ startsAt: string; endsAt: string; minutes: number } | null>;

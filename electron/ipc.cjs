@@ -290,6 +290,7 @@ function registerIpc(app) {
   handle("appointments:list", wrap((_u, opts) => repo.listAppointments(opts || {})));
   handle("appointments:get", wrap((_u, id) => repo.getAppointment(id)));
   handle("appointments:create", wrap((_u, data) => repo.createAppointment(data)));
+  handle("appointments:createWeb", wrap((_u, data) => repo.createWebAppointment(data)));
   handle("appointments:update", wrap((_u, { id, data }) => repo.updateAppointment(id, data)));
   handle("appointments:cancel", wrap((_u, id) => repo.cancelAppointment(id)));
   handle("appointments:next", wrap((_u, data) => repo.nextAppointmentSlot(data || {})));

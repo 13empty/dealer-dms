@@ -480,6 +480,12 @@ function migrate(sqlite) {
   addColumnIfMissing(sqlite, "shop_settings", "pi_next_number", "pi_next_number INTEGER NOT NULL DEFAULT 1");
   addColumnIfMissing(sqlite, "shop_settings", "offer_part_invoices", "offer_part_invoices INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing(sqlite, "shop_settings", "offer_tax", "offer_tax INTEGER NOT NULL DEFAULT 1");
+  addColumnIfMissing(sqlite, "shop_settings", "open_time", "open_time TEXT NOT NULL DEFAULT '08:00'");
+  addColumnIfMissing(sqlite, "shop_settings", "close_time", "close_time TEXT NOT NULL DEFAULT '18:00'");
+  addColumnIfMissing(sqlite, "shop_settings", "open_days", "open_days TEXT NOT NULL DEFAULT '1,2,3,4,5'");
+  addColumnIfMissing(sqlite, "shop_settings", "observe_holidays", "observe_holidays INTEGER NOT NULL DEFAULT 1");
+  addColumnIfMissing(sqlite, "shop_settings", "holiday_skip", "holiday_skip TEXT NOT NULL DEFAULT ''");
+  addColumnIfMissing(sqlite, "shop_settings", "shop_holidays", "shop_holidays TEXT NOT NULL DEFAULT ''");
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS record_history (
       id TEXT PRIMARY KEY,
@@ -530,6 +536,8 @@ function migrate(sqlite) {
       notes TEXT NOT NULL DEFAULT '',
       work_order_id TEXT,
       deleted INTEGER NOT NULL DEFAULT 0,
+      source TEXT NOT NULL DEFAULT 'mostrador',
+      external_id TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -537,6 +545,8 @@ function migrate(sqlite) {
     CREATE INDEX IF NOT EXISTS idx_appointments_tech ON appointments(tech_user_id);
     CREATE INDEX IF NOT EXISTS idx_appointments_customer ON appointments(customer_id);
   `);
+  addColumnIfMissing(sqlite, "appointments", "source", "source TEXT NOT NULL DEFAULT 'mostrador'");
+  addColumnIfMissing(sqlite, "appointments", "external_id", "external_id TEXT");
   addPerfIndexes(sqlite);
 }
 

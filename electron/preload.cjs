@@ -160,6 +160,7 @@ contextBridge.exposeInMainWorld("dms", {
     list: (opts) => invoke("appointments:list", opts || {}),
     get: (id) => invoke("appointments:get", id),
     create: (data) => invoke("appointments:create", data),
+    createWeb: (data) => invoke("appointments:createWeb", data),
     update: (id, data) => invoke("appointments:update", { id, data }),
     cancel: (id) => invoke("appointments:cancel", id),
     next: (data) => invoke("appointments:next", data || {}),

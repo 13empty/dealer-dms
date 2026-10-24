@@ -983,6 +983,7 @@ app.whenReady().then(async () => {
   if (!repo.listSales(closed.id).some((s) => s.id === closed.id)) throw new Error("No busca venta por GUID");
   if (!repo.listWorkOrders(openWo.id).some((o) => o.id === openWo.id)) throw new Error("No busca OT por GUID");
 
+  repo.saveSettings({ openDays: "0,1,2,3,4,5,6", observeHolidays: 0, openTime: "08:00", closeTime: "18:00" });
   const slotStart = new Date();
   slotStart.setHours(9, 0, 0, 0);
   const slotIso = slotStart.toISOString();
@@ -1056,6 +1057,213 @@ app.whenReady().then(async () => {
     complaint: "Tras cancelar",
   });
   if (!reopened?.id) throw new Error("Cancelar la cita no liberó el horario");
+
+  function nextWeekday(weekday, hour) {
+    const date = new Date();
+    date.setHours(hour, 0, 0, 0);
+    while (date.getDay() !== weekday) date.setDate(date.getDate() + 1);
+    return date.toISOString();
+  }
+  repo.saveSettings({ openTime: "06:00", closeTime: "21:00", openDays: "1,2,3,4,5", observeHolidays: 1 });
+  const early = repo.createAppointment({
+    customerId: third.id,
+    techUserId: master.id,
+    serviceLine: "taller",
+    startsAt: nextWeekday(1, 6),
+    minutes: 30,
+    complaint: "Apertura",
+  });
+  if (!early?.id) throw new Error("No se pudo citar a las 06:00");
+  let sundayBlocked = false;
+  try {
+    repo.createAppointment({
+      customerId: ana.id,
+      serviceLine: "lavado",
+      startsAt: nextWeekday(0, 10),
+      minutes: 30,
+      complaint: "Domingo",
+    });
+  } catch (error) {
+    sundayBlocked = /cerrado/i.test(String(error.message || error));
+  }
+  if (!sundayBlocked) throw new Error("El domingo no debía aceptar citas");
+  let holidayBlocked = false;
+  try {
+    const christmas = new Date(2026, 11, 25, 9, 0, 0, 0);
+    repo.createAppointment({
+      customerId: ana.id,
+      serviceLine: "lavado",
+      startsAt: christmas.toISOString(),
+      minutes: 30,
+      complaint: "Navidad",
+    });
+  } catch (error) {
+    holidayBlocked = /feriado/i.test(String(error.message || error));
+  }
+  if (!holidayBlocked) throw new Error("Navidad no se trató como feriado");
+  const beforeWeb = repo.listCustomers().length;
+  const web = repo.createWebAppointment({
+    firstName: "Sitio",
+    lastName: "Web",
+    phone: "4035550199",
+    year: 2018,
+    make: "Honda",
+    model: "Civic",
+    startsAt: nextWeekday(2, 9),
+    minutes: 45,
+    complaint: "Cambio de aceite",
+  });
+  if (web.source !== "web" || !web.vehicle?.tempVin || !String(web.vehicle.vin || "").startsWith("TMP")) {
+    throw new Error("La cita web no guardó cliente nuevo con VIN temporal");
+  }
+  const webAgain = repo.createWebAppointment({
+    firstName: "Sitio",
+    lastName: "Web",
+    phone: "4035550199",
+    year: 2019,
+    make: "Honda",
+    model: "CR-V",
+    startsAt: nextWeekday(3, 11),
+    minutes: 45,
+    complaint: "Frenos",
+  });
+  if (webAgain.customerId !== web.customerId) throw new Error("El teléfono de la web creó un cliente duplicado");
+  if (repo.listCustomers().length !== beforeWeb + 1) throw new Error("La web no dio de alta un solo cliente nuevo");
+  const holidayBook = repo.getSettings().holidays || [];
+  repo.saveSettings({
+    openTime: "06:00",
+    closeTime: "21:00",
+    openDays: "1,2,3,4,5",
+    observeHolidays: 1,
+    holidays: [
+      ...holidayBook
+        .filter((row) => row.id !== "christmas:2026")
+        .map((row) => (row.id === "family:2026" ? { ...row, date: "2026-02-17", name: "Día familiar del taller" } : row)),
+      { id: "custom-inventario", custom: true, date: "2026-11-02", name: "Inventario", closed: true, year: 2026 },
+    ],
+  });
+  const savedHolidays = repo.getSettings().holidays || [];
+  if (savedHolidays.some((row) => row.id === "christmas:2026")) throw new Error("Quitar Navidad no la sacó de la lista");
+  if (!savedHolidays.some((row) => row.date === "2026-11-02" && row.name === "Inventario")) throw new Error("No se guardó el feriado agregado");
+  if (!savedHolidays.some((row) => row.id === "family:2026" && row.date === "2026-02-17")) throw new Error("No se guardó la fecha editada");
+  let customBlocked = false;
+  try {
+    repo.createAppointment({
+      customerId: ana.id,
+      serviceLine: "taller",
+      startsAt: new Date(2026, 10, 2, 15, 0, 0, 0).toISOString(),
+      minutes: 30,
+      complaint: "Inventario",
+    });
+  } catch (error) {
+    customBlocked = /inventario/i.test(String(error.message || error));
+  }
+  if (!customBlocked) throw new Error("El feriado agregado no cerró el taller");
+  const moved = repo.createAppointment({
+    customerId: ana.id,
+    serviceLine: "lavado",
+    startsAt: new Date(2026, 1, 16, 14, 0, 0, 0).toISOString(),
+    minutes: 30,
+    complaint: "Family movido",
+  });
+  if (!moved?.id) throw new Error("La fecha original del feriado editado siguió cerrada");
+  let renamedBlocked = false;
+  try {
+    repo.createAppointment({
+      customerId: ana.id,
+      serviceLine: "taller",
+      startsAt: new Date(2026, 1, 17, 14, 0, 0, 0).toISOString(),
+      minutes: 30,
+      complaint: "Día familiar",
+    });
+  } catch (error) {
+    renamedBlocked = /día familiar del taller/i.test(String(error.message || error));
+  }
+  if (!renamedBlocked) throw new Error("El feriado editado no cerró la fecha nueva");
+  const christmasOpen = repo.createAppointment({
+    customerId: ana.id,
+    serviceLine: "taller",
+    startsAt: new Date(2026, 11, 25, 10, 0, 0, 0).toISOString(),
+    minutes: 30,
+    complaint: "Navidad quitada",
+  });
+  if (!christmasOpen?.id) throw new Error("Quitar Navidad no abrió el día");
+  let badDate = false;
+  try {
+    repo.saveSettings({ holidays: [{ id: "custom-bad", custom: true, date: "2026-02-31", name: "Imposible", closed: true }] });
+  } catch (error) {
+    badDate = /fecha real/i.test(String(error.message || error));
+  }
+  if (!badDate) throw new Error("Aceptó un feriado con fecha imposible");
+  if (!(repo.getSettings().holidays || []).some((row) => row.name === "Inventario")) {
+    throw new Error("Una fecha inválida borró los feriados");
+  }
+  const beforeRejected = repo.listCustomers().length;
+  let rejected = false;
+  try {
+    repo.createWebAppointment({
+      firstName: "No",
+      lastName: "Debe",
+      phone: "4035550188",
+      year: 2020,
+      make: "Toyota",
+      model: "Corolla",
+      startsAt: new Date(2026, 10, 2, 11, 0, 0, 0).toISOString(),
+      minutes: 30,
+      complaint: "En feriado",
+    });
+  } catch (error) {
+    rejected = /inventario/i.test(String(error.message || error));
+  }
+  if (!rejected) throw new Error("La web aceptó una cita en un feriado agregado");
+  if (repo.listCustomers().length !== beforeRejected) throw new Error("Una cita web rechazada dio de alta al cliente");
+  const formatted = repo.createWebAppointment({
+    firstName: "Sitio",
+    lastName: "Web",
+    phone: "(403) 555-0199",
+    year: 2018,
+    make: "Honda",
+    model: "Civic",
+    startsAt: nextWeekday(4, 15),
+    minutes: 30,
+    complaint: "Mismo teléfono",
+  });
+  if (formatted.customerId !== web.customerId || formatted.vehicle?.id !== web.vehicle?.id) {
+    throw new Error("Un teléfono con otro formato no reutilizó el cliente y su VIN temporal");
+  }
+  const beforeExt = repo.listCustomers().length;
+  const ext = repo.createWebAppointment({
+    firstName: "Folio",
+    lastName: "Web",
+    phone: "4035550177",
+    year: 2021,
+    make: "Mazda",
+    model: "3",
+    startsAt: nextWeekday(4, 16),
+    minutes: 30,
+    complaint: "Folio",
+    externalId: "web-smoke-1",
+  });
+  const extAgain = repo.createWebAppointment({
+    firstName: "Otro",
+    lastName: "Folio",
+    phone: "4035550166",
+    year: 2022,
+    make: "Kia",
+    model: "Rio",
+    startsAt: nextWeekday(5, 9),
+    minutes: 30,
+    complaint: "Repetido",
+    externalId: "web-smoke-1",
+  });
+  if (extAgain.id !== ext.id) throw new Error("El mismo folio web creó otra cita");
+  if (repo.listCustomers().length !== beforeExt + 1) throw new Error("Un folio repetido dio de alta otro cliente");
+  const kept = (repo.getSettings().holidays || []).map((row) =>
+    row.id === "labour:2026" ? { ...row, closed: true } : { ...row, closed: row.custom ? row.closed : false }
+  );
+  repo.saveSettings({ observeHolidays: 0, holidays: kept, openDays: "1,2,3,4,5", openTime: "06:00", closeTime: "21:00" });
+  const labour = (repo.getSettings().holidays || []).find((row) => row.id === "labour:2026");
+  if (!labour?.closed) throw new Error("Apagar los feriados de Alberta borró un día cerrado a mano");
 
   const kpis = repo.dashboardKpis();
   for (const key of ["salesAmount", "salesMargin", "unpaidAmount", "workshopRevenue", "workshopMargin", "totalMargin", "closedRosAmount", "closedPartsAmount"]) {

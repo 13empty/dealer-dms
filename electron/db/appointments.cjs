@@ -2,15 +2,23 @@ const { and, eq, ne, sql } = require("drizzle-orm");
 const { appointments, customers, vehicles, users } = require("./schema.cjs");
 const { getDb } = require("./index.cjs");
 const { nowIso, newGuid } = require("./migrate.cjs");
+const { fromSettings, slotReason } = require("./calendar.cjs");
 
 const STATUSES = ["agendada", "llegada", "hecha", "cancelada"];
 const LINES = ["taller", "lavado"];
-const OPEN_MIN = 8 * 60;
-const CLOSE_MIN = 18 * 60;
 const STEP = 15;
 
 function db() {
   return getDb();
+}
+
+function shopCalendar() {
+  return require("./repo.cjs").calendarSettings();
+}
+
+function assertOpen(startsAt, minutes) {
+  const why = slotReason(parseWhen(startsAt), minutes, shopCalendar());
+  if (why) throw new Error(why);
 }
 
 function isGone(row) {
@@ -98,6 +106,8 @@ function decorate(row) {
           make: vehicle.make,
           model: vehicle.model,
           plate: vehicle.plate || "",
+          vin: vehicle.vin || "",
+          tempVin: String(vehicle.vin || "").toUpperCase().startsWith("TMP"),
         }
       : null,
     tech: tech && !isGone(tech) && tech.active ? { id: tech.id, name: tech.name } : null,
@@ -128,24 +138,35 @@ function conflicts(candidate) {
   return rows.filter((row) => row.id !== candidate.excludeId && sameSlot(row, candidate));
 }
 
-function snapForward(start, minutes) {
+function nextMorning(cursor, cal) {
+  const next = dayStart(cursor);
+  next.setDate(next.getDate() + 1);
+  return atMinutes(next, cal.openMin);
+}
+
+function snapForward(start, minutes, cal) {
   let cursor = new Date(start);
-  if (minutesOf(cursor) < OPEN_MIN) cursor = atMinutes(cursor, OPEN_MIN);
-  const rounded = Math.ceil(minutesOf(cursor) / STEP) * STEP;
-  if (rounded !== minutesOf(cursor)) cursor = atMinutes(cursor, rounded);
-  if (minutesOf(cursor) + minutes > CLOSE_MIN) {
-    const next = dayStart(cursor);
-    next.setDate(next.getDate() + 1);
-    cursor = atMinutes(next, OPEN_MIN);
+  for (let guard = 0; guard < 21; guard += 1) {
+    if (minutesOf(cursor) < cal.openMin) cursor = atMinutes(cursor, cal.openMin);
+    const rounded = Math.ceil(minutesOf(cursor) / STEP) * STEP;
+    if (rounded !== minutesOf(cursor)) cursor = atMinutes(cursor, rounded);
+    const closedDay = !cal.openDays.includes(cursor.getDay()) || slotReason(cursor, minutes, cal).startsWith("Feriado");
+    if (closedDay || minutesOf(cursor) + minutes > cal.closeMin) {
+      cursor = nextMorning(cursor, cal);
+      continue;
+    }
+    return cursor;
   }
   return cursor;
 }
 
 function findNextSlot(candidate) {
+  const cal = shopCalendar();
   const minutes = candidate.minutes;
-  let cursor = snapForward(parseWhen(candidate.startsAt), minutes);
-  for (let i = 0; i < 14 * 48; i += 1) {
-    if (minutesOf(cursor) >= OPEN_MIN && minutesOf(cursor) + minutes <= CLOSE_MIN) {
+  let cursor = snapForward(parseWhen(candidate.startsAt), minutes, cal);
+  for (let i = 0; i < 21 * 48; i += 1) {
+    const why = slotReason(cursor, minutes, cal);
+    if (!why) {
       const ends = addMinutes(cursor, minutes);
       const hit = conflicts({
         ...candidate,
@@ -156,9 +177,7 @@ function findNextSlot(candidate) {
       cursor = addMinutes(cursor, STEP);
       continue;
     }
-    const next = dayStart(cursor);
-    next.setDate(next.getDate() + 1);
-    cursor = atMinutes(next, OPEN_MIN);
+    cursor = nextMorning(cursor, cal);
   }
   return null;
 }
@@ -214,6 +233,8 @@ function buildWindow(data, current = {}) {
     complaint: data.complaint != null ? String(data.complaint).trim() : current.complaint || "",
     notes: data.notes != null ? String(data.notes).trim() : current.notes || "",
     status: data.status != null ? data.status : current.status || "agendada",
+    source: data.source === "web" ? "web" : data.source != null ? "mostrador" : current.source || "mostrador",
+    externalId: data.externalId !== undefined ? data.externalId || null : current.externalId || null,
   };
 }
 
@@ -243,12 +264,142 @@ function getAppointment(id) {
   return decorate(db().select().from(appointments).where(eq(appointments.id, String(id || ""))).get());
 }
 
+function digits(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function tempVin() {
+  for (let i = 0; i < 6; i += 1) {
+    const vin = `TMP${newGuid().replace(/-/g, "").slice(0, 13)}`.toUpperCase();
+    const existing = db().select().from(vehicles).where(eq(vehicles.vin, vin)).get();
+    if (!existing) return vin;
+  }
+  throw new Error("No se pudo generar un VIN temporal");
+}
+
+function findCustomerByPhone(phone) {
+  const tail = digits(phone).slice(-10);
+  if (tail.length < 7) return null;
+  const rows = db()
+    .select({ id: customers.id, phone: customers.phone, phonesJson: customers.phonesJson })
+    .from(customers)
+    .where(eq(customers.deleted, 0))
+    .all();
+  return (
+    rows.find((row) => {
+      const nums = [row.phone];
+      try {
+        const extra = JSON.parse(row.phonesJson || "[]");
+        if (Array.isArray(extra)) {
+          for (const item of extra) nums.push(item && item.number);
+        }
+      } catch {
+        /* un teléfono mal guardado no debe tumbar la cita */
+      }
+      return nums.some((item) => digits(item).slice(-10) === tail);
+    }) || null
+  );
+}
+
+function reuseWebVehicle(customerId, data) {
+  const rows = db()
+    .select()
+    .from(vehicles)
+    .where(and(eq(vehicles.customerId, customerId), eq(vehicles.deleted, 0)))
+    .all();
+  const provided = String(data.vin || "").trim().toUpperCase();
+  if (provided) {
+    const byVin = rows.find((row) => String(row.vin || "").toUpperCase() === provided);
+    return byVin ? byVin.id : null;
+  }
+  const year = Number(data.year);
+  const make = String(data.make || "").trim().toLowerCase();
+  const model = String(data.model || "").trim().toLowerCase();
+  const temp = rows.find(
+    (row) =>
+      String(row.vin || "").toUpperCase().startsWith("TMP") &&
+      Number(row.year) === year &&
+      String(row.make || "").trim().toLowerCase() === make &&
+      String(row.model || "").trim().toLowerCase() === model
+  );
+  return temp ? temp.id : null;
+}
+
+function createWebAppointment(data) {
+  const repo = require("./repo.cjs");
+  const minutes = durationOf(data);
+  assertOpen(data.startsAt, minutes);
+  if (data.externalId) {
+    const prev = db().select().from(appointments).where(eq(appointments.externalId, String(data.externalId))).get();
+    if (prev && !isGone(prev)) return getAppointment(prev.id);
+  }
+  const year = Number(data.year);
+  const make = String(data.make || "").trim();
+  const model = String(data.model || "").trim();
+  let customer = null;
+  if (data.customerId) customer = readCustomer(data.customerId);
+  else if (data.phone) {
+    const hit = findCustomerByPhone(data.phone);
+    if (hit) customer = readCustomer(hit.id);
+  }
+  if (!customer) {
+    const firstName = String(data.firstName || "").trim();
+    const lastName = String(data.lastName || "").trim();
+    const phone = String(data.phone || "").trim();
+    if (!firstName || !lastName) throw new Error("Nombre y apellido son obligatorios");
+    if (digits(phone).length < 7) throw new Error("El teléfono es obligatorio para un cliente de la web");
+    customer = repo.createCustomer({
+      firstName,
+      lastName,
+      email: String(data.email || "").trim(),
+      phones: [{ label: "mobile", number: phone }],
+      source: "web",
+      type: "particular",
+    });
+  }
+  let vehicleId = data.vehicleId || null;
+  if (vehicleId) readVehicle(vehicleId, customer.id);
+  else {
+    const reused = reuseWebVehicle(customer.id, data);
+    if (reused) vehicleId = reused;
+    else {
+      if (!year || year < 1950 || year > 2100 || !make || !model) throw new Error("Año, marca y modelo son obligatorios");
+      const provided = String(data.vin || "").trim();
+      const vin = provided || tempVin();
+      const vehicle = repo.createVehicle({
+        vin,
+        plate: String(data.plate || "").trim(),
+        year,
+        make,
+        model,
+        customerId: customer.id,
+        status: "cliente",
+        notes: provided ? "" : "VIN temporal. Capturarlo cuando el auto llegue al taller.",
+      });
+      vehicleId = vehicle.id;
+    }
+  }
+  return createAppointment({
+    customerId: customer.id,
+    vehicleId,
+    techUserId: data.techUserId || null,
+    serviceLine: data.serviceLine || "taller",
+    startsAt: data.startsAt,
+    minutes: data.minutes,
+    complaint: data.complaint || "",
+    notes: data.notes || "",
+    source: "web",
+    externalId: data.externalId || null,
+  });
+}
+
 function createAppointment(data) {
   const window = buildWindow(data);
   if (!STATUSES.includes(window.status) || window.status === "cancelada") window.status = "agendada";
   readCustomer(window.customerId);
   readVehicle(window.vehicleId, window.customerId);
   readTech(window.techUserId);
+  assertOpen(window.startsAt, window.minutes);
   assertFree(window);
   const id = newGuid();
   const now = nowIso();
@@ -267,6 +418,8 @@ function createAppointment(data) {
       notes: window.notes,
       workOrderId: null,
       deleted: 0,
+      source: window.source,
+      externalId: window.externalId,
       createdAt: now,
       updatedAt: now,
     })
@@ -283,6 +436,8 @@ function updateAppointment(id, data) {
     readCustomer(window.customerId);
     readVehicle(window.vehicleId, window.customerId);
     readTech(window.techUserId);
+    const timeChanged = window.startsAt !== current.startsAt || window.endsAt !== current.endsAt;
+    if (timeChanged) assertOpen(window.startsAt, window.minutes);
     assertFree({ ...window, excludeId: current.id });
   }
   db()
@@ -297,6 +452,7 @@ function updateAppointment(id, data) {
       endsAt: window.endsAt,
       complaint: window.complaint,
       notes: window.notes,
+      source: window.source,
       updatedAt: nowIso(),
     })
     .where(eq(appointments.id, current.id))
@@ -345,6 +501,7 @@ module.exports = {
   listAppointments,
   getAppointment,
   createAppointment,
+  createWebAppointment,
   updateAppointment,
   cancelAppointment,
   nextAppointmentSlot,

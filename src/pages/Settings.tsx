@@ -10,9 +10,20 @@ import { useAuth } from "../lib/auth";
 import { catalogLabel, useCatalogs } from "../lib/catalogs";
 import { call, customerName, vehicleLabel } from "../lib/format";
 import { SHOP_DEFAULTS } from "../lib/canada";
-import { useI18n } from "../lib/i18n";
+import { k, useI18n } from "../lib/i18n";
 import { isSettingsSection } from "../lib/settings-nav";
 import type { ShopSettings } from "../vite-env";
+
+function realHolidayDate(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 2000 || year > 2100) return false;
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
 
 export default function Settings() {
   const { t } = useI18n();
@@ -43,6 +54,7 @@ export default function Settings() {
   const [newNumber, setNewNumber] = useState("");
   const [dbPath, setDbPath] = useState("");
   const [rateText, setRateText] = useState({ tax: "", labor: "" });
+  const [holidayYear, setHolidayYear] = useState(() => new Date().getFullYear());
 
   async function loadSettings() {
     const next = await call(window.dms.settings.get());
@@ -309,6 +321,170 @@ export default function Settings() {
 
       {section === "operaciones" ? (
         <div className="grid items-start gap-4">
+          <Card className="p-5">
+            <h2 className="text-lg font-medium">{t("settings.hours")}</h2>
+            <p className="mt-1 text-sm text-slate-400">{t("settings.hoursHint")}</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Field label={t("settings.openTime")}>
+                <input
+                  value={form.openTime || "08:00"}
+                  placeholder="06:00"
+                  onChange={(e) => setForm({ ...form, openTime: e.target.value })}
+                />
+              </Field>
+              <Field label={t("settings.closeTime")}>
+                <input
+                  value={form.closeTime || "18:00"}
+                  placeholder="21:00"
+                  onChange={(e) => setForm({ ...form, closeTime: e.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-3">
+              {[1, 2, 3, 4, 5, 6, 0].map((day) => {
+                const selected = (form.openDays || [1, 2, 3, 4, 5]).includes(day);
+                return (
+                  <label key={day} className="flex items-center gap-2 text-sm normal-case tracking-normal text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={(e) => {
+                        const current = form.openDays || [1, 2, 3, 4, 5];
+                        const openDays = e.target.checked ? [...current, day] : current.filter((item) => item !== day);
+                        setForm({ ...form, openDays });
+                      }}
+                    />
+                    {t(k(`settings.day.${day}`))}
+                  </label>
+                );
+              })}
+            </div>
+            <label className="mt-4 flex items-center gap-2 text-sm normal-case tracking-normal text-slate-200">
+              <input
+                type="checkbox"
+                checked={form.observeHolidays !== 0 && form.observeHolidays !== false}
+                onChange={(e) => setForm({ ...form, observeHolidays: e.target.checked })}
+              />
+              {t("settings.observeHolidays")}
+            </label>
+            <p className="mt-1 text-xs text-slate-500">{t("settings.observeHolidaysHint")}</p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {[new Date().getFullYear(), new Date().getFullYear() + 1].map((year) => (
+                <button
+                  key={year}
+                  type="button"
+                  onClick={() => setHolidayYear(year)}
+                  className={`rounded-full border px-3 py-1 text-sm ${
+                    holidayYear === year ? "border-gold-400 bg-gold-400/10 text-slate-100" : "border-ink-600 text-slate-400"
+                  }`}
+                >
+                  {year}
+                </button>
+              ))}
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    holidays: [
+                      ...(form.holidays || []),
+                      {
+                        id: `custom-${Date.now()}`,
+                        date: `${holidayYear}-01-01`,
+                        name: "",
+                        closed: true,
+                        custom: true,
+                        year: holidayYear,
+                      },
+                    ],
+                  })
+                }
+              >
+                {t("settings.addHoliday")}
+              </Button>
+            </div>
+            <ul className="mt-3 grid gap-2">
+              {(form.holidays || [])
+                .filter((holiday) => (holiday.year || Number(String(holiday.date).slice(0, 4))) === holidayYear)
+                .map((holiday) => (
+                  <li key={holiday.id} className="grid gap-2 rounded-lg border border-ink-700 p-3 sm:grid-cols-[9rem_1fr_auto_auto] sm:items-center">
+                    <input
+                      value={holiday.date}
+                      placeholder="2026-12-25"
+                      aria-label={t("settings.holidayDate")}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          holidays: (form.holidays || []).map((row) =>
+                            row.id === holiday.id ? { ...row, date: e.target.value } : row
+                          ),
+                        })
+                      }
+                    />
+                    <input
+                      value={holiday.name}
+                      placeholder={holiday.custom ? t("settings.holidayName") : t(k(`holiday.${holiday.baseId || holiday.id.split(":")[0]}`))}
+                      aria-label={t("settings.holidayName")}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          holidays: (form.holidays || []).map((row) => (row.id === holiday.id ? { ...row, name: e.target.value } : row)),
+                        })
+                      }
+                    />
+                    <label className="flex items-center gap-2 text-sm normal-case tracking-normal text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={holiday.closed}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            holidays: (form.holidays || []).map((row) =>
+                              row.id === holiday.id ? { ...row, closed: e.target.checked } : row
+                            ),
+                          })
+                        }
+                      />
+                      {t("settings.holidayClosed")}
+                    </label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          holidays: (form.holidays || []).filter((row) => row.id !== holiday.id),
+                        })
+                      }
+                    >
+                      {t("settings.removeHoliday")}
+                    </Button>
+                  </li>
+                ))}
+            </ul>
+            <Button
+              className="mt-4"
+              onClick={() => {
+                const holidays = form.holidays || [];
+                const invalid = holidays.find((row) => !realHolidayDate(row.date) || !row.name.trim());
+                if (invalid) {
+                  setError(t("settings.holidayInvalid"));
+                  return;
+                }
+                void saveFlag({
+                  openTime: form.openTime,
+                  closeTime: form.closeTime,
+                  openDays: form.openDays,
+                  observeHolidays: form.observeHolidays,
+                  holidaySkip: form.holidaySkip,
+                  holidays,
+                });
+              }}
+            >
+              {t("settings.saveHours")}
+            </Button>
+          </Card>
           <Card className="p-5">
             <h2 className="text-lg font-medium">{t("settings.serviceMode")}</h2>
             <p className="mt-1 text-sm text-slate-400">{t("settings.serviceModeHint")}</p>

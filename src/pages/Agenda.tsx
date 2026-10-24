@@ -134,6 +134,7 @@ export default function Agenda() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [draftStart, setDraftStart] = useState<string | null>(null);
+  const [hours, setHours] = useState({ openMin: OPEN_MIN, closeMin: CLOSE_MIN, openDays: [1, 2, 3, 4, 5], holidays: [] as { date: string; name: string; closed: boolean }[] });
   const loadSeq = useRef(0);
 
   const days = useMemo(() => weekKeys(day), [day]);
@@ -161,6 +162,29 @@ export default function Agenda() {
   }
 
   useEffect(() => {
+    let alive = true;
+    const loadHours = () => {
+      void call(window.dms.settings.get())
+        .then((settings) => {
+          if (!alive) return;
+          setHours({
+            openMin: Number(settings.openMin) || OPEN_MIN,
+            closeMin: Number(settings.closeMin) || CLOSE_MIN,
+            openDays: settings.openDays?.length ? settings.openDays : [1, 2, 3, 4, 5],
+            holidays: settings.holidays || [],
+          });
+        })
+        .catch(() => {});
+    };
+    loadHours();
+    window.addEventListener("dms-shop", loadHours);
+    return () => {
+      alive = false;
+      window.removeEventListener("dms-shop", loadHours);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!parseDay(day)) return;
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -185,8 +209,8 @@ export default function Agenda() {
     if ((event.target as HTMLElement).closest("[data-appt]")) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     const y = Math.max(0, event.clientY - bounds.top);
-    const snapped = Math.round((OPEN_MIN + (y / HOUR_PX) * 60) / 15) * 15;
-    const start = Math.max(OPEN_MIN, Math.min(CLOSE_MIN - 15, snapped));
+    const snapped = Math.round((hours.openMin + (y / HOUR_PX) * 60) / 15) * 15;
+    const start = Math.max(hours.openMin, Math.min(hours.closeMin - 15, snapped));
     startNew(`${day}T${pad(Math.floor(start / 60))}:${pad(start % 60)}`);
   }
 
@@ -231,6 +255,8 @@ export default function Agenda() {
             day: "numeric",
           }).format(date);
           const active = key === day;
+          const holiday = hours.holidays.find((row) => row.date === key && row.closed);
+          const shut = !hours.openDays.includes((parseDay(key) || new Date()).getDay());
           return (
             <button
               key={key}
@@ -238,10 +264,10 @@ export default function Agenda() {
               onClick={() => setDay(key)}
               className={`rounded-lg border px-2 py-2 text-left text-xs ${
                 active ? "border-gold-400 bg-gold-400/15 text-gold-400" : "border-ink-600 text-slate-300 hover:bg-ink-800"
-              }`}
+              } ${shut || holiday ? "opacity-60" : ""}`}
             >
               <div className="truncate">{label}</div>
-              <div className="mt-1 text-[11px] text-slate-500">{counts.get(key) || 0}</div>
+              <div className="mt-1 text-[11px] text-slate-500">{holiday ? holiday.name : shut ? t("agenda.closedDay") : counts.get(key) || 0}</div>
             </button>
           );
         })}
@@ -256,6 +282,8 @@ export default function Agenda() {
           setOpen(true);
         }}
         onSlot={bookAt}
+        openMin={hours.openMin}
+        closeMin={hours.closeMin}
       />
       {open ? (
         <AppointmentForm
@@ -281,20 +309,24 @@ function DayBoard({
   rows,
   onOpen,
   onSlot,
+  openMin,
+  closeMin,
 }: {
   rows: Appointment[];
   onOpen: (row: Appointment) => void;
   onSlot: (event: MouseEvent<HTMLDivElement>) => void;
+  openMin: number;
+  closeMin: number;
 }) {
   const { t } = useI18n();
   const inside = rows.filter((row) => {
     const start = localMinutes(row.startsAt);
-    return start >= OPEN_MIN && start < CLOSE_MIN;
+    return start >= openMin && start < closeMin;
   });
   const outside = rows.filter((row) => !inside.includes(row));
   const cancelled = inside.filter((row) => row.status === "cancelada");
   const placed = placeAppointments(inside.filter((row) => row.status !== "cancelada"));
-  const hours = Array.from({ length: (CLOSE_MIN - OPEN_MIN) / 60 }, (_, i) => OPEN_MIN + i * 60);
+  const hours = Array.from({ length: Math.max(1, Math.round((closeMin - openMin) / 60)) }, (_, i) => openMin + i * 60);
   const tone: Record<Appointment["status"], string> = {
     agendada: "border-sky-400/60 bg-sky-500/15",
     llegada: "border-amber-400/60 bg-amber-500/15",
@@ -323,28 +355,30 @@ function DayBoard({
       ) : null}
       <Card className="overflow-hidden">
         <div className="flex">
-          <div className="relative w-14 shrink-0 border-r border-ink-600" style={{ height: ((CLOSE_MIN - OPEN_MIN) / 60) * HOUR_PX }}>
+          <div className="relative w-14 shrink-0 border-r border-ink-600" style={{ height: ((closeMin - openMin) / 60) * HOUR_PX }}>
             {hours.map((minute) => (
               <div
                 key={minute}
                 className="absolute right-2 text-[11px] leading-none text-slate-500"
-                style={{ top: minute === OPEN_MIN ? 6 : ((minute - OPEN_MIN) / 60) * HOUR_PX + 4 }}
+                style={{ top: minute === openMin ? 6 : ((minute - openMin) / 60) * HOUR_PX + 4 }}
               >
-                {pad(Math.floor(minute / 60))}:00
+                {pad(Math.floor(minute / 60))}:{pad(minute % 60)}
               </div>
             ))}
-            <div className="absolute bottom-1 right-2 text-[11px] leading-none text-slate-500">18:00</div>
+            <div className="absolute bottom-1 right-2 text-[11px] leading-none text-slate-500">
+              {pad(Math.floor(closeMin / 60))}:{pad(closeMin % 60)}
+            </div>
           </div>
-          <div className="relative min-w-0 flex-1 cursor-pointer" style={{ height: ((CLOSE_MIN - OPEN_MIN) / 60) * HOUR_PX }} onClick={onSlot}>
+          <div className="relative min-w-0 flex-1 cursor-pointer" style={{ height: ((closeMin - openMin) / 60) * HOUR_PX }} onClick={onSlot}>
             {hours.map((minute) => (
-              <div key={minute} className="pointer-events-none absolute inset-x-0 border-t border-ink-600/80" style={{ top: ((minute - OPEN_MIN) / 60) * HOUR_PX }} />
+              <div key={minute} className="pointer-events-none absolute inset-x-0 border-t border-ink-600/80" style={{ top: ((minute - openMin) / 60) * HOUR_PX }} />
             ))}
             {!placed.length && !outside.length && !cancelled.length ? (
               <p className="pointer-events-none absolute left-3 top-3 text-sm text-slate-500">{t("agenda.empty")}</p>
             ) : null}
             {placed.map((item) => {
-              const top = ((Math.max(item.start, OPEN_MIN) - OPEN_MIN) / 60) * HOUR_PX;
-              const height = Math.max(28, ((Math.min(item.end, CLOSE_MIN) - Math.max(item.start, OPEN_MIN)) / 60) * HOUR_PX - 4);
+              const top = ((Math.max(item.start, openMin) - openMin) / 60) * HOUR_PX;
+              const height = Math.max(28, ((Math.min(item.end, closeMin) - Math.max(item.start, openMin)) / 60) * HOUR_PX - 4);
               const width = `calc(${100 / item.cols}% - 6px)`;
               const left = `calc(${(100 / item.cols) * item.col}% + 3px)`;
               return (
@@ -357,6 +391,7 @@ function DayBoard({
                   style={{ top, height, width, left }}
                 >
                   <div className="truncate text-xs font-medium">
+                    {item.row.source === "web" ? "Web · " : ""}
                     {clock(item.row.startsAt)} {item.row.customer?.name || "—"}
                   </div>
                   <div className="truncate text-[11px] text-slate-400">
@@ -424,6 +459,8 @@ function AppointmentForm({
   const [minutes, setMinutes] = useState(appointment?.minutes || 60);
   const [complaint, setComplaint] = useState(appointment?.complaint || "");
   const [notes, setNotes] = useState(appointment?.notes || "");
+  const [source, setSource] = useState<"mostrador" | "web">(appointment?.source === "web" ? "web" : "mostrador");
+  const [webCar, setWebCar] = useState({ year: String(new Date().getFullYear()), make: "", model: "", plate: "", vin: "" });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -463,6 +500,7 @@ function AppointmentForm({
       minutes,
       complaint,
       notes,
+      source,
       excludeId: appointment?.id,
     };
   }
@@ -486,6 +524,31 @@ function AppointmentForm({
     setBusy(true);
     setError(null);
     try {
+      if (!appointment && source === "web") {
+        await call(
+          window.dms.appointments.createWeb({
+            customerId: addingCustomer ? undefined : customerId || undefined,
+            firstName: customerDraft.firstName,
+            lastName: customerDraft.lastName,
+            phone: customerDraft.phones[0]?.number || "",
+            email: customerDraft.email,
+            year: Number(webCar.year),
+            make: webCar.make,
+            model: webCar.model,
+            plate: webCar.plate,
+            vin: webCar.vin,
+            vehicleId: vehicleId || undefined,
+            techUserId: techUserId || null,
+            serviceLine,
+            startsAt: fromDateTimeLocal(startsAt) || undefined,
+            minutes,
+            complaint,
+            notes,
+          })
+        );
+        onSaved();
+        return;
+      }
       let nextCustomerId = customerId;
       if (addingCustomer || !nextCustomerId) {
         if (!addingCustomer) throw new Error(t("picker.searchCustomer"));
@@ -607,6 +670,23 @@ function AppointmentForm({
       }
     >
       <ErrorText error={error} />
+      <div className="mb-3 grid gap-3 md:grid-cols-2">
+        <Field label={t("agenda.source")}>
+          <select
+            value={source}
+            onChange={(e) => {
+              const next = e.target.value === "web" ? "web" : "mostrador";
+              setSource(next);
+              if (next === "web" && !customerId) setAddingCustomer(true);
+              if (next === "web" && !vehicleId) setAddingVehicle(true);
+            }}
+          >
+            <option value="mostrador">{t("agenda.sourceCounter")}</option>
+            <option value="web">{t("agenda.sourceWeb")}</option>
+          </select>
+        </Field>
+        {source === "web" ? <p className="self-end text-xs text-slate-400">{t("agenda.webHint")}</p> : null}
+      </div>
       <div className="grid gap-3 md:grid-cols-2">
         {addingCustomer ? (
           <div className="grid gap-3 md:col-span-2">
@@ -736,7 +816,27 @@ function AppointmentForm({
                 {t("workshop.searchExistingVehicle")}
               </button>
             </div>
-            <VehicleDraftFields form={vehicleDraft} setForm={setVehicleDraft} t={t} />
+            {source === "web" ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label={t("vehicles.year")} required>
+                  <input value={webCar.year} onChange={(e) => setWebCar({ ...webCar, year: e.target.value })} />
+                </Field>
+                <Field label={t("vehicles.make")} required>
+                  <input value={webCar.make} onChange={(e) => setWebCar({ ...webCar, make: e.target.value })} />
+                </Field>
+                <Field label={t("vehicles.model")} required>
+                  <input value={webCar.model} onChange={(e) => setWebCar({ ...webCar, model: e.target.value })} />
+                </Field>
+                <Field label={t("vehicles.plate")}>
+                  <input value={webCar.plate} onChange={(e) => setWebCar({ ...webCar, plate: e.target.value })} />
+                </Field>
+                <Field label={t("agenda.tempVin")} hint={t("agenda.tempVinHint")}>
+                  <input value={webCar.vin} onChange={(e) => setWebCar({ ...webCar, vin: e.target.value })} placeholder={t("agenda.tempVinPlaceholder")} />
+                </Field>
+              </div>
+            ) : (
+              <VehicleDraftFields form={vehicleDraft} setForm={setVehicleDraft} t={t} />
+            )}
           </div>
         ) : (
           <Field label={t("agenda.vehicle")}>
