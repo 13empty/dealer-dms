@@ -402,7 +402,18 @@ function matchingCustomerIdsByVehicle(query) {
     .filter(Boolean);
 }
 
+let customerStatsCache = null;
+let customerStatsToken = -1;
+
 function customerStatsMap() {
+  const token = Number(getSqlite().prepare("SELECT total_changes() AS n").get()?.n || 0);
+  if (customerStatsCache && customerStatsToken === token) return customerStatsCache;
+  customerStatsCache = buildCustomerStatsMap();
+  customerStatsToken = token;
+  return customerStatsCache;
+}
+
+function buildCustomerStatsMap() {
   const stats = new Map();
   function ensure(id) {
     const key = asId(id);
@@ -1005,24 +1016,15 @@ function listVehicles(q, status, opts = {}) {
 function getVehicle(id, opts = {}) {
   const row = attachVehicle(db().select().from(vehicles).where(eq(vehicles.id, id)).get());
   if (!row || !opts.history) return row;
-  const orders = db()
-    .select()
-    .from(workOrders)
-    .where(and(eq(workOrders.vehicleId, id), alive(workOrders)))
-    .orderBy(desc(workOrders.createdAt))
-    .all()
-    .map((o) => {
-      const lines = db().select().from(workOrderLines).where(eq(workOrderLines.workOrderId, o.id)).all();
-      const payments = db().select().from(workOrderPayments).where(eq(workOrderPayments.workOrderId, o.id)).all();
-      const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
-      const totals = workOrderTotals(o, lines);
-      return {
-        ...o,
-        ...totals,
-        paid,
-        balance: roundMoney(totals.total - paid),
-      };
-    });
+  const orders = attachWorkOrders(
+    db()
+      .select()
+      .from(workOrders)
+      .where(and(eq(workOrders.vehicleId, id), alive(workOrders)))
+      .orderBy(desc(workOrders.createdAt))
+      .all(),
+    { lite: true }
+  );
   const vehicleSales = db()
     .select()
     .from(sales)
@@ -1215,19 +1217,25 @@ function attachSaleExtras(sale) {
 }
 
 function listSales(q, opts = {}) {
-  const rows = db().select().from(sales).where(alive(sales)).orderBy(desc(sales.createdAt)).all();
-  let detailed = attachSales(rows);
+  let rows = db().select().from(sales).where(alive(sales)).orderBy(desc(sales.createdAt)).all();
+  if (opts.status) rows = rows.filter((s) => s.status === String(opts.status));
   const query = String(q || "").trim().toLowerCase();
+  const limit = Number(opts.limit) || 0;
   if (query) {
-    detailed = detailed.filter((s) => {
-      const hay = `${s.id} ${s.customer?.name || ""} ${s.vehicle?.make || ""} ${s.vehicle?.model || ""} ${s.vehicle?.vin || ""} ${s.vehicle?.plate || ""} ${s.vehicle?.stockNumber || ""} ${s.status}`.toLowerCase();
+    const customerBy = new Map(fetchByIds(customers, customers.id, rows.map((s) => s.customerId)).map((row) => [row.id, row]));
+    const vehicleBy = new Map(fetchByIds(vehicles, vehicles.id, rows.map((s) => s.vehicleId)).map((row) => [row.id, row]));
+    rows = rows.filter((s) => {
+      const customer = withPhones(customerBy.get(s.customerId));
+      const vehicle = vehicleBy.get(s.vehicleId);
+      const name = customer?.name || "";
+      const hay = `${s.id} ${name} ${vehicle?.make || ""} ${vehicle?.model || ""} ${vehicle?.vin || ""} ${vehicle?.plate || ""} ${vehicle?.stockNumber || ""} ${s.status}`.toLowerCase();
       return hay.includes(query);
     });
   }
-  if (opts.status) detailed = detailed.filter((s) => s.status === String(opts.status));
+  if (!opts.unpaid && limit > 0) rows = rows.slice(0, limit);
+  let detailed = attachSales(rows);
   if (opts.unpaid) detailed = detailed.filter((s) => s.status !== "borrador" && Number(s.balance) > 0.009);
-  const limit = Number(opts.limit) || 0;
-  return limit > 0 ? detailed.slice(0, limit) : detailed;
+  return opts.unpaid && limit > 0 ? detailed.slice(0, limit) : detailed;
 }
 
 function getSale(id) {
@@ -2390,22 +2398,29 @@ function listWorkOrders(q, opts = {}) {
   let stmt = db().select().from(workOrders);
   if (filters.length === 1) stmt = stmt.where(filters[0]);
   else if (filters.length > 1) stmt = stmt.where(and(...filters));
-  let rows = stmt.orderBy(desc(workOrders.createdAt)).all();
   const query = String(q || "").trim().toLowerCase();
   const limit = Number(opts.limit) || 0;
+  const ordered = stmt.orderBy(desc(workOrders.createdAt));
   if (!query && !opts.unpaid && !opts.overdue) {
     const cap = limit > 0 ? limit : opts.open ? 0 : 200;
-    if (cap > 0 && rows.length > cap) rows = rows.slice(0, cap);
+    const rows = cap > 0 ? ordered.limit(cap).all() : ordered.all();
+    return attachWorkOrders(rows, { lite: !opts.full });
   }
-  let detailed = attachWorkOrders(rows, { lite: !opts.full });
-  if (opts.unpaid) detailed = detailed.filter((o) => o.kind !== "presupuesto" && Number(o.balance) > 0.009);
-  if (opts.overdue) detailed = detailed.filter((o) => o.overdue);
+  let rows = ordered.all();
   if (query) {
-    detailed = detailed.filter((o) => {
-      const hay = `${o.number} ${o.id || ""} ${o.customer?.name || ""} ${o.customer?.company || ""} ${o.vehicle?.make || ""} ${o.vehicle?.model || ""} ${o.vehicle?.plate || ""} ${o.vehicle?.vin || ""} ${o.status} ${o.kind} ${o.serviceLine || ""} ${o.complaint} ${o.poNumber || ""}`.toLowerCase();
+    const customerBy = new Map(fetchByIds(customers, customers.id, rows.map((o) => o.customerId)).map((row) => [row.id, row]));
+    const vehicleBy = new Map(fetchByIds(vehicles, vehicles.id, rows.map((o) => o.vehicleId)).map((row) => [row.id, row]));
+    rows = rows.filter((o) => {
+      const customer = withPhones(customerBy.get(o.customerId));
+      const vehicle = vehicleBy.get(o.vehicleId);
+      const hay = `${o.number} ${o.id || ""} ${customer?.name || ""} ${customer?.company || ""} ${vehicle?.make || ""} ${vehicle?.model || ""} ${vehicle?.plate || ""} ${vehicle?.vin || ""} ${o.status} ${o.kind || ""} ${o.serviceLine || ""} ${o.complaint || ""} ${o.poNumber || ""}`.toLowerCase();
       return hay.includes(query);
     });
   }
+  if (!opts.unpaid && !opts.overdue && limit > 0) rows = rows.slice(0, limit);
+  let detailed = attachWorkOrders(rows, { lite: !opts.full });
+  if (opts.unpaid) detailed = detailed.filter((o) => o.kind !== "presupuesto" && Number(o.balance) > 0.009);
+  if (opts.overdue) detailed = detailed.filter((o) => o.overdue);
   return limit > 0 ? detailed.slice(0, limit) : detailed;
 }
 
@@ -2413,15 +2428,16 @@ function getWorkOrder(id) {
   const attached = attachWorkOrder(db().select().from(workOrders).where(eq(workOrders.id, id)).get());
   if (!attached) return null;
   const history = attached.vehicleId
-    ? db()
-        .select()
-        .from(workOrders)
-        .where(eq(workOrders.vehicleId, attached.vehicleId))
-        .orderBy(desc(workOrders.createdAt))
-        .all()
-        .filter((o) => o.id !== attached.id && !isGone(o))
-        .slice(0, 6)
-        .map(lightWorkOrder)
+    ? attachWorkOrders(
+        db()
+          .select()
+          .from(workOrders)
+          .where(and(eq(workOrders.vehicleId, attached.vehicleId), alive(workOrders), ne(workOrders.id, attached.id)))
+          .orderBy(desc(workOrders.createdAt))
+          .limit(6)
+          .all(),
+        { lite: true }
+      )
     : [];
   return { ...attached, history };
 }
@@ -3140,29 +3156,40 @@ function dashboardKpis() {
   const inStock = db().select({ n: sql`count(*)` }).from(vehicles).where(and(eq(vehicles.status, "en_stock"), alive(vehicles))).get();
   const reserved = db().select({ n: sql`count(*)` }).from(vehicles).where(and(eq(vehicles.status, "reservado"), alive(vehicles))).get();
   const start = monthStartIso();
+  const monthStamp = sql`CASE WHEN ${sales.closedAt} IS NOT NULL AND ${sales.closedAt} != '' THEN ${sales.closedAt} ELSE ${sales.createdAt} END >= ${start}`;
   const monthSales = db()
     .select()
     .from(sales)
-    .all()
-    .filter((s) => !isGone(s) && (s.closedAt || s.createdAt) >= start && s.status !== "borrador");
+    .where(and(alive(sales), ne(sales.status, "borrador"), monthStamp))
+    .all();
   const salesPretax = monthSales.reduce((s, row) => s + Number(row.price || 0), 0);
   const salesAmount = monthSales.reduce((s, row) => {
     const tax = roundMoney(row.tax != null ? row.tax : Number(row.price || 0) * (Number(row.taxRate) || 0) / 100);
     return s + Number(row.price || 0) + tax;
   }, 0);
-  const salesCost = monthSales.reduce((s, row) => {
-    const v = getVehicle(row.vehicleId);
-    return s + Number(v?.cost || 0);
-  }, 0);
-  const allParts = db().select().from(parts).all().filter((p) => !isGone(p)).map(decoratePart);
-  const lowStock = allParts.filter((p) => p.low);
+  const costBy = new Map(
+    fetchByIds(vehicles, vehicles.id, monthSales.map((row) => row.vehicleId)).map((row) => [row.id, Number(row.cost) || 0])
+  );
+  const salesCost = monthSales.reduce((s, row) => s + (costBy.get(row.vehicleId) || 0), 0);
+  const lowStock = db()
+    .select()
+    .from(parts)
+    .where(and(alive(parts), sql`IFNULL(${parts.status}, 'activo') != 'descontinuado'`, sql`${parts.stock} <= ${parts.minStock}`))
+    .all()
+    .map(decoratePart)
+    .filter((part) => part && part.low);
   const deliveredWo = attachWorkOrders(
     db()
       .select()
       .from(workOrders)
-      .where(and(eq(workOrders.status, "entregada"), alive(workOrders)))
-      .all()
-      .filter((o) => (o.deliveredAt || o.createdAt) >= start),
+      .where(
+        and(
+          eq(workOrders.status, "entregada"),
+          alive(workOrders),
+          sql`CASE WHEN ${workOrders.deliveredAt} IS NOT NULL AND ${workOrders.deliveredAt} != '' THEN ${workOrders.deliveredAt} ELSE ${workOrders.createdAt} END >= ${start}`
+        )
+      )
+      .all(),
     { lite: true }
   );
   const woRevenue = deliveredWo.reduce((s, o) => s + Number(o.total || 0), 0);
@@ -3264,28 +3291,42 @@ function financeSummary(period) {
   const paymentsRaw = db()
     .select()
     .from(salePayments)
+    .where(sql`${salePayments.paidAt} >= ${bounds.start} AND ${salePayments.paidAt} < ${bounds.end}`)
     .orderBy(desc(salePayments.paidAt))
-    .all()
-    .filter((p) => inPeriod(p.paidAt, bounds));
+    .all();
   const saleByPay = new Map(
     attachSales(fetchByIds(sales, sales.id, paymentsRaw.map((p) => p.saleId))).map((sale) => [sale.id, sale])
   );
   const payments = paymentsRaw
     .map((p) => ({ ...p, sale: saleByPay.get(p.saleId) || null }))
     .filter((p) => p.sale && !isGone(p.sale));
-  const woPayments = db()
+  const woPaymentsRaw = db()
     .select()
     .from(workOrderPayments)
+    .where(sql`${workOrderPayments.paidAt} >= ${bounds.start} AND ${workOrderPayments.paidAt} < ${bounds.end}`)
     .orderBy(desc(workOrderPayments.paidAt))
-    .all()
-    .filter((p) => inPeriod(p.paidAt, bounds))
+    .all();
+  const orderByPay = new Map(
+    fetchByIds(workOrders, workOrders.id, woPaymentsRaw.map((p) => p.workOrderId)).map((order) => [order.id, order])
+  );
+  const woPayments = woPaymentsRaw
     .map((p) => {
-      const order = db().select().from(workOrders).where(eq(workOrders.id, p.workOrderId)).get();
+      const order = orderByPay.get(p.workOrderId);
       return { ...p, workOrder: order && !isGone(order) ? { id: order.id, number: order.number } : null };
     })
     .filter((p) => p.workOrder);
-  const expenseRows = db().select().from(expenses).orderBy(desc(expenses.spentAt)).all().filter((e) => !isGone(e) && inPeriod(e.spentAt, bounds));
-  const incomeRows = db().select().from(incomes).orderBy(desc(incomes.receivedAt)).all().filter((e) => !isGone(e) && inPeriod(e.receivedAt, bounds));
+  const expenseRows = db()
+    .select()
+    .from(expenses)
+    .where(and(alive(expenses), sql`${expenses.spentAt} >= ${bounds.start} AND ${expenses.spentAt} < ${bounds.end}`))
+    .orderBy(desc(expenses.spentAt))
+    .all();
+  const incomeRows = db()
+    .select()
+    .from(incomes)
+    .where(and(alive(incomes), sql`${incomes.receivedAt} >= ${bounds.start} AND ${incomes.receivedAt} < ${bounds.end}`))
+    .orderBy(desc(incomes.receivedAt))
+    .all();
 
   const collectedSales = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
   const collectedShop = woPayments.reduce((s, p) => s + Number(p.amount || 0), 0);

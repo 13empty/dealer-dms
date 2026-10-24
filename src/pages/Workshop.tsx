@@ -123,34 +123,45 @@ export default function Workshop() {
   const [customerForce, setCustomerForce] = useState(false);
   const pickSeq = useRef(0);
 
-  async function load() {
+  async function load(search = q) {
     try {
       setError(null);
-      const [orders, staffRows, settings] = await Promise.all([
-        call(
-          window.dms.workOrders.list(q, {
-            status: status || undefined,
-            kind: kind || undefined,
-            serviceLine: "taller",
-            unpaid: unpaid || undefined,
-            overdue: overdue || undefined,
-            open: showDelivered || showDeleted ? undefined : true,
-            deleted: showDeleted || undefined,
-          })
-        ),
-        call(window.dms.staff.list({ line: "taller" })),
-        call(window.dms.settings.get()),
-      ]);
+      const orders = await call(
+        window.dms.workOrders.list(search, {
+          status: status || undefined,
+          kind: kind || undefined,
+          serviceLine: "taller",
+          unpaid: unpaid || undefined,
+          overdue: overdue || undefined,
+          open: showDelivered || showDeleted ? undefined : true,
+          deleted: showDeleted || undefined,
+        })
+      );
       setRows(Array.isArray(orders) ? orders : []);
-      setStaff(Array.isArray(staffRows) ? staffRows : []);
-      setSimple(settings?.serviceMode === "sencillo");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   }
 
   useEffect(() => {
-    void load();
+    let alive = true;
+    void Promise.all([call(window.dms.staff.list({ line: "taller" })), call(window.dms.settings.get())])
+      .then(([staffRows, settings]) => {
+        if (!alive) return;
+        setStaff(Array.isArray(staffRows) ? staffRows : []);
+        setSimple(settings?.serviceMode === "sencillo");
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void load(q);
+    }, q.trim() ? 200 : 0);
+    return () => window.clearTimeout(timer);
   }, [q, status, kind, unpaid, overdue, showDelivered, showDeleted]);
 
   useEffect(() => {

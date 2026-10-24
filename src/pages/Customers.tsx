@@ -22,6 +22,7 @@ export default function Customers() {
   const [params, setParams] = useSearchParams();
   const [rows, setRows] = useState<Customer[]>([]);
   const [q, setQ] = useState("");
+  const [query, setQuery] = useState("");
   const [type, setType] = useState("");
   const [status, setStatus] = useState(() => (params.get("balance") === "1" ? "" : "activo"));
   const [balanceOnly, setBalanceOnly] = useState(() => params.get("balance") === "1");
@@ -38,7 +39,7 @@ export default function Customers() {
       setError(null);
       setRows(
         await call(
-          window.dms.customers.list(q, {
+          window.dms.customers.list(query, {
             type: type || undefined,
             status: status || undefined,
             balance: balanceOnly || undefined,
@@ -52,8 +53,16 @@ export default function Customers() {
   }
 
   useEffect(() => {
+    const next = q.trim();
+    const timer = window.setTimeout(() => {
+      setQuery((prev) => (prev === next ? prev : next));
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [q]);
+
+  useEffect(() => {
     void load();
-  }, [q, type, status, balanceOnly, showDeleted]);
+  }, [query, type, status, balanceOnly, showDeleted]);
 
   useEffect(() => {
     if (params.get("nuevo") !== "1") return;

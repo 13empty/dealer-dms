@@ -211,10 +211,10 @@ function listUsers(actor, q) {
   const query = String(q || "").trim().toLowerCase();
   const assigned = new Set(
     db()
-      .select()
+      .select({ techUserId: workOrders.techUserId })
       .from(workOrders)
+      .where(eq(workOrders.deleted, 0))
       .all()
-      .filter((row) => Number(row.deleted) !== 1)
       .map((row) => row.techUserId)
       .filter(Boolean)
   );
