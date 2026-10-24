@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   VehicleDraftFields,
@@ -11,7 +11,7 @@ import {
   type VehicleDraft,
 } from "../components/CustomerForm";
 import { SearchPicker } from "../components/SearchPicker";
-import { Badge, Button, Card, Empty, ErrorText, Field, Modal, Page, PageHeader } from "../components/ui";
+import { Badge, Button, Card, ErrorText, Field, Modal, Page, PageHeader } from "../components/ui";
 import { call, customerName, customerSearchHint, fromDateTimeLocal, toDateTimeLocal, vehicleLabel, workOrderPath } from "../lib/format";
 import { k, useI18n } from "../lib/i18n";
 import { useShop } from "../lib/shop-context";
@@ -64,6 +64,64 @@ function defaultStart(key: string) {
   return `${key}T09:00`;
 }
 
+const OPEN_MIN = 8 * 60;
+const CLOSE_MIN = 18 * 60;
+const HOUR_PX = 56;
+
+function localMinutes(iso: string) {
+  const local = toDateTimeLocal(iso);
+  const hh = Number(local.slice(11, 13));
+  const mm = Number(local.slice(14, 16));
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return OPEN_MIN;
+  return hh * 60 + mm;
+}
+
+function clock(iso: string) {
+  return toDateTimeLocal(iso).slice(11, 16);
+}
+
+type Placed = { row: Appointment; start: number; end: number; col: number; cols: number };
+
+function placeAppointments(rows: Appointment[]): Placed[] {
+  const items: Placed[] = rows
+    .map((row) => {
+      const start = localMinutes(row.startsAt);
+      const endRaw = localMinutes(row.endsAt);
+      return { row, start, end: endRaw > start ? endRaw : start + (row.minutes || 60), col: 0, cols: 1 };
+    })
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+  const groups: Placed[][] = [];
+  let group: Placed[] = [];
+  let groupEnd = -1;
+  for (const item of items) {
+    if (!group.length || item.start < groupEnd) {
+      group.push(item);
+      groupEnd = Math.max(groupEnd, item.end);
+      continue;
+    }
+    groups.push(group);
+    group = [item];
+    groupEnd = item.end;
+  }
+  if (group.length) groups.push(group);
+  for (const cluster of groups) {
+    const active: Placed[] = [];
+    for (const item of cluster) {
+      for (let i = active.length - 1; i >= 0; i -= 1) {
+        if (active[i].end <= item.start) active.splice(i, 1);
+      }
+      const used = new Set(active.map((entry) => entry.col));
+      let col = 0;
+      while (used.has(col)) col += 1;
+      item.col = col;
+      active.push(item);
+    }
+    const cols = Math.max(1, ...cluster.map((item) => item.col + 1));
+    for (const item of cluster) item.cols = cols;
+  }
+  return items;
+}
+
 export default function Agenda() {
   const { t, locale } = useI18n();
   const { offerWash } = useShop();
@@ -75,10 +133,13 @@ export default function Agenda() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
+  const [draftStart, setDraftStart] = useState<string | null>(null);
+  const loadSeq = useRef(0);
 
   const days = useMemo(() => weekKeys(day), [day]);
 
   async function load(nextDay = day, nextLine = line) {
+    const seq = ++loadSeq.current;
     setLoading(true);
     setError(null);
     try {
@@ -89,11 +150,13 @@ export default function Agenda() {
           serviceLine: nextLine || undefined,
         })
       );
+      if (seq !== loadSeq.current) return;
       setRows(list);
     } catch (err) {
+      if (seq !== loadSeq.current) return;
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }
 
@@ -111,9 +174,20 @@ export default function Agenda() {
     counts.set(key, (counts.get(key) || 0) + 1);
   }
 
-  function startNew() {
+  function startNew(at?: string) {
     setEditing(null);
+    setDraftStart(at || null);
     setOpen(true);
+  }
+
+  function bookAt(event: MouseEvent<HTMLDivElement>) {
+    if (!parseDay(day)) return;
+    if ((event.target as HTMLElement).closest("[data-appt]")) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const y = Math.max(0, event.clientY - bounds.top);
+    const snapped = Math.round((OPEN_MIN + (y / HOUR_PX) * 60) / 15) * 15;
+    const start = Math.max(OPEN_MIN, Math.min(CLOSE_MIN - 15, snapped));
+    startNew(`${day}T${pad(Math.floor(start / 60))}:${pad(start % 60)}`);
   }
 
   return (
@@ -126,7 +200,7 @@ export default function Agenda() {
             <Button variant="ghost" onClick={() => setDay(dayKey(new Date()))}>
               {t("agenda.today")}
             </Button>
-            <Button onClick={startNew}>{t("agenda.new")}</Button>
+            <Button onClick={() => startNew()}>{t("agenda.new")}</Button>
           </>
         }
       />
@@ -172,36 +246,22 @@ export default function Agenda() {
           );
         })}
       </div>
+      <p className="mb-2 text-xs text-slate-500">{t("agenda.clickHour")}</p>
       {loading ? <p className="text-sm text-slate-400">{t("common.loading")}</p> : null}
-      {!loading && !dayRows.length ? <Empty>{t("agenda.empty")}</Empty> : null}
-      <div className="grid gap-2">
-        {dayRows.map((row) => (
-          <button key={row.id} type="button" onClick={() => { setEditing(row); setOpen(true); }} className="text-left">
-            <Card className={`px-4 py-3 ${row.status === "cancelada" ? "opacity-60" : ""}`}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="font-medium text-white">
-                    {toDateTimeLocal(row.startsAt).slice(11, 16)} – {toDateTimeLocal(row.endsAt).slice(11, 16)}
-                  </div>
-                  <div className="text-sm text-slate-300">
-                    {row.customer?.name || "—"}
-                    {row.vehicle ? ` · ${vehicleLabel(row.vehicle)}${row.vehicle.plate ? ` · ${row.vehicle.plate}` : ""}` : ""}
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    {row.tech?.name || t("agenda.unassigned")}
-                    {row.complaint ? ` · ${row.complaint}` : ""}
-                  </div>
-                </div>
-                <Badge status={row.status} label={t(k(`agenda.status.${row.status}`))} />
-              </div>
-            </Card>
-          </button>
-        ))}
-      </div>
+      <DayBoard
+        rows={dayRows}
+        onOpen={(row) => {
+          setEditing(row);
+          setDraftStart(null);
+          setOpen(true);
+        }}
+        onSlot={bookAt}
+      />
       {open ? (
         <AppointmentForm
           appointment={editing}
           day={day}
+          initialStart={draftStart}
           offerWash={offerWash}
           onClose={() => setOpen(false)}
           onSaved={() => {
@@ -217,9 +277,120 @@ export default function Agenda() {
   );
 }
 
+function DayBoard({
+  rows,
+  onOpen,
+  onSlot,
+}: {
+  rows: Appointment[];
+  onOpen: (row: Appointment) => void;
+  onSlot: (event: MouseEvent<HTMLDivElement>) => void;
+}) {
+  const { t } = useI18n();
+  const inside = rows.filter((row) => {
+    const start = localMinutes(row.startsAt);
+    return start >= OPEN_MIN && start < CLOSE_MIN;
+  });
+  const outside = rows.filter((row) => !inside.includes(row));
+  const cancelled = inside.filter((row) => row.status === "cancelada");
+  const placed = placeAppointments(inside.filter((row) => row.status !== "cancelada"));
+  const hours = Array.from({ length: (CLOSE_MIN - OPEN_MIN) / 60 }, (_, i) => OPEN_MIN + i * 60);
+  const tone: Record<Appointment["status"], string> = {
+    agendada: "border-sky-400/60 bg-sky-500/15",
+    llegada: "border-amber-400/60 bg-amber-500/15",
+    hecha: "border-emerald-400/50 bg-emerald-500/15",
+    cancelada: "border-ink-600 bg-ink-700/40",
+  };
+  return (
+    <div>
+      {outside.length ? (
+        <div className="mb-3 grid gap-2">
+          <p className="text-xs uppercase tracking-wide text-slate-500">{t("agenda.outside")}</p>
+          {outside.map((row) => (
+            <button key={row.id} type="button" onClick={() => onOpen(row)} className="text-left">
+              <Card className="px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="font-medium">{clock(row.startsAt)} – {clock(row.endsAt)}</div>
+                    <div className="text-sm text-slate-300">{row.customer?.name || "—"}</div>
+                  </div>
+                  <Badge status={row.status} label={t(k(`agenda.status.${row.status}`))} />
+                </div>
+              </Card>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <Card className="overflow-hidden">
+        <div className="flex">
+          <div className="relative w-14 shrink-0 border-r border-ink-600" style={{ height: ((CLOSE_MIN - OPEN_MIN) / 60) * HOUR_PX }}>
+            {hours.map((minute) => (
+              <div
+                key={minute}
+                className="absolute right-2 text-[11px] leading-none text-slate-500"
+                style={{ top: minute === OPEN_MIN ? 6 : ((minute - OPEN_MIN) / 60) * HOUR_PX + 4 }}
+              >
+                {pad(Math.floor(minute / 60))}:00
+              </div>
+            ))}
+            <div className="absolute bottom-1 right-2 text-[11px] leading-none text-slate-500">18:00</div>
+          </div>
+          <div className="relative min-w-0 flex-1 cursor-pointer" style={{ height: ((CLOSE_MIN - OPEN_MIN) / 60) * HOUR_PX }} onClick={onSlot}>
+            {hours.map((minute) => (
+              <div key={minute} className="pointer-events-none absolute inset-x-0 border-t border-ink-600/80" style={{ top: ((minute - OPEN_MIN) / 60) * HOUR_PX }} />
+            ))}
+            {!placed.length && !outside.length && !cancelled.length ? (
+              <p className="pointer-events-none absolute left-3 top-3 text-sm text-slate-500">{t("agenda.empty")}</p>
+            ) : null}
+            {placed.map((item) => {
+              const top = ((Math.max(item.start, OPEN_MIN) - OPEN_MIN) / 60) * HOUR_PX;
+              const height = Math.max(28, ((Math.min(item.end, CLOSE_MIN) - Math.max(item.start, OPEN_MIN)) / 60) * HOUR_PX - 4);
+              const width = `calc(${100 / item.cols}% - 6px)`;
+              const left = `calc(${(100 / item.cols) * item.col}% + 3px)`;
+              return (
+                <button
+                  key={item.row.id}
+                  type="button"
+                  data-appt
+                  onClick={() => onOpen(item.row)}
+                  className={`absolute overflow-hidden rounded-md border px-2 py-1 text-left ${tone[item.row.status]}`}
+                  style={{ top, height, width, left }}
+                >
+                  <div className="truncate text-xs font-medium">
+                    {clock(item.row.startsAt)} {item.row.customer?.name || "—"}
+                  </div>
+                  <div className="truncate text-[11px] text-slate-400">
+                    {item.row.tech?.name || t("agenda.unassigned")}
+                    {item.row.vehicle ? ` · ${item.row.vehicle.plate || vehicleLabel(item.row.vehicle)}` : ""}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </Card>
+      {cancelled.length ? (
+        <div className="mt-3 grid gap-2">
+          {cancelled.map((row) => (
+            <button key={row.id} type="button" onClick={() => onOpen(row)} className="text-left opacity-60">
+              <Card className="flex items-center justify-between gap-2 px-4 py-2">
+                <span className="text-sm">
+                  {clock(row.startsAt)} · {row.customer?.name || "—"}
+                </span>
+                <Badge status={row.status} label={t(k(`agenda.status.${row.status}`))} />
+              </Card>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function AppointmentForm({
   appointment,
   day,
+  initialStart,
   offerWash,
   onClose,
   onSaved,
@@ -227,6 +398,7 @@ function AppointmentForm({
 }: {
   appointment: Appointment | null;
   day: string;
+  initialStart?: string | null;
   offerWash: boolean;
   onClose: () => void;
   onSaved: () => void;
@@ -248,7 +420,7 @@ function AppointmentForm({
   const [techUserId, setTechUserId] = useState(appointment?.techUserId || "");
   const [staff, setStaff] = useState<StaffUser[]>([]);
   const [serviceLine, setServiceLine] = useState<"taller" | "lavado">(appointment?.serviceLine || "taller");
-  const [startsAt, setStartsAt] = useState(appointment ? toDateTimeLocal(appointment.startsAt) : defaultStart(day));
+  const [startsAt, setStartsAt] = useState(appointment ? toDateTimeLocal(appointment.startsAt) : initialStart || defaultStart(day));
   const [minutes, setMinutes] = useState(appointment?.minutes || 60);
   const [complaint, setComplaint] = useState(appointment?.complaint || "");
   const [notes, setNotes] = useState(appointment?.notes || "");

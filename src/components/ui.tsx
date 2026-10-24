@@ -141,7 +141,7 @@ export function Modal({
           </button>
         </div>
         <div className={`min-h-0 flex-1 pr-1 ${overflowVisible ? "overflow-visible" : "overflow-auto"}`}>{children}</div>
-        {footer ? <div className="mt-4 flex shrink-0 justify-end gap-2">{footer}</div> : null}
+        {footer ? <div className="mt-4 flex shrink-0 flex-wrap justify-end gap-2">{footer}</div> : null}
       </div>
     </div>
   );

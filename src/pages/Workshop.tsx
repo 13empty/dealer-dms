@@ -559,19 +559,19 @@ export default function Workshop() {
       </Toolbar>
       <ErrorText error={error} />
       {view === "board" ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-3 pb-4">
-          <div className="min-h-[12rem] rounded-xl border border-ink-600 bg-ink-800 p-3">
-            <div className={`mb-3 border-t-2 pt-2 text-xs uppercase tracking-wide text-slate-400 ${COL_TONE.presupuesto}`}>
+        <div className="flex gap-3 overflow-x-auto pb-4">
+          <div className="flex max-h-[calc(100vh-15rem)] w-72 shrink-0 flex-col overflow-hidden rounded-xl border border-ink-600 bg-ink-800 p-3">
+            <div className={`mb-3 shrink-0 border-t-2 pt-2 text-xs uppercase tracking-wide text-slate-400 ${COL_TONE.presupuesto}`}>
               {t("workshop.estimate")} ({estimates.length})
             </div>
-            <div className="space-y-2">{estimates.length ? estimates.map(card) : <p className="text-xs text-slate-600">{t("workshop.emptyBoard")}</p>}</div>
+            <div className="min-h-0 flex-1 space-y-2 overflow-auto">{estimates.length ? estimates.map(card) : <p className="text-xs text-slate-600">{t("workshop.emptyBoard")}</p>}</div>
           </div>
           {boardStatuses.map((col) => (
-            <div key={col} className="min-h-[12rem] rounded-xl border border-ink-600 bg-ink-800 p-3">
-              <div className={`mb-3 border-t-2 pt-2 text-xs uppercase tracking-wide text-slate-400 ${COL_TONE[col]}`}>
+            <div key={col} className="flex max-h-[calc(100vh-15rem)] w-72 shrink-0 flex-col overflow-hidden rounded-xl border border-ink-600 bg-ink-800 p-3">
+              <div className={`mb-3 shrink-0 border-t-2 pt-2 text-xs uppercase tracking-wide text-slate-400 ${COL_TONE[col]}`}>
                 {t(k(`wo.${col}`))} ({(board[col] || []).length})
               </div>
-              <div className="space-y-2">
+              <div className="min-h-0 flex-1 space-y-2 overflow-auto">
                 {(board[col] || []).length ? board[col].map(card) : <p className="text-xs text-slate-600">{t("workshop.emptyBoard")}</p>}
               </div>
             </div>
