@@ -983,6 +983,80 @@ app.whenReady().then(async () => {
   if (!repo.listSales(closed.id).some((s) => s.id === closed.id)) throw new Error("No busca venta por GUID");
   if (!repo.listWorkOrders(openWo.id).some((o) => o.id === openWo.id)) throw new Error("No busca OT por GUID");
 
+  const slotStart = new Date();
+  slotStart.setHours(9, 0, 0, 0);
+  const slotIso = slotStart.toISOString();
+  const third = customers.find(
+    (c) => c.id !== plated.customerId && c.id !== ana.id && c.status !== "bloqueado" && c.status !== "inactivo"
+  );
+  if (!third) throw new Error("Falta un cliente libre para probar la agenda");
+  const booked = repo.createAppointment({
+    customerId: plated.customerId,
+    vehicleId: plated.id,
+    techUserId: admin.id,
+    serviceLine: "taller",
+    startsAt: slotIso,
+    minutes: 60,
+    complaint: "Agenda",
+  });
+  if (!booked?.id || booked.status !== "agendada") throw new Error("No se creó la cita");
+  let overlap = false;
+  try {
+    repo.createAppointment({
+      customerId: ana.id,
+      techUserId: admin.id,
+      serviceLine: "taller",
+      startsAt: slotIso,
+      minutes: 60,
+      complaint: "Choque",
+    });
+  } catch (error) {
+    overlap = /ocupado/i.test(String(error.message || error));
+  }
+  if (!overlap) throw new Error("La agenda dejó dos citas del mismo técnico");
+  const otherTech = repo.createAppointment({
+    customerId: ana.id,
+    techUserId: master.id,
+    serviceLine: "taller",
+    startsAt: slotIso,
+    minutes: 60,
+    complaint: "Otro técnico",
+  });
+  if (!otherTech?.id) throw new Error("Dos técnicos distintos no pudieron coincidir");
+  let lineTaken = false;
+  try {
+    repo.createAppointment({
+      customerId: third.id,
+      serviceLine: "taller",
+      startsAt: slotIso,
+      minutes: 60,
+      complaint: "Sin técnico",
+    });
+  } catch (error) {
+    lineTaken = /ocupado/i.test(String(error.message || error));
+  }
+  if (!lineTaken) throw new Error("Una cita sin técnico se cruzó con la línea ocupada");
+  const nextSlot = repo.nextAppointmentSlot({
+    customerId: third.id,
+    techUserId: admin.id,
+    serviceLine: "taller",
+    startsAt: slotIso,
+    minutes: 60,
+  });
+  if (!nextSlot || new Date(nextSlot.startsAt).getTime() < new Date(booked.endsAt).getTime()) {
+    throw new Error("El siguiente hueco sigue encima de la cita");
+  }
+  repo.cancelAppointment(booked.id);
+  const reopened = repo.createAppointment({
+    customerId: third.id,
+    techUserId: admin.id,
+    serviceLine: "taller",
+    startsAt: slotIso,
+    minutes: 60,
+    complaint: "Tras cancelar",
+  });
+  if (!reopened?.id) throw new Error("Cancelar la cita no liberó el horario");
+
   const kpis = repo.dashboardKpis();
   for (const key of ["salesAmount", "salesMargin", "unpaidAmount", "workshopRevenue", "workshopMargin", "totalMargin", "closedRosAmount", "closedPartsAmount"]) {
     const n = Number(kpis[key]);

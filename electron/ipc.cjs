@@ -287,6 +287,14 @@ function registerIpc(app) {
   handle("updates:install", wrap(() => updater.install(), { minRank: 80 }));
   handle("updates:backup", wrap(() => updater.backupOnly("manual"), { minRank: 50 }));
   handle("updates:setAllow", wrap((_u, on) => updater.setAllow(on), { minRank: 80 }));
+  handle("appointments:list", wrap((_u, opts) => repo.listAppointments(opts || {})));
+  handle("appointments:get", wrap((_u, id) => repo.getAppointment(id)));
+  handle("appointments:create", wrap((_u, data) => repo.createAppointment(data)));
+  handle("appointments:update", wrap((_u, { id, data }) => repo.updateAppointment(id, data)));
+  handle("appointments:cancel", wrap((_u, id) => repo.cancelAppointment(id)));
+  handle("appointments:next", wrap((_u, data) => repo.nextAppointmentSlot(data || {})));
+  handle("appointments:openOrder", wrap((_u, id) => repo.openAppointmentOrder(id)));
+
   handle("sql:tables", wrap(() => repo.listSqlTables(), { minRank: 80 }));
   handle("sql:query", wrap((_u, payload) => repo.sqlQuery(payload?.sql, payload), { minRank: 80 }));
 }

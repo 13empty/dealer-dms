@@ -472,6 +472,39 @@ export type StaffUser = {
   active: number;
 };
 
+export type AppointmentStatus = "agendada" | "llegada" | "hecha" | "cancelada";
+
+export type Appointment = {
+  id: string;
+  customerId: string;
+  vehicleId: string | null;
+  techUserId: string | null;
+  serviceLine: "taller" | "lavado";
+  status: AppointmentStatus;
+  startsAt: string;
+  endsAt: string;
+  minutes: number;
+  complaint: string;
+  notes: string;
+  workOrderId: string | null;
+  customer: { id: string; name: string; phone: string } | null;
+  vehicle: { id: string; year?: number; make?: string; model?: string; plate?: string } | null;
+  tech: { id: string; name: string } | null;
+};
+
+export type AppointmentInput = {
+  customerId?: string;
+  vehicleId?: string | null;
+  techUserId?: string | null;
+  serviceLine?: "taller" | "lavado";
+  status?: AppointmentStatus;
+  startsAt?: string;
+  minutes?: number;
+  complaint?: string;
+  notes?: string;
+  excludeId?: string;
+};
+
 export type DashboardKpis = {
   vehiclesInStock: number;
   vehiclesReserved: number;
@@ -906,6 +939,15 @@ interface DmsApi {
     backup: () => Result<{ dir: string; file: string }>;
     setAllow: (allow: boolean) => Result<UpdateStatus>;
     onEvent: (cb: (event: UpdateEvent) => void) => () => void;
+  };
+  appointments: {
+    list: (opts?: { from?: string; to?: string; serviceLine?: "taller" | "lavado"; techUserId?: string }) => Result<Appointment[]>;
+    get: (id: string) => Result<Appointment | null>;
+    create: (data: AppointmentInput) => Result<Appointment>;
+    update: (id: string, data: AppointmentInput) => Result<Appointment>;
+    cancel: (id: string) => Result<Appointment>;
+    next: (data: AppointmentInput) => Result<{ startsAt: string; endsAt: string; minutes: number } | null>;
+    openOrder: (id: string) => Result<WorkOrder>;
   };
   sql: {
     tables: () => Result<SqlTable[]>;

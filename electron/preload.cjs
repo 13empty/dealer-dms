@@ -156,6 +156,15 @@ contextBridge.exposeInMainWorld("dms", {
       return () => ipcRenderer.removeListener("updates:event", listener);
     },
   },
+  appointments: {
+    list: (opts) => invoke("appointments:list", opts || {}),
+    get: (id) => invoke("appointments:get", id),
+    create: (data) => invoke("appointments:create", data),
+    update: (id, data) => invoke("appointments:update", { id, data }),
+    cancel: (id) => invoke("appointments:cancel", id),
+    next: (data) => invoke("appointments:next", data || {}),
+    openOrder: (id) => invoke("appointments:openOrder", id),
+  },
   sql: {
     tables: () => invoke("sql:tables"),
     query: (sql, opts) => invoke("sql:query", { sql, ...(opts || {}) }),

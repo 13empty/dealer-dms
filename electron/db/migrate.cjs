@@ -516,6 +516,27 @@ function migrate(sqlite) {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_user_op_shortcuts_pair ON user_op_shortcuts(user_id, op_code_id);
     CREATE INDEX IF NOT EXISTS idx_user_op_shortcuts_user ON user_op_shortcuts(user_id);
   `);
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS appointments (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL,
+      vehicle_id TEXT,
+      tech_user_id TEXT,
+      service_line TEXT NOT NULL DEFAULT 'taller',
+      status TEXT NOT NULL DEFAULT 'agendada',
+      starts_at TEXT NOT NULL,
+      ends_at TEXT NOT NULL,
+      complaint TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      work_order_id TEXT,
+      deleted INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_appointments_start ON appointments(starts_at);
+    CREATE INDEX IF NOT EXISTS idx_appointments_tech ON appointments(tech_user_id);
+    CREATE INDEX IF NOT EXISTS idx_appointments_customer ON appointments(customer_id);
+  `);
   addPerfIndexes(sqlite);
 }
 

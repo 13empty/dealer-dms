@@ -313,6 +313,23 @@ const incomes = sqliteTable("incomes", {
   deleted: integer("deleted").notNull().default(0),
 });
 
+const appointments = sqliteTable("appointments", {
+  id: id(),
+  customerId: text("customer_id").notNull(),
+  vehicleId: text("vehicle_id"),
+  techUserId: text("tech_user_id"),
+  serviceLine: text("service_line").notNull().default("taller"),
+  status: text("status").notNull().default("agendada"),
+  startsAt: text("starts_at").notNull(),
+  endsAt: text("ends_at").notNull(),
+  complaint: text("complaint").notNull().default(""),
+  notes: text("notes").notNull().default(""),
+  workOrderId: text("work_order_id"),
+  deleted: integer("deleted").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 const inventoryMovements = sqliteTable("inventory_movements", {
   id: id(),
   partId: text("part_id").notNull(),
@@ -342,4 +359,5 @@ module.exports = {
   shopSettings,
   expenses,
   incomes,
+  appointments,
 };

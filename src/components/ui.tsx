@@ -73,6 +73,10 @@ export function Badge({ status, label }: { status: string; label: string }) {
       garantia: "bg-sky-500/15 text-sky-300",
       interno: "bg-violet-500/15 text-violet-300",
       sublet: "bg-amber-500/15 text-amber-300",
+      agendada: "bg-sky-500/15 text-sky-300",
+      llegada: "bg-amber-500/15 text-amber-300",
+      hecha: "bg-emerald-500/15 text-emerald-300",
+      cancelada: "bg-slate-500/20 text-slate-400",
     }[status] || "bg-slate-500/20 text-slate-300";
   return <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>{label}</span>;
 }

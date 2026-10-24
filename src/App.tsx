@@ -29,6 +29,7 @@ import PartDetail from "./pages/PartDetail";
 import PartPrint from "./pages/PartPrint";
 import PartInvoice from "./pages/PartInvoice";
 import Workshop from "./pages/Workshop";
+import Agenda from "./pages/Agenda";
 import OpCodes from "./pages/OpCodes";
 import Wash from "./pages/Wash";
 import WashTicket from "./pages/WashTicket";
@@ -220,6 +221,7 @@ function Shell() {
   const opsItems: MenuLink[] = [
     { id: "home", to: "/", label: t("nav.home"), icon: "home", show: true, end: true },
     { id: "workshop", to: "/taller", label: t("nav.workshop"), icon: "wrench", show: true, end: true },
+    { id: "agenda", to: "/agenda", label: t("nav.agenda"), icon: "calendar", show: true, end: true },
     { id: "wash", to: "/lavado", label: t("nav.wash"), icon: "droplet", show: offerWash, end: true },
     { id: "customers", to: "/clientes", label: t("nav.customers"), icon: "users", show: true },
     { id: "parts", to: "/partes", label: t("nav.parts"), icon: "box", show: true },
@@ -387,6 +389,7 @@ function Shell() {
             <Route path="/partes/:id" element={<PartDetail />} />
             <Route path="/recambios" element={<Navigate to="/partes" replace />} />
             <Route path="/taller" element={<Workshop />} />
+            <Route path="/agenda" element={<Agenda />} />
             <Route path="/taller/opcodes" element={<OpCodes />} />
             <Route path="/taller/:id/imprimir" element={<Invoice />} />
             <Route path="/taller/:id" element={<WorkOrderDetail />} />

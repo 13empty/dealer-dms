@@ -17,7 +17,8 @@ export type IconName =
   | "palette"
   | "download"
   | "archive"
-  | "chart";
+  | "chart"
+  | "calendar";
 
 const paths: Record<IconName, string> = {
   home: "M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z",
@@ -40,6 +41,7 @@ const paths: Record<IconName, string> = {
   download: "M12 4v11m-4-4 4 4 4-4M5 19h14",
   archive: "M4 6h16v3H4V6Zm2 3v11h12V9M9 14h6",
   chart: "M4 19V5M4 19h16M8 16v-4M12 16V8M16 16v-7",
+  calendar: "M7 4v3M17 4v3M4 9h16M6 5h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z",
 };
 
 export function Icon({ name, className = "h-4 w-4" }: { name: IconName; className?: string }) {

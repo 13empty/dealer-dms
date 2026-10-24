@@ -20,6 +20,7 @@ const {
   incomes,
 } = require("./schema.cjs");
 const { getDb, getSqlite, withReadOnly } = require("./index.cjs");
+const appointmentsApi = require("./appointments.cjs");
 const { nowIso, splitLegacyName, titleName, newGuid } = require("./migrate.cjs");
 
 function db() {
@@ -4158,4 +4159,11 @@ module.exports = {
   linkKnownOpcodeParts,
   listSqlTables,
   sqlQuery,
+  listAppointments: appointmentsApi.listAppointments,
+  getAppointment: appointmentsApi.getAppointment,
+  createAppointment: appointmentsApi.createAppointment,
+  updateAppointment: appointmentsApi.updateAppointment,
+  cancelAppointment: appointmentsApi.cancelAppointment,
+  nextAppointmentSlot: appointmentsApi.nextAppointmentSlot,
+  openAppointmentOrder: appointmentsApi.openAppointmentOrder,
 };
