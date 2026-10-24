@@ -7,13 +7,8 @@ App de escritorio para un **taller** (órdenes de servicio, clientes, partes, ca
 1. Instala `DealerDMS-Setup.exe` (Windows 10/11, 64 bits).
 2. Si SmartScreen avisa, **Más información → Ejecutar de todas formas**. El instalador no está firmado.
 3. Abre **Dealer DMS** desde el escritorio.
-4. Entra con:
-
-   - Usuario: `admin`
-   - Contraseña: `Admin123`
-
-5. Cambia esa contraseña en Inicio (o Ajustes) antes de dejar la PC en el piso.
-6. En **Ajustes** pon el nombre del taller, dirección de Calgary, GST 5 % y número GST si lo tienen.
+4. Cambia la contraseña en Inicio (o Ajustes) antes de dejar la PC en el piso.
+5. En **Ajustes** pon el nombre del taller, dirección de Calgary, GST 5 % y número GST si lo tienen.
 
 Los datos quedan en:
 
@@ -31,6 +26,10 @@ En la app instalada, **Ajustes → Actualizaciones** (solo Admin/Master, y hay q
 
 - Taller: OT, presupuestos, operaciones, partes, cobro y entrega
 - Clientes y vehículos (los del taller; inventario de venta es opcional)
+- Agenda: no cruza al mismo técnico ni al mismo cliente, y una cita sin técnico ocupa toda la línea
+- Horario del taller: días hábiles y hora de apertura y cierre (por ejemplo 06:00 a 21:00)
+- Feriados: los de Alberta salen solos; se puede agregar uno, cambiar la fecha o el nombre, quitarlo, o dejar ese día abierto
+- Citas de la página web: se ven como web. Si el cliente es nuevo, se da de alta con su auto. Si no trae VIN, queda uno temporal hasta que el auto llegue; año, marca y modelo son obligatorios
 - Inicio configurable y temas
 - Español / English / Français (CAD, GST Alberta)
 - Usuarios: Admin, Master, Gerente, Empleado
@@ -38,10 +37,9 @@ En la app instalada, **Ajustes → Actualizaciones** (solo Admin/Master, y hay q
 
 ## Generar el instalador (desarrollo)
 
-Node.js 20+ en Windows.
+Node.js 20+ en Windows. Desde la carpeta del proyecto:
 
 ```powershell
-cd C:\Users\danie\dealer-dms
 npm install --ignore-scripts
 npm run rebuild
 npm run dist
