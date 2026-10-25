@@ -79,8 +79,8 @@ export function UpdateNotice({
   const token = `${kind}:${shown}`;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-4 z-40 flex justify-center px-4 print:hidden">
-      <div className="pointer-events-auto w-full max-w-lg rounded-xl border border-gold-400/50 bg-ink-900 px-4 py-3 shadow-lg shadow-black/40">
+    <div className="print:hidden">
+      <div className="rounded-xl border border-gold-400/50 bg-ink-900 px-4 py-3 shadow-sm shadow-black/30">
         <p className="text-sm font-medium text-slate-100">
           {kind === "available"
             ? t("updates.noticeAvailable", { version: shown })

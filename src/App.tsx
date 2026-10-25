@@ -347,18 +347,6 @@ function Shell() {
           className="absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize hover:bg-gold-400/50"
         />
       </aside>
-      {appVersion ? (
-        <UpdateNotice
-          version={appVersion}
-          onShowMore={(kind) => {
-            if (kind === "available" && can.updates) {
-              navigate("/ajustes/actualizaciones");
-              return;
-            }
-            setChangelogOpen(true);
-          }}
-        />
-      ) : null}
       {changelogOpen && appVersion ? (
         <ChangelogModal
           version={appVersion}
@@ -370,6 +358,20 @@ function Shell() {
         />
       ) : null}
       <main className="min-w-0 flex-1 overflow-auto bg-ink-950">
+        {appVersion ? (
+          <div className="empty:hidden px-6 pt-5">
+            <UpdateNotice
+              version={appVersion}
+              onShowMore={(kind) => {
+                if (kind === "available" && can.updates) {
+                  navigate("/ajustes/actualizaciones");
+                  return;
+                }
+                setChangelogOpen(true);
+              }}
+            />
+          </div>
+        ) : null}
         {can.updates ? <UpdateBanner className="mx-6 mt-5 mb-0" /> : null}
         <ErrorBoundary>
           <Routes>

@@ -41,9 +41,15 @@ export default function LoginGate() {
   }
 
   return (
-    <div className="relative flex h-full items-center justify-center overflow-hidden p-6">
+    <div className="relative flex h-full flex-col overflow-hidden">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_420px_at_20%_10%,rgba(232,184,109,0.16),transparent_55%)]" />
-      <Card className="relative w-full max-w-md p-7">
+      {appVersion ? (
+        <div className="relative empty:hidden px-6 pt-5">
+          <UpdateNotice version={appVersion} onShowMore={() => setChangelogOpen(true)} />
+        </div>
+      ) : null}
+      <div className="relative flex flex-1 items-center justify-center p-6">
+      <Card className="w-full max-w-md p-7">
         <div className="mb-5 flex items-start gap-3">
           <BrandMark className="h-10 w-10 shrink-0" />
           <div className="min-w-0">
@@ -81,7 +87,7 @@ export default function LoginGate() {
           </Button>
         </form>
       </Card>
-      {appVersion ? <UpdateNotice version={appVersion} onShowMore={() => setChangelogOpen(true)} /> : null}
+      </div>
       {appVersion ? (
         <VersionButton
           className="absolute bottom-4 left-6"
