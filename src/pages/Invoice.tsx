@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { useParams } from "react-router-dom";
 import { PrintDoc, PrintShopHead } from "../components/PrintDoc";
 import { Button, ErrorText } from "../components/ui";
@@ -58,8 +59,8 @@ function customerOrderNote(order: WorkOrder, lines: WorkOrderLine[], field: "com
 
 function visibleLineNote(line: WorkOrderLine, field: "complaint" | "cause" | "correction", shopCopy: boolean) {
   const text = norm(line[field]);
-  if (!text || !shopCopy) return "";
-  if (line.type === "part" && opcodeStory(line, text)) return "";
+  if (!text) return "";
+  if (line.type === "part") return shopCopy && !opcodeStory(line, text) ? text : "";
   return text;
 }
 
@@ -137,8 +138,8 @@ export default function Invoice() {
           <Button
             variant="ghost"
             onClick={() => {
-              setShopCopy(false);
-              window.setTimeout(() => window.print(), 50);
+              flushSync(() => setShopCopy(false));
+              window.print();
             }}
           >
             {t("invoice.printCustomer")}
@@ -146,8 +147,8 @@ export default function Invoice() {
           <Button
             variant="ghost"
             onClick={() => {
-              setShopCopy(true);
-              window.setTimeout(() => window.print(), 50);
+              flushSync(() => setShopCopy(true));
+              window.print();
             }}
           >
             {t("invoice.printShop")}
